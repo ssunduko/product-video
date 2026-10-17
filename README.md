@@ -95,7 +95,7 @@ never appear in a flow file.
 
 | What | Status here | Notes |
 |------|-------------|-------|
-| Node 18+ | ✅ v24.1.0 | |
+| Node 22.12+ | ✅ v24.1.0 | required by puppeteer-core 25 |
 | Chrome | ✅ `C:\Program Files\Google\Chrome\Application\chrome.exe` | auto-detected; override with `CHROME_PATH` |
 | ffmpeg + ffprobe | ✅ 9.0 (Gyan build, via winget) | installed to `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`. Override with `FFMPEG` / `FFPROBE` |
 | `pipeline/node_modules` | run `npm install` in `pipeline/` | pulls `puppeteer-core` and `@napi-rs/canvas` |

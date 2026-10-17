@@ -588,7 +588,7 @@ function authActions(onCamera) {
     },
     async type(spec, text) {
       const el = await waitSpec(spec, 15000);
-      await el.click({ clickCount: 3 });
+      await el.click({ count: 3 });
       await page.keyboard.type(String(text), { delay: 10 });
     },
     pause: () => Promise.resolve(),
