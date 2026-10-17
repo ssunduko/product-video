@@ -1,0 +1,40 @@
+# A flow that signs in on camera, then tours the app.
+#
+# Credentials live in the target, never here:
+#   productvideos/targets/<name>.local.json, productvideos/.env, or DEMO_USERNAME / DEMO_PASSWORD.
+#
+#   node driver.mjs ../scripts/signed-in-tour.demo --target acme-staging
+#
+# The target's auth.start must be "signed-out" (the default) so the driver signs
+# out off camera first and the take opens on the login page.
+
+name: signed-in-tour
+description: sign in, land on the dashboard, look around
+
+selectors:
+  dashboard = text "Dashboard"
+  settingsLink = button "Settings"
+  settingsHeading = text "Workspace settings"
+
+beat Login page
+  hold 2s
+
+beat Sign in
+  login
+  wait @dashboard within 30s
+  hold 2s
+
+# Some identity providers re-prompt for consent on every run.
+  if button "Accept" appears within 5s
+    click button "Accept"
+    wait @dashboard within 30s
+  end
+
+beat Settings
+  click @settingsLink
+  wait @settingsHeading within 15s
+  hold 1.5s
+
+beat Sign out
+  logout
+  hold 2.5s
