@@ -1,0 +1,966 @@
+gr# Demo video pipeline
+
+Turns a plain-English product flow into a polished MP4. A CDP-driven Chrome
+walks the flow while frames and input are captured, ffmpeg assembles the frames
+into a variable-rate video, zoom regions are derived from the click telemetry,
+and a compositor renders the finished video — eased zoom and pan, a synthesized
+cursor, and a styled window frame.
+
+## Layout
+
+```
+productvideos/
+  pipeline/
+    driver.mjs      launches Chrome, runs a flow, captures frames + input telemetry
+    target.mjs      loads a target: app URL + credentials
+    script.mjs      compiles a plain-text script into a scenario module
+    assemble.mjs    frames -> raw.mp4 (+ raw.mp4.cursor.json), applies cuts / fast-forwards
+    project.mjs     click telemetry -> demo.recordly (one zoom region per click cluster)
+    compose.mjs     demo.recordly + video -> final.mp4 (zoom, cursor, window frame)
+    narrate.mjs     say-cues -> speech, muxed onto the video (optional)
+    tighten.mjs     removes dead air: frozen + silent stretches, and the tail
+    cards.mjs       branded intro/outro cards, joined onto the video (optional)
+    author.mjs      observed trace -> .demo + selector sidecar; sizes narration
+                    to measured waits (see "Generating the whole script from
+                    plain English")
+    brand.mjs       StyleGuide.txt -> colours and fonts, shared by every stage
+    tts.mjs         shared text-to-speech provider + clip cache
+  targets/
+    signed-in.json          template for an app that needs sign-in
+    local-app.json          the Express app in this repo
+    <name>.local.json       credentials — gitignored
+  scenarios/                what you AUTHOR: the flow, however you express it
+    mcp.flow                plain English, one step per line — the human input
+    mcp.trace.json          the observed walk: selectors + measured wait times
+    <name>.mjs              hand-written scenarios, when a flow needs real
+                            control flow — see "b. A scenario" below
+  scripts/                  what gets EXECUTED: the DSL, generated or hand-written
+    mcp.demo                generated from scenarios/mcp.trace.json
+    mcp.selectors.json      its sidecar — must sit beside the .demo (see below)
+    grammar-tour.demo       plain-text flow, every command documented
+    signed-in-tour.demo     a flow that signs in on camera
+  brand/
+    StyleGuide.txt          brand colours and fonts, read by brand.mjs
+                            (compose.mjs paints the frame with them too)
+    salesmsg-logo-white.png the logo on the title cards
+    *.ttf / *.otf           optional: brand font files, registered at render time
+  .env              optional, gitignored: KEY=VALUE for env: references in targets
+  out/              generated: frames/, frames.json, actions.json, *.mp4, demo.recordly
+  profile/          generated: the Chrome user-data-dir the takes run under
+```
+
+`out/`, `profile/`, `.env` and `targets/*.local.json` are gitignored. Note what
+that means for `scenarios/*.trace.json`: it is the one artifact here that cannot
+be rebuilt from anything else, which is why it lives in `scenarios/` and not in
+`out/`.
+
+**Architecture diagrams** are in [`../docs/`](../docs/C4.md) — C4 at three
+levels, with a component diagram for every stage including `author.mjs`.
+`docs/C4.md` reads anywhere; the same model is also published as C4-PlantUML
+(`docs/c4-*.puml`) and a StarUML project (`docs/ProductVideo-C4.mdj`). All three
+are generated from `docs/c4-model.mjs` — change the model there and re-run
+`node docs/c4-model.mjs`; do not edit an output.
+
+Three pieces, separable on purpose:
+
+| Piece | Answers | Lives in |
+|-------|---------|----------|
+| **target** | *which* deployment, and how to sign in | `targets/<name>.json` |
+| **flow** | *what* to do on screen | `scenarios/<name>.flow` (plain English) or `scripts/<name>.demo` |
+| **pipeline** | how it becomes a video | `pipeline/*.mjs` |
+
+**`scenarios/` is what you author; `scripts/` is what runs.** A plain-English
+`.flow` and the `.trace.json` observed from walking it are inputs — hand-written,
+diffable, the things worth arguing about in review. The `.demo` is generated from
+the trace and can be thrown away and rebuilt. Keeping them apart stops the
+question "is this file the source or the output?" from ever coming up.
+
+The one exception is `<name>.selectors.json`, which stays in `scripts/` beside
+its `.demo`: `script.mjs` finds it by swapping the extension on the script path,
+so moving it breaks compilation. It is generated alongside the `.demo` from the
+same trace, so it belongs on the generated side anyway.
+
+Keeping the target separate means the same flow records against localhost,
+staging or a customer sandbox by swapping `--target`, and means credentials
+never appear in a flow file.
+
+## Prerequisites
+
+| What | Status here | Notes |
+|------|-------------|-------|
+| Node 18+ | ✅ v24.1.0 | |
+| Chrome | ✅ `C:\Program Files\Google\Chrome\Application\chrome.exe` | auto-detected; override with `CHROME_PATH` |
+| ffmpeg + ffprobe | ✅ 9.0 (Gyan build, via winget) | installed to `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`. Override with `FFMPEG` / `FFPROBE` |
+| `pipeline/node_modules` | run `npm install` in `/pipeline` | pulls `puppeteer-core` and `@napi-rs/canvas` |
+
+ffmpeg was installed by winget, which edits PATH — a shell opened **before** the
+install will not see it until restarted.
+
+The app you are recording must already be running. The pipeline never starts
+your dev server; if it is down, start it yourself first.
+
+## Usage
+
+Every stage is a script in `pipeline/`, run from that directory. Each one also
+has an npm alias, which is the quickest way to see what stages exist:
+
+```powershell
+cd productvideos\pipeline
+npm run                    # lists all eight
+```
+
+| Step | Stage | npm alias | Reads | Writes |
+|------|-------|-----------|-------|--------|
+| 2 | `script.mjs` | `npm run compile` | `scripts/*.demo` | `scenarios/*.mjs` |
+| 3 | `driver.mjs` | `npm run record` | a flow + a target | `out/frames/`, `actions.json`, `frames.json` |
+| 4 | `assemble.mjs` | `npm run assemble` | `frames.json`, `actions.json` | `out/raw.mp4` (or `cut.mp4`) + telemetry |
+| 6 | `project.mjs` | `npm run project` | `<take>.cursor.json` | `out/demo.recordly` |
+| 7 | `compose.mjs` | `npm run compose` | the take + the project | `out/final.mp4` |
+| 8 | `narrate.mjs` | `npm run narrate` | `final.mp4` + cues | `out/final-narrated.mp4` |
+| 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
+| 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand/` | `out/*-carded.mp4` |
+
+> **Passing a flag through npm on Windows: quote the separator.** In PowerShell,
+> `npm run tighten -- --dry-run` **silently runs the real thing** — PowerShell
+> consumes the bare `--` as its own end-of-parameters token, so npm never
+> forwards it and the stage never sees `--dry-run`. There is no error; you just
+> get a render you did not ask for. Write `npm run tighten '--' --dry-run`, or
+> skip the alias and call the stage directly:
+>
+> ```powershell
+> node tighten.mjs --dry-run          # always works, every shell
+> ```
+>
+> The steps below use the `node` form for that reason. The npm aliases are for
+> the no-argument case and for discovery.
+
+### 1. Point at an app (optional: with credentials)
+
+A **target** says where to record and how to sign in. It is optional — a
+scenario can carry its own `APP` — but it is how you record the same flow
+against another deployment, and the only place credentials belong.
+
+Copy `targets/signed-in.json` to `targets/<name>.json` and edit it:
+
+```json
+{
+  "app": "https://app.example.com",
+  "startUrl": "/",
+  "viewport": { "width": 1440, "height": 810 },
+  "pageUrlMatch": ["auth.example.com"],
+
+  "auth": {
+    "mode": "form",
+    "start": "signed-out",
+    "username": "env:DEMO_USERNAME",
+    "password": "env:DEMO_PASSWORD",
+    "selectors": {
+      "signInLink": "btn:Sign in",
+      "username": "input[name=\"email\"]",
+      "password": "input[type=\"password\"]",
+      "submit": "btn:Log in",
+      "signedIn": "::-p-text(Dashboard)",
+      "userMenu": "btn:Jane Doe|JD",
+      "logoutItem": "btn:Log out",
+      "loginHeading": "::-p-text(Welcome back)"
+    }
+  },
+
+  "secrets": { "workspaceId": "env:DEMO_WORKSPACE_ID" }
+}
+```
+
+Everything except `app` is optional. Selector strings use the same grammar as a
+scenario (`btn:Exact Text` or a puppeteer selector). Keys starting with `//` are
+treated as comments.
+
+`auth.start` decides what the take opens on:
+
+| `start` | Before rolling camera | Use when |
+|---------|----------------------|----------|
+| `signed-out` (default) | signs out off camera if needed | the demo shows signing in — add a `login` step |
+| `signed-in` | signs in off camera if needed | the demo starts inside the app |
+
+Nothing before the take is recorded, so the off-camera sign-in or sign-out never
+appears in the video.
+
+**Credentials never go in the committed file.** Any string may be written as
+`env:VAR_NAME` and is read from the environment. Put the values in whichever of
+these suits you — all three are gitignored or ephemeral:
+
+```powershell
+# a) targets/<name>.local.json — deep-merged over targets/<name>.json
+#    { "auth": { "password": "hunter2" } }
+
+# b) productvideos/.env — KEY=VALUE, read automatically
+#    DEMO_PASSWORD=hunter2
+
+# c) the shell, for a one-off
+$env:DEMO_USERNAME='demo@acme.com'; $env:DEMO_PASSWORD='hunter2'
+```
+
+`DEMO_APP`, `DEMO_USERNAME` and `DEMO_PASSWORD` also work with **no target file
+at all** — enough to point an existing flow somewhere else for one run:
+
+```powershell
+$env:DEMO_APP='https://staging.example.com'; node driver.mjs ..\scenarios\tour.mjs
+```
+
+Precedence, later wins: scenario exports → `targets/<name>.json` →
+`targets/<name>.local.json` → `/.env` → `DEMO_*` variables.
+
+The driver prints the resolved target when it starts. Usernames are printed (they
+appear on camera during an on-camera sign-in anyway); passwords never are.
+
+### 2. Describe the flow
+
+Two ways, same result — a script compiles into a scenario, so you can start with
+a script and drop to a scenario when you need real control flow.
+
+#### a. A script (`scripts/<name>.demo`)
+
+Plain text, one command per line. `scripts/grammar-tour.demo` documents every
+command; `scripts/feature.demo` is a real flow.
+
+```
+target: acme-staging
+
+selectors:
+  dashboard = text "Dashboard"
+  settings  = button "Settings"
+
+beat Sign in
+  login
+  wait @dashboard within 30s
+  hold 2s
+
+beat Settings
+  click @settings
+  hover text "Members"
+  hold 1.5s
+
+beat Done
+  logout
+  hold 2s
+```
+
+Header directives, all optional, all before the first beat: `name`,
+`description`, `target`, `app`, `start` (start path), `viewport` (`1440x810`),
+`match` (comma-separated extra hosts), and `selectors:` opening a block of
+`name = <selector>` definitions.
+
+Selectors — `button "Text"` (exact text / aria-label / inner `img[alt]`; use
+`button "A" or "B"` for alternatives), `text "Text"`, `css <raw selector>`,
+`ask "description"` (below), or `@name` for one defined above. A bare `"Text"`
+defaults to a button for `click` and to text everywhere else.
+
+#### Generating the whole script from plain English
+
+You do not have to write a `.demo` at all. Describe the flow in ordinary
+language and let the **author-demo** skill walk the real app through the Claude
+in Chrome extension, recording what it finds:
+
+```
+scenarios/<name>.flow          plain English, one step per line — you write this
+        │
+        ▼   Claude drives your browser, timing every wait
+scenarios/<name>.trace.json    selectors + MEASURED wait times
+        │
+        ▼   node author.mjs ../scenarios/<name>.trace.json
+scripts/<name>.demo  +  scripts/<name>.selectors.json     generated
+```
+
+The trace is the interesting artifact: it records, per step, the element, the
+selector it answers to, and **how long the wait actually took**. `author.mjs`
+turns that into the DSL — sizing the narration to each measured wait, deriving
+the holds from real speech lengths, reporting any line that would not fit, and
+emitting a ready-to-paste `SPEEDS_MS` range for whatever narration cannot cover.
+
+That last part is the reason this is code and not a prompt. A hand-written
+script guesses how long the app takes, and guessing low is not a small error —
+narration stops, the screen keeps moving, and the video is silent for the
+difference. Both scripts here were written with `hold 7s` against generation
+that measured 36.6s in one run and 43s in the next, and both shipped
+double-digit silences that had to be found and fixed afterwards.
+
+Supply *more* narration lines than you think will fit; the generator places what
+the measurement allows and tells you what it dropped.
+
+#### Natural-language selectors
+
+Every selector kind above is a hardcoded handle onto the DOM, and that is the
+most brittle thing in a script. `btn:` needs the text exact. An avatar button
+flips between initials and an alt-named image. A redesign invalidates the lot.
+And when the app writes its own copy — a model's answer, say — the wording is
+different on every run, which is why the anchors in `feature.demo` had to be
+rewritten to wait on *completion* rather than on text.
+
+`ask` states the intent instead:
+
+```
+selectors:
+  composer = ask "the message box at the bottom of the chat"
+  results  = ask "the results table in the main answer area"
+```
+
+The concrete selector is found by driving the real app through the **Claude in
+Chrome extension** — your browser, your session, no SSO ritual — and written to
+a sidecar next to the script:
+
+```powershell
+node script.mjs ..\scripts\<name>.demo --intents   # what needs resolving
+# then ask Claude: "resolve the selectors for <name>.demo"
+```
+
+```jsonc
+// scripts/<name>.selectors.json
+{
+  "resolvedAgainst": "https://claude.ai/new",
+  "selectors": {
+    "the message box at the bottom of the chat": {
+      "spec": "div[data-testid=\"chat-input\"]",
+      "evidence": "contenteditable tiptap div, aria-label 'Write a message', 1 match, visible"
+    }
+  }
+}
+```
+
+Keyed by the intent text, so renaming a selector or reordering the block does
+not orphan a resolution. After a redesign, delete the stale key and re-resolve —
+the `.demo` itself does not change.
+
+**Resolution happens before the take, never during it**, and that is not a
+preference. `driver.mjs` stamps narration cues at wall-clock time while the
+screencast runs, so the take's timing *is* the video timeline: a model round
+trip mid-run would land in the finished video as dead air, and no two takes
+would cut the same way. Resolved up front, the take is deterministic and
+full-rate, and the sidecar is a reviewable artifact rather than a decision made
+live and forgotten.
+
+An unresolved intent is a **compile error**, before Chrome is launched:
+
+```
+2 selector(s) still state an intent and have no resolution:
+  composer = ask "the message box at the bottom of the chat"
+```
+
+That is deliberate. Guessing a selector from a description does not fail here —
+it fails mid-take, after the browser is up and the recording has started, which
+is the expensive place to fail.
+
+Commands:
+
+| Command | Does |
+|---------|------|
+| `beat <label>` | a comment marking the next beat |
+| `wait <sel> [within 15s]` | wait for something to appear |
+| `wait <sel> gone [within 60s]` | wait for something to **disappear** — a spinner, a Stop button, a skeleton |
+| `say "..."` | a narration line, timestamped here and voiced by `narrate.mjs`. Does not pause the flow |
+
+Header directives for the title cards (read by `cards.mjs`, not the driver):
+
+| Directive | Meaning |
+|-----------|---------|
+| `intro: Headline \| Subhead` | opening card; both lines appear and are read aloud |
+| `outro: Headline \| Subhead` | closing card |
+| `click <sel>` | glide the cursor over and click |
+| `hover <sel>` | glide the cursor over |
+| `hold 2s` / `hold 800ms` | pause on camera |
+| `type "text" into <sel>` | click the field and type at human pace |
+| `type secret <name> into <sel>` | same, with a value from the target's `secrets` |
+| `press Enter` | a key press |
+| `scroll down [px]` / `scroll up [px]` | scroll (default 240) |
+| `open /path` | navigate without clicking |
+| `login` / `logout` | sign in or out **on camera**, using the target's credentials |
+| `if <sel> appears [within 20s]` … `end` | optional beat — consent screens, first-run tips |
+
+Comments start with `#` at the start of a line or surrounded by spaces, so
+`css #search` keeps its id.
+
+Compile it to look at, or hand-edit, the generated scenario:
+
+```powershell
+cd productvideos\pipeline
+node script.mjs ..\scripts\<name>.demo          # -> scenarios/<name>.mjs
+node script.mjs ..\scripts\<name>.demo --print  # to stdout
+```
+
+It refuses to overwrite a scenario it did not generate (pass `--force`).
+
+#### b. A scenario (`scenarios/<name>.mjs`)
+
+Reach for this only when the flow needs real control flow — loops, branching
+beyond `if <sel> appears`, anything computed. A `.demo` covers the rest and
+compiles to a file exactly like this one.
+
+A scenario exports `SEL` and `run(d)`, plus optional `APP`, `VIEWPORT`,
+`PAGE_URL_MATCH`, `START_URL` and `TARGET` (a default target name). `APP` is
+required only when no target supplies one. The whole skeleton:
+
+```js
+// productvideos/scenarios/<name>.mjs
+// Record with: cd productvideos/pipeline && node driver.mjs ../scenarios/<name>.mjs
+
+export const VIEWPORT = { width: 1440, height: 810 };
+export const APP = 'http://localhost:3000';   // only if no target supplies one
+
+// export const TARGET = 'local-app';         // default target for this flow
+// export const START_URL = '/pricing';       // where the take opens
+// export const PAGE_URL_MATCH = ['accounts.google.com'];  // only if the flow leaves the origin
+
+export const SEL = {
+  // The anchor the driver waits on before rolling camera. Prefer real content
+  // text over a heading that renders before the data does.
+  ready: '::-p-text(Express)',
+
+  // Supply userMenu + logoutItem + loginHeading — here or via the target's
+  // auth.selectors — and the driver puts the app in the state `auth.start`
+  // asks for, off camera, before the take.
+  // userMenu: 'btn:Jane Doe|JD',
+  // logoutItem: 'btn:Log out',
+  // loginHeading: '::-p-text(Welcome back.)',
+};
+
+export async function run(d) {
+  await d.waitSel(SEL.ready, 15000);
+  await d.hold(2500);
+
+  // ...beats. d.say('...') records a narration cue at this moment.
+
+  await d.hold(2000);   // end on a hold so the last zoom can settle
+}
+```
+
+Recon the flow in a real browser first and note, for every click target, its
+**exact** trimmed text or aria-label, and for every page a unique anchor text to
+wait on. Verify each beat exists before writing it — a `btn:` spec that is one
+character off just times out.
+
+Selector specs:
+
+- `btn:Exact Text|Alt` — matches `button` / `a` / `[role=menuitem]` /
+  `[role=button]` by exact trimmed `textContent`, `aria-label`, or inner
+  `img[alt]`. `|` separates alternatives.
+- anything else — a puppeteer selector. `::-p-text(unique substring)` is the
+  usual choice for hover and wait anchors.
+
+Driver primitives:
+
+| Primitive | Does |
+|-----------|------|
+| `d.hold(ms)` | pause on camera |
+| `d.waitSel(spec, timeout)` | wait for a spec, throws on timeout |
+| `d.waitGone(spec, timeout)` | wait for a spec to disappear, throws on timeout |
+| `d.say(text)` | record a narration cue at this moment (non-blocking) |
+| `d.appears(spec, timeout)` | same, but returns `true`/`false` |
+| `d.hoverSel(spec)` | glide the cursor to a spec |
+| `d.clickSel(spec)` | glide, pause, click |
+| `d.type(spec, text)` | click a field and type at human pace |
+| `d.key(name)` | press a key |
+| `d.wheel(px)` | scroll (positive = down) |
+| `d.open(path)` | navigate, relative to the app |
+| `d.race({key: spec}, timeout)` | first spec to appear wins; returns its key |
+| `d.login()` / `d.logout()` | sign in/out on camera with the target's credentials |
+| `d.creds()` | `{username, password}` from the target, throws if unset |
+| `d.secret(name)` | a value from the target's `secrets` |
+
+Pace beats at 1–2.5s holds with hovers on rows. **Every click becomes a zoom
+region downstream**, so a click you do not want zoomed is better expressed as a
+hover.
+
+Flows run against live data: never click anything that creates, modifies or
+deletes unless the flow explicitly asks for it.
+
+If `SEL` contains `userMenu` + `logoutItem` + `loginHeading` — directly, or via
+a target's `auth.selectors` — the driver puts the app in the state
+`auth.start` asks for before the take. Without them it waits on `SEL.ready`.
+
+### 3. Record
+
+```powershell
+cd productvideos\pipeline
+node driver.mjs ..\scripts\<name>.demo --target <name>     # script
+node driver.mjs ..\scenarios\<name>.mjs --target <name>    # scenario
+```
+
+`--target` is optional: the driver also honours `DEMO_TARGET`, a `target:`
+header in the script, or a `TARGET` export in the scenario. A script is compiled
+to `out/generated/<name>.mjs` on the way in, and the path is printed.
+
+A Chrome window opens and runs the flow (roughly flow length + 15s). Writes
+`out/frames/`, `out/frames.json`, `out/actions.json`.
+
+### 4. Assemble and inspect
+
+```powershell
+node assemble.mjs
+```
+
+Writes `out/raw.mp4` and `out/raw.mp4.cursor.json`, and prints the largest
+inter-frame gaps — the video freezes there. Spot-check beats:
+
+```powershell
+ffmpeg -ss 12.5 -i ..\out\raw.mp4 -frames:v 1 ..\out\f.png
+```
+
+### 5. Shorten the long waits by hand (optional)
+
+For a stretch you want dealt with *before* zoom regions are derived from it.
+Routine dead air does not belong here: step 9 finds and removes it automatically
+once the narration is on the timeline, and knows the difference between an empty
+pause and a shot the voiceover is playing over. This step is for the two things
+step 9 cannot judge.
+
+**Prefer `SPEEDS_MS`.** It keeps every frame and plays the span faster:
+
+```powershell
+$env:SPEEDS_MS='[[30000,138000,15]]'; $env:OUT_NAME='cut.mp4'; node assemble.mjs
+```
+
+**`CUTS_MS` drops the frames outright.** Right for something with no content —
+a redirect spinner, a misfire in the take:
+
+```powershell
+$env:CUTS_MS='[[4200,7300]]'; $env:OUT_NAME='cut.mp4'; node assemble.mjs
+```
+
+The difference matters more than it looks, and the case that proves it is a
+model writing an answer. That wait is long — two minutes here — but it is not
+empty: the answer arriving *is* the payoff of the demo. Cut across it and the
+viewer lands on a finished table having never seen it appear, which is a worse
+video than the one with the wait still in. Fast-forwarded at 15x the same span
+costs eight seconds and reads as a deliberate fast-forward.
+
+Both go through one `warp()` that moves frames, cursor telemetry and narration
+cues together. Always shorten in the assembler, never with editor trims —
+otherwise the three drift apart.
+
+**Finding the ranges.** The gap report only sees a *frozen* screen, so it will
+not find a generation wait: streaming text is motion. Read the cue spacing in
+`out/*.narration.json` instead — a 100s hole between two cues is a wait, and its
+bounds are roughly `previous cue end` to `next cue start`.
+
+### 6. Generate zoom regions
+
+```powershell
+node project.mjs
+```
+
+Writes `out/demo.recordly` — one zoom region per click cluster (clicks under
+2.5s apart merge), derived from the cut telemetry. Review the printed regions
+and hand-edit the JSON if framing needs it, e.g. a region crossing a cut
+boundary or focus too tight on a corner. Explicit regions beat any auto-zoom.
+
+Each region carries a `focusTrack`: every click position in the cluster, not
+just the last. A merged region can span clicks far apart on screen, and the
+compositor pans between them instead of framing only the final one.
+
+### 7. Compose
+
+```powershell
+node compose.mjs
+```
+
+Defaults to `out/demo.recordly` and writes `out/final.mp4`. Override with
+`node compose.mjs <project.recordly> -o <output.mp4>`.
+
+This is the step that replaces Recordly. It renders every frame itself:
+
+- **Zoom and pan** — each region eases in over ~500ms, holds, eases out. Focus
+  is clamped so zooming never reveals the background behind the video. Within a
+  held zoom the view pans between click positions, timed off the telemetry so it
+  travels *with* the cursor rather than jumping after it.
+- **Cursor** — synthesized from `*.cursor.json`, so the capture needs no real
+  cursor. Arrow and pointing-hand variants, with a click ripple and a slight
+  press. Drawn at constant size in output space, clipped to the window.
+- **Window frame** — the video inset with padding, rounded corners, a drop
+  shadow, over a gradient background.
+
+Frames stream ffmpeg → canvas → ffmpeg; nothing intermediate hits disk. Expect
+roughly **4-5x the video's length** at 1080p60 — measured here at 77s for a 20s
+clip, 387s for 95s, and 1490s for 300s (~14 composited frames/sec). Budget for
+it: anything over about two minutes of video will outlast a 10-minute shell
+timeout, so run this step in the background.
+
+Tune the look via an optional `editor.frame` block in the project file — all
+fields optional:
+
+```json
+"frame": {
+  "padding": 64,
+  "radius": 16,
+  "shadow": true,
+  "background": ["#232a3b", "#0d1017"],
+  "rampMs": 500,
+  "panMs": 700,
+  "cursor": { "show": true, "scale": 1 }
+}
+```
+
+Env overrides: `NO_FRAME=1` (bare video, no padding/rounding/shadow),
+`PADDING=<px>`, `X264_PRESET`, `X264_CRF`.
+
+Zoom `depth` maps 1–5 to 1.25×, 1.5×, 1.75×, 2×, 2.5×; `project.mjs` emits
+depth 3.
+
+### 8. Narrate (optional)
+
+`say "..."` lines in a script become timestamped narration cues. Render and mux
+them onto the composed video:
+
+```powershell
+node narrate.mjs                 # out/final.mp4 -> out/final-narrated.mp4
+node narrate.mjs --dry-run       # print cue times only, no audio, no API calls
+```
+
+Anthropic has no text-to-speech API, so this calls a third party. The provider
+is chosen by `DEMO_TTS`, else by whichever key is set — `ELEVENLABS_API_KEY`
+(best voice quality) or `OPENAI_API_KEY` (cheaper, close). Keys resolve through
+the same path as every other credential: your shell or `/.env`, never a
+committed file. Pick a voice with `DEMO_TTS_VOICE`.
+
+Why cues are timestamped at record time rather than authored on a timeline:
+beat length varies per run — an assistant thinking, a slow query — so a
+narration timeline written in advance drifts. `assemble.mjs` puts cues through
+the same cut/shift maths as the cursor telemetry, so `CUTS_MS` moves the voice
+with the picture instead of desyncing it.
+
+**Where to put a `say`.** `wait <sel> gone` blocks for however long the app
+takes, so ordering alone cannot place a line *during* that wait. The pattern
+that holds up:
+
+```
+beat 15 - Totals land
+  say "Credit usage for the month, split by category."              # process line
+  hold 6s
+  say "A third question, a third endpoint - credit usage analytics."  # covers the wait
+  hold 6s
+  say "Messages, textbot, calls - all itemised."                    # still covering it
+  wait @generating gone within 240s
+  say "Ninety-eight credits for August, against 650 in July."       # result line
+```
+
+A *process* line goes right after the action, describing what is happening. A
+*result* line goes **after** `wait ... gone`, so it fires exactly when the
+answer lands — self-syncing to however long the work actually took, instead of
+a fixed offset that breaks on the next run. Between them, budget roughly one
+more line per 6s of expected wait, spaced with `hold`.
+
+**Leave nothing over a `wait`, a `hold` or a `type`.** This is the placement
+mistake that survives every later stage. A beat whose last `say` sits *before*
+its `wait ... gone` leaves the tail of that wait, the `hold` after it, and the
+typing of the next question with no voice on them at all. Two such beats in this
+demo produced 11.6s and 11.1s of digital silence — the longest stretches in the
+video by a factor of two, and the reason the pattern above now has a line in the
+middle rather than a bare `hold 1500ms`.
+
+Do not expect step 9 to rescue it. `tighten.mjs` removes runs that are frozen
+**and** silent, and a screen streaming an answer, or a question being typed, is
+not frozen. Silent-but-moving is invisible to it by design, so the only place
+that dead air can be fixed is here, in the cue placement.
+
+The other half of the same guard: a `hold` before `wait ... gone` is what stops
+the wait firing before the element appears, so a longer hold with a line on it
+does that job as well as a bare short one. Put two lines too close together and
+`narrate.mjs` warns that they overlap; separate them with a `hold` longer than
+the first clip.
+
+**Levels.** Three things sit between the provider's output and the mix, because
+speech that is merely normalised still does not sound even:
+
+1. **The breath is trimmed off the front of each clip.** TTS does not start on
+   the word — it starts on 100-160ms at -50 to -85 dB. Cued at its file start,
+   the line begins with something barely audible and only then speaks, which is
+   heard as the narration fading up, and it survives any amount of loudness
+   normalisation because normalising a breath just gives you a louder breath.
+   The head is measured in 20ms RMS windows (not `silenceremove`, which decides
+   on peaks and keeps it) and the line is cued on its first word. Derived from
+   the cached mp3, never in place of it, so changing `TTS_ONSET_DB` re-derives
+   from disk and re-bills nothing.
+2. **Every clip is levelled before the mix.** Providers do not return lines at a
+   consistent level: measured here, ElevenLabs spans 4.1 LU across one script
+   (-18.6 to -22.7 LUFS), worst on the short lines. Each clip is measured and
+   put on `NARRATION_PREMIX_LUFS` (default -20) with a *static* gain. Static
+   rather than a second `loudnorm`, because a per-clip dynamic pass rides the
+   syllables inside a line and is audible on one that opens loud and tails off.
+   `narrate.mjs` prints the spread it found and every clip it moved by 1.5 dB or
+   more.
+3. **The track is then set to -16 LUFS** by `NARRATION_FILTER` — `speechnorm`
+   (which lifts soft line openings level with the body of the take) followed by
+   `loudnorm` with true peak under -1.5 dB.
+
+The order is the point, and 2 is not redundant with 3. A dynamic pass over the
+finished mix sets the level of the *track*; it cannot set the level of a *line*.
+A quiet line inside a well-levelled track stays quiet relative to its
+neighbours, which is heard as the narration dropping away for a sentence and
+coming back — the same symptom as the dead air above, from an unrelated cause.
+Levelling has to happen per clip, before the mix.
+
+Both filters leave digital silence alone — there is no noise floor between lines
+to lift — so `tighten.mjs` can still find the silent stretches afterwards.
+
+**Editing cues by hand.** `out/*.narration.json` is a plain `[{atMs, text}]`
+list — the same escape hatch as hand-editing zoom regions. Adding or moving a
+line there avoids a whole re-record, which matters when a take is expensive
+(here, four messages to a live account). Re-run `narrate.mjs` and only changed
+lines re-render. Keep the script in sync afterwards, or the next re-record
+loses the edits.
+
+Clips are cached in `out/tts/` keyed by provider+voice+text, so re-cutting or
+re-composing costs nothing and re-bills nothing. The video stream is copied, not
+re-encoded, so this step takes seconds. `narrate.mjs` warns when one line runs
+into the next, or when narration outlasts the video.
+
+| Env | Default | What it does |
+|-----|---------|--------------|
+| `DEMO_TTS` | key-dependent | `elevenlabs` or `openai` |
+| `DEMO_TTS_VOICE` | provider default | voice **ID**, not name |
+| `TTS_ONSET_DB` | `-34` | level that counts as speaking, for the breath trim |
+| `NARRATION_PREMIX_LUFS` | `-20` | common level every clip is put on before the mix |
+| `NARRATION_FILTER` | `speechnorm=e=3:r=0.0008:l=1,loudnorm=I=-16:TP=-1.5:LRA=11` | the master chain over the finished mix |
+
+### 9. Take the dead air out
+
+```powershell
+node tighten.mjs                 # out/final-narrated.mp4 -> out/final-narrated-tight.mp4
+node tighten.mjs --dry-run       # print the segment plan, write nothing
+```
+
+A recording of a real app is mostly waiting: a request in flight, a `hold`
+running longer than the line it was covering, and the take rolling on for
+seconds after the last thing happens. On the first pass of this demo that was
+**53s of a 116s video**, including a 7.7s frozen tail after the closing line.
+
+A stretch is treated as dead only when the picture is **frozen and the audio is
+silent**. Either signal alone is wrong: a frozen screen under a narration line
+is the shot that line is playing over, and cutting it truncates the voiceover.
+
+The corollary catches people out, so it is worth stating plainly: **silence over
+a moving screen is not dead air to this stage.** An answer streaming in, or a
+question being typed, keeps the picture alive, so a long unnarrated stretch
+there passes through untouched however long it is. That is a cue-placement
+problem and it is fixed in step 8, not here.
+
+That is also why this runs *after* `narrate.mjs` rather than before. The audio
+has to be on the timeline for silence to mean anything, and because both
+streams are then cut together, nothing can drift — unlike the manual `CUTS_MS`
+in `assemble.mjs`, where the cursor telemetry and narration cues have to be
+re-mapped by hand to match.
+
+Interior dead runs are played fast rather than excised, keeping at least
+`--keep` of screen time, so a pause still reads as a pause. The trailing run is
+trimmed to `--tail`. Every seam is a crossfade, not a cut.
+
+**Where a seam is allowed to sit, and why it is the whole correctness argument.**
+Every seam sits a full crossfade *inside* the dead run, never on its edge.
+
+A dead run begins where the silence begins and ends where speech resumes. So the
+audio immediately outside either edge is, by construction, narration — and a
+crossfade placed on the edge reaches `--xfade` past it and fades that narration
+in or out. Result lines suffer worst: a result line starts the instant
+generation finishes, which is exactly where a dead run ends, so the line's own
+first word is what gets faded up from nothing. Zoom moves fail the same way,
+because a zoom is triggered by a click and the screen goes still right after it —
+the ease-in and ease-out sit against the run's edges and get dissolved away,
+turning a considered move into a snap.
+
+Inside the run there is nothing to damage: frozen picture, silent audio, so the
+seam is invisible and inaudible and the pause simply gets shorter.
+
+Zoom regions are read from `demo.recordly` and subtracted from the dead runs
+outright. Then a **placement check** re-verifies every seam against the detected
+silence and the zoom list, and refuses to write if one is over either. That check
+is not belt-and-braces: this failure produces a clean file of an entirely
+plausible length, so nothing catches it except watching the video.
+
+| Flag | Default | What it does |
+|------|---------|--------------|
+| `--min` | `3.0` | shortest dead run worth acting on, seconds |
+| `--keep` | `1.4` | screen time left where a dead run was |
+| `--speed` | `3` | top playback rate through a dead run |
+| `--tail` | `2.5` | screen time left after the last thing that happens |
+| `--xfade` | `0.6` | seam length |
+| `--freeze` / `--silence` | `-50` / `-40` | detector noise floors, dB |
+
+Every default here errs toward leaving the video alone, because the failure mode
+of this stage is squeezing too hard, and it does not announce itself — the
+output is simply a video that feels rushed.
+
+`--min` is 3.0s rather than half a second because the pause between two spoken
+lines is not dead air; it is the beat the viewer reads the answer in. At 0.9s
+this demo lost 46% of its runtime and the answers became unreadable.
+
+`--keep` and `--speed` decide how hard the squeeze is. A pause cut to 0.8s at 5x
+does not read as a pause, it reads as a jump; 1.4s at 3x still breathes. `--keep`
+also caps the dissolve — a seam cannot exceed half the segment it lands in, so a
+short `--keep` quietly forces hard cuts no matter what `--xfade` says. It is
+floored at 0.3s for that reason.
+
+Check `--dry-run` before committing to a render.
+
+### 10. Intro and outro cards (optional)
+
+```powershell
+node cards.mjs --script ..\scripts\<name>.demo
+```
+
+Renders branded title cards and joins them onto the video, writing
+`out/<name>-carded.mp4`. With no path given it takes the newest stage that
+exists — tightened, else narrated, else composed — so the usual output is
+`out/final-narrated-tight-carded.mp4`. Copy comes from the script's `intro:` / `outro:`
+headers (`Headline | Subhead`). Both cards are voiced with the same TTS provider
+as the narration; `--no-voice` makes them silent. Card length follows the
+voiceover, with a floor of 5-6s.
+
+Every brand asset comes from `productvideos/brand`, and only from there — there
+is no flag to point elsewhere. `brand/StyleGuide.txt` drives the look:
+
+```
+Salesmsg Blue: #1d94ef
+Salesmsg Green CTA Button: #13cb6e
+Headlines: Neue Einstellung
+Body Text: Inter
+```
+
+The blue is the card. Two ways to get this wrong, both of which leave the
+style-guide hex as an ingredient nobody can see: mix it down into a near-black
+navy, or run a gradient off it immediately so `#1d94ef` survives on the top row
+of pixels and nowhere else. So the top 55% of the card is the hex flat and
+unmodified — sample it anywhere up there and you get `#1d94ef` back — and only
+below that does it deepen. The accent rule is the CTA green verbatim.
+
+The same blue is the mat the browser window sits on for the whole demo
+(`compose.mjs`), which is where most of the runtime actually is. Both stages
+read `StyleGuide.txt` through `brand.mjs`, so the two cannot drift apart.
+
+Headlines are set in the headline font, subheads in the body font. Fonts resolve
+from `brand/*.ttf|otf` (or
+`brand/fonts/`) first, then from installed system fonts; if neither has them,
+the card falls back to a system sans and prints a warning — so a card in the
+wrong typeface never passes silently. Editing `StyleGuide.txt` restyles the
+cards without touching the code.
+
+Cards are drawn with `@napi-rs/canvas`, not ffmpeg `drawtext`: real layout
+control, and the white logo composites with its alpha over the gradient. The
+layout is measured then centred, so a long headline stays balanced.
+
+The join **crossfades** (`xfade` + `acrossfade`, 0.75s, `CARD_XFADE` to change),
+so the card dissolves into the demo. It used to fade the card out to black and
+then cut in — which reads as two videos stapled together, with a black flash on
+the seam. Only the outer edges fade to black now: the open of the intro and the
+close of the outro.
+
+It is filter-based, not the concat demuxer — the cards and the composed video
+are encoded separately, and the demuxer silently corrupts joins when parameters
+differ. That re-encodes the body once; it is the only step that does, and it
+takes well under a minute.
+
+Override without touching the script with `--intro` / `--outro`, or point it at
+a different video: `node cards.mjs out/final.mp4 -o out/x.mp4`.
+
+### 11. Verify before calling it done
+
+Extract frames from `final.mp4` and actually look at them:
+
+```powershell
+ffmpeg -y -v error -ss 4.7 -i ..\out\final.mp4 -frames:v 1 -vf scale=860:-1 ..\out\check.png
+```
+
+Take one at each click + 0.6s and one wide per page. Confirm the zoom lands on
+every click, the cursor is visible where it should be, beats are in order, and
+content actually loaded — not skeletons or spinners. Iterate cuts and zooms
+until clean.
+
+## Differences from the gist
+
+The gist targets macOS and one specific app. Changes made:
+
+- **`compose.mjs` replaces Recordly** — the gist's step 7 shelled out to
+  `Recordly.app`, which has no Windows build, so the pipeline could not finish
+  here. The replacement reads the same project and telemetry files and renders
+  zoom/pan, cursor and window frame directly.
+- **`focusTrack` on zoom regions** — the gist collapsed a merged region to the
+  *last* click's focus, which frames the final click and leaves every earlier
+  click in the cluster off screen. Regions now carry every click position and
+  the compositor pans across them. `focus` is still written for compatibility.
+- **Chrome discovery** — was a hardcoded macOS path; now `CHROME_PATH` else the
+  standard Windows / macOS / Linux locations, with Edge as a last resort.
+- **`--use-mock-keychain`** — macOS-only cookie-decryption workaround, now
+  applied only on darwin. Windows encrypts cookies with DPAPI, where the flag is
+  meaningless.
+- **`--force-device-scale-factor=1`** — added. Windows display scaling (125% /
+  150% is the norm) otherwise makes `innerWidth` and the screencast size
+  disagree, so frames come out the wrong size.
+- **Tab matching** — the gist hardcoded `localhost:5175` / `auth0.com`; scenarios
+  now declare `PAGE_URL_MATCH`, defaulting to the host of `APP`.
+- **Pre-take logout is optional** — the gist required auth selectors on every
+  scenario. Now it runs only when `userMenu` + `logoutItem` + `loginHeading` are
+  present, so no-auth flows work.
+- **Process teardown** — `chrome.kill()` only reaps the launcher process on
+  Windows; the driver uses `taskkill /T /F` on the tree instead.
+- **ffmpeg concat paths** — the concat demuxer treats `\` as an escape inside
+  quotes, so frame paths are normalised to forward slashes. Without this every
+  Windows run fails to find its frames.
+- **ffmpeg override + error** — honours `FFMPEG`, and a missing binary reports
+  the install command instead of a bare `ENOENT`.
+- **Guards** — empty telemetry, over-aggressive cuts, and malformed scenario
+  exports now fail with a message that says what to fix.
+- **Targets** — the gist hardcoded the app URL in the scenario and had no way to
+  sign in; a signed-out profile just made the take fail. Targets add the app URL,
+  credentials (`env:` references, `.local.json`, `.env` or `DEMO_*`), and an
+  `auth.start` that puts the app in the right state before rolling.
+- **Scripts** — a plain-text flow format that compiles to a scenario, so a demo
+  can be written and reviewed without touching JavaScript.
+- **Capture gating** — the gist started the screencast on every navigation,
+  including the pre-take logout, which put off-camera steps at the head of the
+  video. Capture is now gated on the take actually having started.
+- **`d.type` / `d.key` / `d.open` / `d.appears`** — added. Typing logs a
+  telemetry sample per keystroke, so the composited cursor stays on the field
+  instead of drifting toward the next beat.
+
+Unchanged: the frame timing model, the cut/shift maths, the original input
+primitives, the selector grammar, and the zoom-region clustering.
+
+## Gotchas
+
+| Symptom | Cause / fix |
+|---------|-------------|
+| `ffmpeg not found` | A shell opened before the winget install still has the old PATH. Reopen it, or set `FFMPEG` |
+| `--dry-run` did nothing and the stage rendered for real | `npm run <stage> -- --dry-run` in PowerShell: the shell eats the bare `--` before npm sees it, so the flag never reaches the script and there is no error. Quote it — `npm run tighten '--' --dry-run` — or call `node tighten.mjs --dry-run` directly |
+| `no project at ...` | `compose.mjs` ran before `project.mjs` |
+| `video not found` | The project moved between machines. `compose.mjs` also tries a sibling of the project file; otherwise fix `videoPath` |
+| Compose is slow | Expected: ~4-5x the video's length at 1080p60 (~14 frames/sec). `X264_PRESET=veryfast` trades a little size for speed. Run it in the background for anything over ~2 minutes |
+| Cursor missing at a click | The click is outside the zoomed view — the region's focus is elsewhere. Check the `focusTrack` that `project.mjs` printed |
+| Frames are the wrong size / blurry | Display scaling. The driver pins `--force-device-scale-factor=1`; if you removed it, put it back |
+| `viewport is 1425x795, wanted 1440x810` warning | Window-fit loop lost to a min-size or snap constraint. Framing shifts but telemetry stays correct |
+| `app page not found` | The flow leaves the `APP` origin. Add the other host to `PAGE_URL_MATCH` |
+| `race: nothing appeared` after an auth click | A page you did not anticipate (account chooser, consent variant). Look at the last jpg in `out/frames/` to see what was on screen |
+| `btn:` spec times out | Text is not exact. `btn:` matches exact trimmed textContent, aria-label, or inner `img[alt]` — avatar buttons flip between initials text and an alt-named image, so give both: `btn:Jane Doe\|JD` |
+| Video freezes mid-flow | Dead air. Step 9 removes it automatically once narration exists; for a wait you have to shorten earlier, see step 5 |
+| A narration line fades in or out mid-word | A seam landed on speech. `tighten.mjs` now refuses to write when that happens — if you see it in an older render, re-run the stage |
+| One line sounds quieter than the rest | The provider returned that clip low — short lines are the usual offenders. `narrate.mjs` levels every clip before the mix and prints what it moved; check its `levels:` line. If it is still uneven, the clip needed more than the ±6 dB cap, so reword or re-render it |
+| A long silence `tighten.mjs` will not remove | It is silent but not frozen — an answer streaming in, or a question being typed. That is invisible to the stage by design. Add a `say` over it (step 8); do not lower `--min` |
+| The video got *longer* after adding narration | Expected. A stretch that was being played at `--speed` because it was frozen and silent is no longer silent, so it plays at 1x. Narrated content at normal speed beats sped-up silence, but check the runtime is still what you want |
+| A zoom snaps instead of easing | A seam landed on the zoom ramp. Same fix; the placement check covers zooms too |
+| The demo jumps from "Found tools" to a finished answer | A `CUTS_MS` range spans the answer being written. Use `SPEEDS_MS` for that span instead — see step 5 |
+| Video ends on a frozen frame with nothing happening | The take kept rolling after the last line. `tighten.mjs` trims that tail to `--tail`; if it survived, the tail was not silent — check for a narration clip still playing under it |
+| `tighten.mjs` made the answers unreadable | `--min` is too low, so the reading pauses between spoken lines got compressed along with the real waiting. Raise it and re-check `--dry-run` |
+| Tightening feels abrupt / jumpy | Not `--min` — that decides *what* gets compressed, not how hard. Raise `--keep` and lower `--speed`, then raise `--xfade`. A seam is capped at half the segment it lands in, so `--xfade` alone does nothing while `--keep` is small |
+| `target "x" not found` | No `targets/x.json`. The message lists the targets that do exist |
+| `target auth.password is not set` | The `env:` variable behind it is unset. The message names the variable; set it in `targets/<name>.local.json`, `/.env` or the shell |
+| `this flow signs in, but the target has no auth block` | The flow has a `login` step but the target has no `auth`, or you forgot `--target` |
+| Login typed into the wrong field | `auth.selectors.username` / `password` point at the wrong input. They are puppeteer selectors — `input[name="email"]`, not `btn:` |
+| Take opens on the login page when it should not | `auth.start` is `signed-out` (the default). Set it to `signed-in` |
+| `pre-take: the app is signed in but there is no way to sign out` | Add `userMenu` + `logoutItem` to `auth.selectors`, or set `auth.start` to `signed-in`, or delete `/profile/` |
+| Script command not recognised | The error names the line. Commands are the ones in the step-2 table; `css #id` needs the `css` prefix |
+| Generated scenario overwritten | `script.mjs` writes `scenarios/<name>.mjs` and refuses to clobber a file it did not generate. Use `-o` to write elsewhere |
+| Beat shows skeletons | The driver waited on a heading that renders before data. Wait on content text instead |
+| Chrome processes left running | Killed mid-take. `taskkill /IM chrome.exe /F` only kills every Chrome, so prefer closing the demo window; the driver cleans up on normal exit |
+| Second run reuses stale login | `/profile/` persists between takes by design. Delete it for a cold start |
+| Profile is signed out after every take | Fixed: the driver now closes Chrome cleanly so cookies flush. A hard `taskkill` loses unflushed session state, which silently signs the profile out |
+| `clicking <sel> did not focus it` | `d.type` verified the click missed — a toast or overlay took it, or the layout moved. It retries once, then refuses to type rather than sending text to whatever has focus. Remove mid-beat `scroll` steps; they shift layout between measuring and clicking |
+| Zoom regions all land on a text input | Expected when typing is the flow's only click. Framing an empty composer four times is worse than none — set `zoomRegions: []` in the project, or hand-author regions over the content |
+| Cutting removed the payoff | Cuts are blind to meaning. After any aggressive cut, extract the *last* frame and confirm the final state still renders — an over-long cut can end the video mid-answer |
+| ElevenLabs `402 paid_plan_required` | Free-tier keys cannot use library voices via the API — including the premade defaults. The key is valid (401 would mean invalid); either upgrade or use a voice the plan allows |
+| ElevenLabs `401 missing_permissions` on quota/voices | Harmless. The key lacks `user_read`/`voices_read`; neither is needed to render speech |
+| Narration desyncs after a cut | Should not happen — `assemble.mjs` shifts cues with the same maths as the cursor. If you hand-edited `*.narration.json`, re-derive it or re-apply the offsets |

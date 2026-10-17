@@ -1,0 +1,43 @@
+{
+  "name": "example",
+  "description": "template for an app that requires sign-in — copy, do not edit in place",
+
+  "app": "https://app.example.com",
+
+  "//startUrl": "optional: where the take begins, relative to app (default '/')",
+  "startUrl": "/",
+
+  "viewport": { "width": 1440, "height": 810 },
+
+  "//pageUrlMatch": "extra hosts that still count as 'the app' (SSO, payments)",
+  "pageUrlMatch": ["auth.example.com"],
+
+  "auth": {
+    "//mode": "'form' fills a username/password form. 'none' disables sign-in.",
+    "mode": "form",
+
+    "//start": "'signed-out' (default) signs out off camera so the take opens on the login page — use with a `login` step. 'signed-in' signs in off camera so the take opens inside the app.",
+    "start": "signed-out",
+
+    "//credentials": "put real values in example.local.json (gitignored), or leave these env: references and set the variables in productvideos/.env",
+    "username": "env:DEMO_USERNAME",
+    "password": "env:DEMO_PASSWORD",
+
+    "//selectors": "same grammar as a scenario: 'btn:Exact Text' or a puppeteer selector",
+    "selectors": {
+      "signInLink": "btn:Sign in",
+      "username": "input[name=\"email\"]",
+      "password": "input[type=\"password\"]",
+      "submit": "btn:Log in",
+      "signedIn": "::-p-text(Dashboard)",
+      "userMenu": "btn:Jane Doe|JD",
+      "logoutItem": "btn:Log out",
+      "loginHeading": "::-p-text(Welcome back)"
+    }
+  },
+
+  "//secrets": "anything else a flow types on camera; read with d.secret('name') or `type secret name into ...`",
+  "secrets": {
+    "workspaceId": "env:DEMO_WORKSPACE_ID"
+  }
+}

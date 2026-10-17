@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# IDE and local Claude Code settings
+.idea/
+*.iml
+.claude/settings.local.json
+**/.claude/settings.local.json
+
+# credentials: never commit (productvideos/.env.example is the template)
+.env
+.env.*
+!.env.example
+*.local.json
+
+# pipeline output and the signed-in Chrome profile — see productvideos/.gitignore
+productvideos/out/
+productvideos/profile/
+
+# OS / logs
+.DS_Store
+Thumbs.db
+npm-debug.log*
+*.log

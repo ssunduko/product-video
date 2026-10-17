@@ -1,0 +1,83 @@
+# Example script. Everything the grammar supports is shown here.
+#
+# Compile it:  node script.mjs ../scripts/grammar-tour.demo
+# Or just run: node driver.mjs ../scripts/grammar-tour.demo
+#
+# Lines are one command each. `#` starts a comment. Indentation is cosmetic.
+
+# ---- header (all optional, must come before the first beat) ----
+
+name: feature
+description: grammar tour, recorded against the local Express app
+
+# Which deployment to record against. `--target` on the command line wins.
+target: local-app
+
+# `app:` is only needed when there is no target (or to override one).
+# app: http://localhost:3000
+
+# start: /pricing          # where the take opens, relative to the app
+# viewport: 1440x810
+# match: localhost:3000, auth0.com   # extra hosts that count as "the app"
+
+# ---- named selectors ----
+#
+#   button "Text"     a button/link/menuitem whose exact text, aria-label or
+#                     inner img alt matches. `button "A" or "B"` for alternatives.
+#   text "Text"       any element containing that text — for hover and wait anchors
+#   css <selector>    a puppeteer selector, verbatim
+#
+# Inline selectors work too; naming them just makes the generated scenario nicer.
+
+selectors:
+  welcome = text "Welcome to Express"
+  heading = css h1
+
+  # `ask` states the intent and lets the Claude in Chrome extension find the
+  # real selector against the live app, writing it to grammar-tour.selectors.json.
+  # Use it wherever a hardcoded handle would be brittle — generated class names,
+  # an avatar that flips between initials and an image, or anything anchored on
+  # copy the app writes itself. Resolve with:
+  #
+  #   node script.mjs ../scripts/grammar-tour.demo --intents
+  #   ...then ask Claude to "resolve the selectors for grammar-tour.demo"
+  #
+  # Compiling without a resolution is an error, not a guess.
+  #
+  #   tagline = ask "the paragraph under the main heading"
+
+# ---- the flow ----
+#
+# Every `click` becomes a zoom region in the finished video, so anything you do
+# not want zoomed is better expressed as a `hover`.
+
+beat Landing page
+  wait @welcome within 15s
+  hold 2.5s
+
+beat Look at the heading
+  hover @heading
+  hold 1.5s
+  scroll down 240
+  hold 800ms
+  scroll up 240
+
+# Other commands, shown but commented out because this app has none of them:
+#
+#   click button "Pricing"          click (defaults to a button selector)
+#   hover text "Growth plan"        hover (defaults to a text selector)
+#   type "hello" into css #search   type into a field
+#   type secret workspaceId into css #workspace
+#   press Enter
+#   open /pricing                   navigate without clicking
+#   login                           sign in on camera, using the target's creds
+#   logout                          sign out on camera
+#
+#   if button "Accept" appears within 20s
+#     click button "Accept"
+#     hold 1s
+#   end
+
+# End on a hold so the last zoom has room to settle.
+beat Settle
+  hold 2s

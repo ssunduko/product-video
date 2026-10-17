@@ -1,0 +1,22 @@
+{
+  "name": "demo-video-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CDP-driven capture, ffmpeg assembly, zoom-region generation, compositing, narration, dead-air tightening and branded title cards for product demo videos. Flows come from a scenario module or a plain-text script; the app URL and credentials come from a target.",
+  "scripts": {
+    "compile": "node script.mjs",
+    "record": "node driver.mjs",
+    "assemble": "node assemble.mjs",
+    "project": "node project.mjs",
+    "compose": "node compose.mjs",
+    "narrate": "node narrate.mjs",
+    "tighten": "node tighten.mjs",
+    "cards": "node cards.mjs",
+    "author": "node author.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.3",
+    "puppeteer-core": "^24.10.0"
+  }
+}

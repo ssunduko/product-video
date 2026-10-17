@@ -1,0 +1,19 @@
+# renders, frames, narration and TTS cache: regenerable, and they show live
+# account data (claude.ai sidebar, Salesmessage analytics)
+out/
+# signed-in Chrome profile: cookies, saved logins, history
+profile/
+pipeline/node_modules/
+
+# credentials: never commit
+.env
+.env.*
+!.env.example
+targets/*.local.json
+
+# commercial font (Hanken Design Co): licence does not allow redistribution
+brand/fonts/Hanken Design Co - Neue Einstellung*.otf
+
+# Salesmsg logos and internal page screenshots: keep local, not for a public
+# repo. cards.mjs renders title cards without the logo when it is absent.
+brand/*.png
