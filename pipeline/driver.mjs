@@ -685,7 +685,7 @@ if (managesAuth) {
       throw new Error(
         'pre-take: the app is signed in but there is no way to sign out ' +
           '(need SEL.userMenu + SEL.logoutItem). Set auth.start to "signed-in", or ' +
-          'delete productvideos/profile/ for a cold start.',
+          'delete profile/ for a cold start.',
       );
     }
     console.log('pre-take: logged in, logging out off camera');

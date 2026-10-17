@@ -9,7 +9,7 @@ caption Level 3, container "2 · Driver".
 
 Person(demo_author, "Demo author", "Developer or PM. Writes the flow as a .demo script, points it at a deployment with a target, then runs the stages in turn from a shell and checks the frames.")
 System_Ext(google_chrome, "Google Chrome", "Chrome + DevTools Protocol. Driven by puppeteer-core on a dedicated user-data profile, so a login survives between takes.")
-ContainerDb(flow_definitions, "Flow definitions", "scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
+ContainerDb(flow_definitions, "Flow definitions", "input/ + scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
 ContainerDb(targets_secrets, "Targets & secrets", "targets/*.json, *.local.json, .env", "Which deployment, and how to sign in.")
 ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
 
@@ -17,7 +17,7 @@ Container_Boundary(driver_2, "2 · Driver") {
   Component(input_resolver, "Input resolver", "driver.mjs", "Reads argv.")
   Component(script_compiler_3, "Script compiler", "script.mjs · shared", "Parses the .demo grammar — header directives, a selectors block, then beats — and emits a scenario module.")
   Component(target_loader, "Target loader", "target.mjs · shared", "Deep-merges the target JSON, its .local.json sidecar, .env and the DEMO_* env vars, later winning, and resolves env:VAR_NAME values at load time.")
-  Component(chrome_launcher, "Chrome launcher", "puppeteer-core", "Runs a real Chrome on productvideos/profile, pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size.")
+  Component(chrome_launcher, "Chrome launcher", "puppeteer-core", "Runs a real Chrome on profile/, pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size.")
   Component(sign_in_step, "Sign-in step", "driver.mjs", "Fills the target's auth.selectors and waits the app out. auth.start decides whether the take opens signed-out, with the login part of the demo, or signed-in, with the login happening off-camera bef...")
   Component(flow_primitives, "Flow primitives", "driver.mjs · d.*", "hold, waitSel, waitGone, appears, hoverSel, clickSel, type, key, wheel, open, race, login, logout. d.type verifies the click actually focused the element and refuses to type into the wrong one rath...")
   Component(screencast_recorder, "Screencast recorder", "CDP Page.startScreencast", "Acks every frame and writes out/frames/*.jpg plus frames.json.")

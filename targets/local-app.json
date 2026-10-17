@@ -1,6 +1,6 @@
 {
   "name": "local-app",
-  "description": "the Express app in this repo, no sign-in",
+  "description": "the Express app in sample-app/, no sign-in",
   "app": "http://localhost:3000",
   "viewport": { "width": 1440, "height": 810 }
 }

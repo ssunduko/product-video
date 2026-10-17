@@ -1,6 +1,6 @@
 // The brand, read from one place.
 //
-// productvideos/brand/StyleGuide.txt is the source of truth for colour and
+// brand/StyleGuide.txt is the source of truth for colour and
 // type. Every stage that paints anything imports this — compose.mjs for the
 // video's own frame, cards.mjs for the title cards — so the style-guide hex
 // cannot end up in one and not the other.

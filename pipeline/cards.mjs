@@ -7,7 +7,7 @@
 // out/<name>-carded.mp4. Card copy comes from the script's `intro:` / `outro:`
 // headers, or from --intro/--outro.
 //
-// Brand assets come from productvideos/brand and nowhere else: the logo, plus
+// Brand assets come from brand/ and nowhere else: the logo, plus
 // the colours and fonts declared in brand/StyleGuide.txt. There is no flag to
 // point this at another folder — one directory is the brand.
 //
@@ -28,7 +28,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(HERE, '..', 'out');
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 
-loadTarget(undefined); // loads productvideos/.env
+loadTarget(undefined); // loads .env
 
 const W = 1920;
 const H = 1080;

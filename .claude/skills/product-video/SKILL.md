@@ -7,7 +7,7 @@ description: Use when asked to create a product demo video, tutorial video, walk
 
 ## Overview
 
-Scripted pipeline at `../../../productvideos/` that turns a plain-English product flow into a
+Scripted pipeline at the repo root (`../../../`) that turns a plain-English product flow into a
 polished MP4: a CDP-driven Chrome runs the flow while frames + input are
 captured, ffmpeg assembles them, zoom regions are derived from click telemetry,
 and `compose.mjs` renders the finished video — eased zoom/pan, a synthesized
@@ -18,12 +18,12 @@ need no real cursor.
 
 Three separable pieces:
 
-- **target** (`../../../productvideos/targets/<name>.json`) — which deployment, and how to sign
+- **target** (`../../../targets/<name>.json`) — which deployment, and how to sign
   in. Optional. The only place credentials belong.
-- **flow** — either a plain-text script (`../../../productvideos/scripts/<name>.demo`) that
+- **flow** — either a plain-text script (`../../../scripts/<name>.demo`) that
   compiles to a scenario, or a hand-written scenario
-  (`../../../productvideos/scenarios/<name>.mjs`).
-- **pipeline** (`../../../productvideos/pipeline/*.mjs`) — author (plain English
+  (`../../../scenarios/<name>.mjs`).
+- **pipeline** (`../../../pipeline/*.mjs`) — author (plain English
   to DSL), then capture, assemble, zoom, compose, then the optional finishing
   stages: narrate, tighten, cards.
 
@@ -33,7 +33,7 @@ is also published as PlantUML and a StarUML project. All generated from
 `docs/c4-model.mjs`, so change the model there and re-run rather than editing an
 output.
 
-Full docs: `../../../productvideos/README.md`.
+Full docs: `../../../README.md`.
 
 ## Prerequisites (check, never fix silently)
 
@@ -42,11 +42,11 @@ Full docs: `../../../productvideos/README.md`.
 - `ffmpeg` + `ffprobe` on PATH, or `FFMPEG` / `FFPROBE` set. Installed here via
   `winget install Gyan.FFmpeg`; a shell opened before that install has a stale
   PATH and must be restarted.
-- `../../../productvideos/pipeline/node_modules` installed (`npm install` there if not) —
+- `../../../pipeline/node_modules` installed (`npm install` there if not) —
   `puppeteer-core` and `@napi-rs/canvas`.
 - Chrome — auto-detected, or `CHROME_PATH`.
 
-Every stage runs from `productvideos/pipeline` and has an npm alias (`npm run`
+Every stage runs from `pipeline/` and has an npm alias (`npm run`
 lists all eight: compile, record, assemble, project, compose, narrate, tighten,
 cards). **Use the `node <stage>.mjs` form whenever you are passing a flag.** In
 PowerShell, `npm run tighten -- --dry-run` silently runs the real render —
@@ -56,15 +56,15 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
 ## Procedure
 
 1. **Settle the target.** If the user named an app URL, or the flow needs a
-   login, look in `../../../productvideos/targets/` for a matching target and otherwise create
+   login, look in `../../../targets/` for a matching target and otherwise create
    one from `targets/<name>.json`: `app`, plus for login an `auth` block with
    `mode: "form"`, selectors for the username/password/submit fields, and
    `start` (`signed-out` when the demo shows signing in, `signed-in` when it
    starts inside the app).
 
    **Never write a credential into a committed file.** Use `"env:DEMO_PASSWORD"`
-   references and ask the user to put values in `../../../productvideos/targets/<name>.local.json`
-   or `../../../productvideos/.env` (both gitignored), or to export `DEMO_USERNAME` /
+   references and ask the user to put values in `../../../targets/<name>.local.json`
+   or `../../../.env` (both gitignored), or to export `DEMO_USERNAME` /
    `DEMO_PASSWORD`. If credentials are needed and absent, ask — do not invent
    them or skip the login step. Never echo a password back to the user.
 
@@ -97,17 +97,17 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
    measured wait instead of a guess. Hand-write a script only when the app
    cannot be reached from the user's browser.
 
-   Otherwise, a script at `../../../productvideos/scripts/<name>.demo` —
+   Otherwise, a script at `../../../scripts/<name>.demo` —
    the user can read and correct it, and it compiles to a scenario.
    `scripts/grammar-tour.demo` documents every command. Drop to a hand-written
-   scenario at `../../../productvideos/scenarios/<name>.mjs` when the flow needs
+   scenario at `../../../scenarios/<name>.mjs` when the flow needs
    real control flow — loops, branching beyond `if <sel> appears`, anything
    computed. The skeleton and the full `d.*` contract are in README "b. A
    scenario"; a `.demo` compiles to a file exactly like it.
 
    Script: header directives `target:`, `app:`, `viewport:`, `match:`,
    `intro:` / `outro:` (title cards; brand assets always come from
-   `productvideos/brand`, there is no `brand:` directive), a
+   `brand/`, there is no `brand:` directive), a
    `selectors:` block of `name = button "Text"` / `text "Text"` / `css <sel>` /
    `ask "description"` (resolved by the resolve-selectors skill; see step 2),
    then beats of `wait` / `click` / `hover` / `hold` / `type` / `press` /
@@ -139,7 +139,7 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
 4. **Record** — a script or a scenario path both work:
 
    ```
-   cd productvideos/pipeline
+   cd pipeline
    node driver.mjs ../scripts/<name>.demo --target <name>
    ```
 
@@ -245,7 +245,7 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
    For a narrated cut, check the audio too — `silencedetect` for gaps the cue
    placement missed, `ebur128` per line for one that sits below the rest.
 
-13. **Deliver:** copy to `../../../productvideos/out/<descriptive-name>.mp4` and report
+13. **Deliver:** copy to `../../../out/<descriptive-name>.mp4` and report
     beat-by-beat verification.
 
 ## Gotchas
@@ -271,14 +271,14 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
 | Video got *longer* after adding narration | Expected: a stretch that was played at `--speed` for being frozen and silent is no longer silent, so it plays at 1x                                                                        |
 | A narration line fades in or out mid-word | A seam landed on speech. `tighten.mjs` refuses to write when that happens — re-run the stage on an older render                                                                             |
 | Beat shows skeletons | Driver waited on a heading that renders before data. Wait on content text instead, or trim                                                                                                 |
-| Cookies lost between takes (macOS) | Profile cookies encrypted with puppeteer's mock keychain; the driver keeps `--use-mock-keychain` on darwin. Recopy the profile with Chrome quit, and `rm productvideos/profile/Singleton*` |
-| Second run reuses a stale login | `../../../productvideos/profile/` persists by design. Delete it for a cold start                                                                                                           |
+| Cookies lost between takes (macOS) | Profile cookies encrypted with puppeteer's mock keychain; the driver keeps `--use-mock-keychain` on darwin. Recopy the profile with Chrome quit, and `rm profile/Singleton*` |
+| Second run reuses a stale login | `../../../profile/` persists by design. Delete it for a cold start                                                                                                           |
 | Profile signed out after every take | Fixed: the driver closes Chrome cleanly so cookies flush; a hard kill loses unflushed session state                                                                                        |
 | `clicking <sel> did not focus it` | `d.type` caught a missed click (toast, overlay, or layout shift) and refused to type into the wrong element. Drop mid-beat `scroll` steps                                                  |
 | Zoom regions all on a text input | Expected when typing is the only click. Set `zoomRegions: []` rather than framing an empty composer                                                                                        |
 | Cutting removed the payoff | Cuts are blind to meaning — after an aggressive cut, check the LAST frame still shows the final state                                                                                      |
 | ElevenLabs `402 paid_plan_required` | Free-tier keys cannot use library voices via the API, including premade defaults. 401 would mean an invalid key; 402 means the key is fine                                                 |
-| `target "x" not found` | No `../../../productvideos/targets/x.json`; the error lists the ones that exist                                                                                                            |
+| `target "x" not found` | No `../../../targets/x.json`; the error lists the ones that exist                                                                                                            |
 | `target auth.password is not set` | The `env:` variable behind it is unset — the error names it. Ask the user to set it; never guess                                                                                           |
 | `this flow signs in, but the target has no auth block` | A `login` step with no `auth` on the target, or `--target` was omitted                                                                                                                     |
 | Login typed into the wrong field | `auth.selectors.username`/`password` are puppeteer selectors (`input[name="email"]`), not `btn:` specs                                                                                     |

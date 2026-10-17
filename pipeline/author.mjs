@@ -3,8 +3,8 @@
 //
 //   node author.mjs ../scenarios/<name>.trace.json [-o ../scripts/<name>.demo]
 //
-// Traces live in scenarios/ beside the .flow they came from: both are authored,
-// both belong in review. The .demo and its selector sidecar are generated into
+// Traces live in scenarios/; the .flow they came from lives in input/. Both are
+// authored, both belong in review. The .demo and its selector sidecar are generated into
 // scripts/ and can be deleted and rebuilt from the trace at any time.
 //
 // WHERE A TRACE COMES FROM

@@ -20,7 +20,7 @@ jobs:
   scan-pr:
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.7.0"
     with:
-      # Scans package-lock.json and productvideos/pipeline/package-lock.json
+      # Scans pipeline/package-lock.json and sample-app/package-lock.json
       scan-args: |-
         --recursive
         ./
