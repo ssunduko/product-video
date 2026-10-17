@@ -1,0 +1,56 @@
+# Flow template — copy this file to input/<name>.flow and fill it in.
+#
+#   cp input/_template.flow input/my-feature.flow
+#
+# A .flow is plain English: it is what you WANT the video to show. Nothing parses
+# it mechanically. The author-demo skill reads it, walks the real app through
+# the Claude in Chrome extension, measures every wait, and writes
+# scenarios/<name>.trace.json. author.mjs then generates the executable
+# scripts/<name>.demo plus its scripts/<name>.selectors.json sidecar:
+#
+#   input/<name>.flow  ->  scenarios/<name>.trace.json  ->  scripts/<name>.demo
+#
+# To run it, ask Claude:  "author a demo from input/<name>.flow"
+#
+# Lines starting with # are comments. Delete these instructions when you are done.
+
+# ---- header ----------------------------------------------------------------
+
+# Short id. Becomes the .trace.json / .demo / output file names.
+name: my-feature
+
+# One line: what the video demonstrates.
+description: show how a user does X in the app
+
+# Which deployment to record against: a file in targets/ (claude-ai, local-app,
+# or your own copy of signed-in.json). Credentials never go in this file.
+target: claude-ai
+
+# Optional title cards, rendered by cards.mjs. Format: "Headline | Subhead".
+# Both lines appear on the card and are read aloud. Delete a line to skip it.
+intro: Product name | One sentence on what this demo shows
+outro: Thanks for watching | Where to learn more
+
+# ---- steps -----------------------------------------------------------------
+# One step per line, in order. Write them the way you would explain the flow to
+# a colleague. Useful shapes:
+#
+#   Open <page or screen>
+#   Click <the thing, described by what it says or does>
+#   Type "<exact text>" into <the field>
+#   Ask the assistant: "<exact question>"
+#   Wait for <something to finish or appear>
+#   Confirm <what the viewer should see on screen>   <- becomes narration + a check
+#   Pause on <something worth lingering on>
+#
+# Say "Confirm ..." after each action whose result matters: it tells the author
+# what to wait for and what the narration should say when it arrives.
+# Anything that SENDS, CREATES, EDITS or DELETES live data is confirmed with you
+# before it is done during the walk.
+
+Steps:
+Open <the starting page>
+Click <the first control>
+Confirm <what appears>
+Type "<text>" into <the field>
+Confirm <the result the viewer should notice>

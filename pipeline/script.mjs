@@ -9,7 +9,7 @@
 //
 // driver.mjs also accepts a script directly and compiles it on the way in.
 //
-// Grammar: see productvideos/scripts/feature.demo and the README.
+// Grammar: see scripts/feature.demo and the README.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -755,7 +755,7 @@ if (invokedDirectly) {
 
   const { source, warnings } = compileScript(src, {
     file: path.basename(inPath),
-    sourcePath: path.relative(path.join(HERE, '..', '..'), inPath).split(path.sep).join('/'),
+    sourcePath: path.relative(path.join(HERE, '..'), inPath).split(path.sep).join('/'),
     scriptPath: inPath,
   });
 

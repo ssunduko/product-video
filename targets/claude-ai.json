@@ -1,0 +1,11 @@
+{
+  "name": "claude-ai",
+  "description": "claude.ai web app — session comes from profile/, not a password",
+
+  "app": "https://claude.ai",
+  "startUrl": "/new",
+  "viewport": { "width": 1440, "height": 810 },
+
+  "//auth": "claude.ai signs in with SSO / email code, not a username+password form, so the driver cannot fill it. mode 'none' means: use whatever session profile/ already holds. Log in once by hand first — see README/.md, 'Apps the driver cannot sign into'.",
+  "auth": { "mode": "none" }
+}

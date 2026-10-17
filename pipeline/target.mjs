@@ -8,7 +8,7 @@
 // Resolution, later wins:
 //   targets/<name>.json          committed, no secrets
 //   targets/<name>.local.json    gitignored, secrets
-//   productvideos/.env                   gitignored, KEY=VALUE for env: references
+//   .env                   gitignored, KEY=VALUE for env: references
 //   DEMO_APP / DEMO_USERNAME / DEMO_PASSWORD
 //
 // Any string value may be written as "env:VAR_NAME" and is read from the
@@ -152,7 +152,7 @@ function warnUnknown(obj, allowed, where) {
 
 export function targetPathFor(ref) {
   // a ref containing a separator or ending in .json is a path; anything else
-  // is a name looked up in productvideos/targets/
+  // is a name looked up in targets/
   const pathish = /[\\/]/.test(ref) || ref.endsWith('.json');
   return pathish ? path.resolve(ref) : path.join(TARGETS_DIR, `${ref}.json`);
 }
@@ -193,7 +193,7 @@ export function loadTarget(ref) {
       throw new Error(
         `target "${ref}" not found (looked for ${base}).` +
           (known.length ? ` Known targets: ${known.join(', ')}` : '') +
-          '\nCreate one from productvideos/targets/signed-in.json, or point at the app with' +
+          '\nCreate one from targets/signed-in.json, or point at the app with' +
           ' DEMO_APP / DEMO_USERNAME / DEMO_PASSWORD.',
       );
     }
@@ -300,7 +300,7 @@ export function requireCredentials(t) {
 
   const hint =
     (missingList ? `\nUnset environment variables: ${missingList}.` : '') +
-    '\nSupply them in productvideos/targets/<name>.local.json, productvideos/.env, or as' +
+    '\nSupply them in targets/<name>.local.json, .env, or as' +
     ' DEMO_USERNAME / DEMO_PASSWORD.';
 
   if (!t?.auth || t.auth.mode !== 'form') {

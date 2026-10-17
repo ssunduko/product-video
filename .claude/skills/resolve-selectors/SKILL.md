@@ -1,6 +1,6 @@
 ---
 name: resolve-selectors
-description: Resolve the natural-language `ask "..."` selectors in a productvideos .demo script against the live app, using the Claude in Chrome extension, and write the <script>.selectors.json sidecar. Use when a script has unresolved intents, when compiling or recording fails with "selector(s) still state an intent", or when a redesign has broken selectors that used to work.
+description: Resolve the natural-language `ask "..."` selectors in a pipeline .demo script against the live app, using the Claude in Chrome extension, and write the <script>.selectors.json sidecar. Use when a script has unresolved intents, when compiling or recording fails with "selector(s) still state an intent", or when a redesign has broken selectors that used to work.
 ---
 
 # Resolving natural-language selectors
@@ -34,7 +34,7 @@ model round-trip during a run would land in the finished video as dead air.
 1. **Get the work list.**
 
    ```
-   cd productvideos/pipeline
+   cd pipeline
    node script.mjs ../scripts/<name>.demo --intents
    ```
 

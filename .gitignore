@@ -7,15 +7,24 @@ node_modules/
 .claude/settings.local.json
 **/.claude/settings.local.json
 
-# credentials: never commit (productvideos/.env.example is the template)
+# credentials: never commit (.env.example is the template)
 .env
 .env.*
 !.env.example
 *.local.json
 
-# pipeline output and the signed-in Chrome profile — see productvideos/.gitignore
-productvideos/out/
-productvideos/profile/
+# renders, frames, narration and TTS cache: regenerable, and they show live
+# account data (claude.ai sidebar, Salesmessage analytics)
+out/
+# signed-in Chrome profile: cookies, saved logins, history
+profile/
+
+# commercial font (Hanken Design Co): licence does not allow redistribution
+brand/fonts/Hanken Design Co - Neue Einstellung*.otf
+
+# Salesmsg logos and internal page screenshots: keep local, not for a public
+# repo. cards.mjs renders title cards without the logo when it is absent.
+brand/*.png
 
 # OS / logs
 .DS_Store

@@ -19,7 +19,7 @@
     "//start": "'signed-out' (default) signs out off camera so the take opens on the login page — use with a `login` step. 'signed-in' signs in off camera so the take opens inside the app.",
     "start": "signed-out",
 
-    "//credentials": "put real values in example.local.json (gitignored), or leave these env: references and set the variables in productvideos/.env",
+    "//credentials": "put real values in example.local.json (gitignored), or leave these env: references and set the variables in .env",
     "username": "env:DEMO_USERNAME",
     "password": "env:DEMO_PASSWORD",
 

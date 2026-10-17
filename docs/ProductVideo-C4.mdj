@@ -10,7 +10,7 @@
         "$ref": "c4-project-0001"
       },
       "name": "Demo Video Pipeline",
-      "documentation": "C4 model of productvideos/ — the scripted pipeline that turns a plain-English flow into a narrated, branded MP4.\n\nLevels: 1 System Context, 2 Containers, 3 Components (two containers drawn).\n\nGenerated from docs/c4-model.mjs — edit that and re-run rather than editing the generated files.\n\nThe Express scaffold at the repository root (app.js, routes/, views/, bin/) is an untouched express-generator skeleton, not part of this system, and is deliberately not modelled.",
+      "documentation": "C4 model of the ProductVideo repo — the scripted pipeline that turns a plain-English flow into a narrated, branded MP4.\n\nLevels: 1 System Context, 2 Containers, 3 Components (two containers drawn).\n\nGenerated from docs/c4-model.mjs — edit that and re-run rather than editing the generated files.\n\nThe Express scaffold in sample-app/ (app.js, routes/, views/, bin/) is an untouched express-generator skeleton, not part of this system, and is deliberately not modelled.",
       "ownedElements": [
         {
           "_type": "UMLProfile",
@@ -173,7 +173,7 @@
               "stereotype": {
                 "$ref": "c4-st-0006"
               },
-              "documentation": "Technology: ElevenLabs or OpenAI\n\nChosen by DEMO_TTS, or by whichever key is set. Anthropic has no TTS API, so this is a third party. Keys come from the shell or productvideos/.env, never a committed file. The only network dependency other than the app under demo."
+              "documentation": "Technology: ElevenLabs or OpenAI\n\nChosen by DEMO_TTS, or by whichever key is set. Anthropic has no TTS API, so this is a third party. Keys come from the shell or .env, never a committed file. The only network dependency other than the app under demo."
             },
             {
               "_type": "UMLClassDiagram",
@@ -2908,7 +2908,7 @@
               "stereotype": {
                 "$ref": "c4-st-0008"
               },
-              "documentation": "Technology: scenarios/ authored, scripts/ generated\n\nWhat happens on screen and what is said over it. Split by who writes it: scenarios/ holds the plain-English .flow and the .trace.json observed from walking it, both authored and worth reviewing; scripts/ holds the .demo the trace generates, plus its selector sidecar, either of which can be deleted and rebuilt. Committed; contains no credentials."
+              "documentation": "Technology: input/ + scenarios/ authored, scripts/ generated\n\nWhat happens on screen and what is said over it. Split by who writes it: input/ holds the plain-English .flow and scenarios/ the .trace.json observed from walking it, both authored and worth reviewing; scripts/ holds the .demo the trace generates, plus its selector sidecar, either of which can be deleted and rebuilt. Committed; contains no credentials."
             },
             {
               "_type": "UMLClass",
@@ -5783,7 +5783,7 @@
                           "top": 205,
                           "width": 210,
                           "height": 13,
-                          "text": "«file store: scenarios/ authored, scripts/ generated»",
+                          "text": "«file store: input/ + scenarios/ authored, scripts/ generated»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -13638,7 +13638,7 @@
                           "top": 195,
                           "width": 210,
                           "height": 13,
-                          "text": "«file store: scenarios/ authored, scripts/ generated»",
+                          "text": "«file store: input/ + scenarios/ authored, scripts/ generated»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -17981,7 +17981,7 @@
                           "top": 205,
                           "width": 210,
                           "height": 13,
-                          "text": "«file store: scenarios/ authored, scripts/ generated»",
+                          "text": "«file store: input/ + scenarios/ authored, scripts/ generated»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -20321,7 +20321,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: puppeteer-core\n\nRuns a real Chrome on productvideos/profile, pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size. On macOS keeps --use-mock-keychain so profile cookies decrypt."
+              "documentation": "Technology: puppeteer-core\n\nRuns a real Chrome on profile/, pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size. On macOS keeps --use-mock-keychain so profile cookies decrypt."
             },
             {
               "_type": "UMLClass",
@@ -22984,7 +22984,7 @@
                           "top": 205,
                           "width": 210,
                           "height": 13,
-                          "text": "«file store: scenarios/ authored, scripts/ generated»",
+                          "text": "«file store: input/ + scenarios/ authored, scripts/ generated»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -45678,7 +45678,7 @@
                           "top": 45,
                           "width": 210,
                           "height": 13,
-                          "text": "«file store: scenarios/ authored, scripts/ generated»",
+                          "text": "«file store: input/ + scenarios/ authored, scripts/ generated»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
