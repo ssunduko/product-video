@@ -4,7 +4,7 @@
 // Anthropic has no TTS API, so this calls a third party. Provider comes from
 // DEMO_TTS, else whichever key is set:
 //   ELEVENLABS_API_KEY -> elevenlabs   OPENAI_API_KEY -> openai
-// Keys resolve via the shell or productvideos/.env — never a committed file.
+// Keys resolve via the shell or .env — never a committed file.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,7 +26,7 @@ export function pickProvider() {
   if (!name) {
     throw new Error(
       'no text-to-speech key found. Set ELEVENLABS_API_KEY or OPENAI_API_KEY ' +
-        '(shell or productvideos/.env).',
+        '(shell or .env).',
     );
   }
 

@@ -8,7 +8,7 @@
  "intro": "Salesmessage MCP Server | A demo of live analytics, asked in plain English",
  "outro": "Thanks for watching | Do you have any questions? Follow up with us any time - we are happy to help",
  "warnings": [
-  "BEFORE THE FIRST TAKE, dismiss the notify banner by hand on the pipeline profile.\nclaude.ai shows a \"Want to be notified when Claude responds?\" banner during long\ngenerations, and while it is up BOTH the Send and Stop controls are absent from\nthe DOM - Enter does nothing and the take stalls. Dismissing it once appears to\nsuppress it for that profile, but productvideos/profile is a DIFFERENT profile\nfrom your everyday Chrome, so dismissing it there does not help the take.\nDo it in the same sitting as the sign-in step.",
+  "BEFORE THE FIRST TAKE, dismiss the notify banner by hand on the pipeline profile.\nclaude.ai shows a \"Want to be notified when Claude responds?\" banner during long\ngenerations, and while it is up BOTH the Send and Stop controls are absent from\nthe DOM - Enter does nothing and the take stalls. Dismissing it once appears to\nsuppress it for that profile, but profile/ is a DIFFERENT profile\nfrom your everyday Chrome, so dismissing it there does not help the take.\nDo it in the same sitting as the sign-in step.",
   "Trimmed from the eight questions in mcp.flow. Dropped: conversations, messages,\nteam response times, and \"break that down by agent\" - that last one answers\n\"there is nothing to break down\" on this account, because only one member has\nmeasurable conversations. Verified live on 2026-08-09."
  ],
  "beats": [

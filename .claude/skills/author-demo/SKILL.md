@@ -9,7 +9,7 @@ The user describes a flow in ordinary language. You walk the real app, observe
 it, and emit the DSL the pipeline executes.
 
 ```
-scenarios/<name>.flow          plain English, one step per line — the user writes this
+input/<name>.flow          plain English, one step per line — the user writes this
         │
         ▼   you drive the real app through the extension, timing as you go
 scenarios/<name>.trace.json    selectors + MEASURED wait times
@@ -20,6 +20,9 @@ scripts/<name>.demo  +  scripts/<name>.selectors.json      generated
         ▼   node driver.mjs ../scripts/<name>.demo
    the take
 ```
+
+New flows start from `input/_template.flow` (header fields + step shapes);
+point a user who has no `.flow` yet at it. Never author from the template itself.
 
 `scenarios/` is authored, `scripts/` is generated. Never hand-edit a generated
 `.demo` and expect it to survive — change the trace and re-run.
@@ -99,8 +102,8 @@ the number in the trace, and let the generator size the narration to it.
    Put these in `trace.warnings` — the generator writes them into the script
    header, where the next person will actually see them.
 
-7. **Write the trace** to `scenarios/<name>.trace.json`, beside the `.flow` it
-   came from — **not** in `out/`, which is gitignored and disposable. A trace is
+7. **Write the trace** to `scenarios/<name>.trace.json` (the `.flow` it came
+   from stays in `input/`) — **not** in `out/`, which is gitignored and disposable. A trace is
    an authored artifact: it is the record of what the app actually did, and it is
    what someone re-reads when a selector or a timing goes stale.
 
@@ -112,7 +115,7 @@ the number in the trace, and let the generator size the narration to it.
 8. **Generate, then verify.**
 
    ```
-   cd productvideos/pipeline
+   cd pipeline
    node author.mjs ../scenarios/<name>.trace.json
    node script.mjs ../scripts/<name>.demo --intents   # expect 0 unresolved
    node script.mjs ../scripts/<name>.demo --print     # expect no warnings

@@ -25,7 +25,7 @@ System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   Container(narrator, "6 · Narrator", "narrate.mjs · Node.js + ffmpeg", "Voices the say-cues, trims the breath off each clip, levels every clip to a common loudness, and mixes them onto the video.")
   Container(tightener, "7 · Tightener", "tighten.mjs · Node.js + ffmpeg", "Compresses stretches that are frozen AND silent, trims the trailing run, and crossfades every seam.")
   Container(card_renderer, "8 · Card Renderer", "cards.mjs · Node.js + canvas + ffmpeg", "Renders branded intro/outro title cards, voices them with the same provider, and dissolves them on with the concat filter rather than the demuxer.")
-  ContainerDb(flow_definitions, "Flow definitions", "scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
+  ContainerDb(flow_definitions, "Flow definitions", "input/ + scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
   ContainerDb(targets_secrets, "Targets & secrets", "targets/*.json, *.local.json, .env", "Which deployment, and how to sign in.")
   ContainerDb(brand_assets, "Brand assets", "brand/", "StyleGuide.txt (colour and type, the source of truth), the logo, and the font files.")
   ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")

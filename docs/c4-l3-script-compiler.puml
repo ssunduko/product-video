@@ -8,7 +8,7 @@ title C4-L3 — Components · Script Compiler (script.mjs)
 caption Level 3, container "1 · Script Compiler".
 
 Person(demo_author, "Demo author", "Developer or PM. Writes the flow as a .demo script, points it at a deployment with a target, then runs the stages in turn from a shell and checks the frames.")
-ContainerDb(flow_definitions, "Flow definitions", "scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
+ContainerDb(flow_definitions, "Flow definitions", "input/ + scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
 ContainerDb(selector_resolutions, "Selector resolutions", "scripts/*.selectors.json", "What each ask description resolved to against the live DOM, plus the evidence for it.")
 System_Ext(claude_in_chrome_extension, "Claude in Chrome extension", "Browser extension. Drives the user own Chrome, with their own session, so there is no SSO ritual and no email code to fill.")
 

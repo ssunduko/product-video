@@ -3,7 +3,7 @@ description: ask Claude for Salesmessage response-time and credit-usage breakdow
 target: claude-ai
 # Intro / outro title cards, rendered by cards.mjs after compose.
 # Format: "Headline | Subhead" - both appear on the card and are read aloud.
-# Logo, colours and fonts always come from productvideos/brand.
+# Logo, colours and fonts always come from brand/.
 intro: Salesmessage MCP Server | A demo of live analytics, asked in plain English
 outro: Thanks for watching | Do you have any questions? Follow up with us any time - we are happy to help
 Steps:
