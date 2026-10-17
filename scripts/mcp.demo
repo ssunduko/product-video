@@ -12,7 +12,7 @@
 # claude.ai shows a "Want to be notified when Claude responds?" banner during long
 # generations, and while it is up BOTH the Send and Stop controls are absent from
 # the DOM - Enter does nothing and the take stalls. Dismissing it once appears to
-# suppress it for that profile, but productvideos/profile is a DIFFERENT profile
+# suppress it for that profile, but profile/ is a DIFFERENT profile
 # from your everyday Chrome, so dismissing it there does not help the take.
 # Do it in the same sitting as the sign-in step.
 #

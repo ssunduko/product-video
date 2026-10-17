@@ -1,4 +1,4 @@
-gr# Demo video pipeline
+# Demo video pipeline
 
 Turns a plain-English product flow into a polished MP4. A CDP-driven Chrome
 walks the flow while frames and input are captured, ffmpeg assembles the frames
@@ -9,7 +9,7 @@ cursor, and a styled window frame.
 ## Layout
 
 ```
-productvideos/
+./                  repo root — every path in this README is relative to it
   pipeline/
     driver.mjs      launches Chrome, runs a flow, captures frames + input telemetry
     target.mjs      loads a target: app URL + credentials
@@ -27,11 +27,14 @@ productvideos/
     tts.mjs         shared text-to-speech provider + clip cache
   targets/
     signed-in.json          template for an app that needs sign-in
-    local-app.json          the Express app in this repo
+    local-app.json          the Express app in sample-app/
     <name>.local.json       credentials — gitignored
-  scenarios/                what you AUTHOR: the flow, however you express it
+  input/                    START HERE: the text description of each video
+    _template.flow          copy to <name>.flow and write your steps
     mcp.flow                plain English, one step per line — the human input
-    mcp.trace.json          the observed walk: selectors + measured wait times
+  scenarios/                what the walk OBSERVED, and hand-written scenarios
+    mcp.trace.json          the observed walk of input/mcp.flow: selectors +
+                            measured wait times
     <name>.mjs              hand-written scenarios, when a flow needs real
                             control flow — see "b. A scenario" below
   scripts/                  what gets EXECUTED: the DSL, generated or hand-written
@@ -44,6 +47,9 @@ productvideos/
                             (compose.mjs paints the frame with them too)
     salesmsg-logo-white.png the logo on the title cards
     *.ttf / *.otf           optional: brand font files, registered at render time
+  docs/             C4 architecture model and its renderings
+  sample-app/       a small Express app to record against (npm install && npm start)
+  .env.example      template for .env — copy and fill in
   .env              optional, gitignored: KEY=VALUE for env: references in targets
   out/              generated: frames/, frames.json, actions.json, *.mp4, demo.recordly
   profile/          generated: the Chrome user-data-dir the takes run under
@@ -54,7 +60,7 @@ that means for `scenarios/*.trace.json`: it is the one artifact here that cannot
 be rebuilt from anything else, which is why it lives in `scenarios/` and not in
 `out/`.
 
-**Architecture diagrams** are in [`../docs/`](../docs/C4.md) — C4 at three
+**Architecture diagrams** are in [`docs/`](docs/C4.md) — C4 at three
 levels, with a component diagram for every stage including `author.mjs`.
 `docs/C4.md` reads anywhere; the same model is also published as C4-PlantUML
 (`docs/c4-*.puml`) and a StarUML project (`docs/ProductVideo-C4.mdj`). All three
@@ -66,16 +72,17 @@ Three pieces, separable on purpose:
 | Piece | Answers | Lives in |
 |-------|---------|----------|
 | **target** | *which* deployment, and how to sign in | `targets/<name>.json` |
-| **flow** | *what* to do on screen | `scenarios/<name>.flow` (plain English) or `scripts/<name>.demo` |
+| **flow** | *what* to do on screen | `input/<name>.flow` (plain English) or `scripts/<name>.demo` |
 | **pipeline** | how it becomes a video | `pipeline/*.mjs` |
 
-**`scenarios/` is what you author; `scripts/` is what runs.** A plain-English
-`.flow` and the `.trace.json` observed from walking it are inputs — hand-written,
+**`input/` and `scenarios/` are what you author; `scripts/` is what runs.** A
+plain-English `.flow` in `input/` and the `.trace.json` observed from walking it
+in `scenarios/` are inputs — hand-written,
 diffable, the things worth arguing about in review. The `.demo` is generated from
 the trace and can be thrown away and rebuilt. Keeping them apart stops the
 question "is this file the source or the output?" from ever coming up.
 
-The one exception is `<name>.selectors.json`, which stays in `scripts/` beside
+The one exception is `<name>.selectors.json`, which stays in `scripts` beside
 its `.demo`: `script.mjs` finds it by swapping the extension on the script path,
 so moving it breaks compilation. It is generated alongside the `.demo` from the
 same trace, so it belongs on the generated side anyway.
@@ -91,7 +98,7 @@ never appear in a flow file.
 | Node 18+ | ✅ v24.1.0 | |
 | Chrome | ✅ `C:\Program Files\Google\Chrome\Application\chrome.exe` | auto-detected; override with `CHROME_PATH` |
 | ffmpeg + ffprobe | ✅ 9.0 (Gyan build, via winget) | installed to `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`. Override with `FFMPEG` / `FFPROBE` |
-| `pipeline/node_modules` | run `npm install` in `/pipeline` | pulls `puppeteer-core` and `@napi-rs/canvas` |
+| `pipeline/node_modules` | run `npm install` in `pipeline/` | pulls `puppeteer-core` and `@napi-rs/canvas` |
 
 ffmpeg was installed by winget, which edits PATH — a shell opened **before** the
 install will not see it until restarted.
@@ -101,7 +108,7 @@ your dev server; if it is down, start it yourself first.
 
 ## Usage
 
-Every stage is a script in `pipeline/`, run from that directory. Each one also
+Every stage is a script in `pipeline`, run from that directory. Each one also
 has an npm alias, which is the quickest way to see what stages exist:
 
 ```powershell
@@ -118,7 +125,7 @@ npm run                    # lists all eight
 | 7 | `compose.mjs` | `npm run compose` | the take + the project | `out/final.mp4` |
 | 8 | `narrate.mjs` | `npm run narrate` | `final.mp4` + cues | `out/final-narrated.mp4` |
 | 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
-| 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand/` | `out/*-carded.mp4` |
+| 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand` | `out/*-carded.mp4` |
 
 > **Passing a flag through npm on Windows: quote the separator.** In PowerShell,
 > `npm run tighten -- --dry-run` **silently runs the real thing** — PowerShell
@@ -192,7 +199,7 @@ these suits you — all three are gitignored or ephemeral:
 # a) targets/<name>.local.json — deep-merged over targets/<name>.json
 #    { "auth": { "password": "hunter2" } }
 
-# b) productvideos/.env — KEY=VALUE, read automatically
+# b) .env — KEY=VALUE, read automatically
 #    DEMO_PASSWORD=hunter2
 
 # c) the shell, for a one-off
@@ -261,7 +268,7 @@ language and let the **author-demo** skill walk the real app through the Claude
 in Chrome extension, recording what it finds:
 
 ```
-scenarios/<name>.flow          plain English, one step per line — you write this
+input/<name>.flow          plain English, one step per line — you write this
         │
         ▼   Claude drives your browser, timing every wait
 scenarios/<name>.trace.json    selectors + MEASURED wait times
@@ -285,6 +292,15 @@ double-digit silences that had to be found and fixed afterwards.
 
 Supply *more* narration lines than you think will fit; the generator places what
 the measurement allows and tells you what it dropped.
+
+**Start from the template.** `input/_template.flow` lists the header fields
+(`name`, `description`, `target`, `intro`, `outro`) and the step shapes the
+author understands. Copy it, fill it in, then ask Claude to author it:
+
+```powershell
+cp input\_template.flow input\my-feature.flow
+# edit it, then ask Claude: "author a demo from input/my-feature.flow"
+```
 
 #### Natural-language selectors
 
@@ -398,8 +414,8 @@ A scenario exports `SEL` and `run(d)`, plus optional `APP`, `VIEWPORT`,
 required only when no target supplies one. The whole skeleton:
 
 ```js
-// productvideos/scenarios/<name>.mjs
-// Record with: cd productvideos/pipeline && node driver.mjs ../scenarios/<name>.mjs
+// scenarios/<name>.mjs
+// Record with: cd pipeline/ && node driver.mjs ../scenarios/<name>.mjs
 
 export const VIEWPORT = { width: 1440, height: 810 };
 export const APP = 'http://localhost:3000';   // only if no target supplies one
@@ -812,7 +828,7 @@ headers (`Headline | Subhead`). Both cards are voiced with the same TTS provider
 as the narration; `--no-voice` makes them silent. Card length follows the
 voiceover, with a floor of 5-6s.
 
-Every brand asset comes from `productvideos/brand`, and only from there — there
+Every brand asset comes from `brand/`, and only from there — there
 is no flag to point elsewhere. `brand/StyleGuide.txt` drives the look:
 
 ```
@@ -835,7 +851,7 @@ read `StyleGuide.txt` through `brand.mjs`, so the two cannot drift apart.
 
 Headlines are set in the headline font, subheads in the body font. Fonts resolve
 from `brand/*.ttf|otf` (or
-`brand/fonts/`) first, then from installed system fonts; if neither has them,
+`brand/fonts`) first, then from installed system fonts; if neither has them,
 the card falls back to a system sans and prints a warning — so a card in the
 wrong typeface never passes silently. Editing `StyleGuide.txt` restyles the
 cards without touching the code.

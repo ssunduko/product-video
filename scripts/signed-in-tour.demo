@@ -1,7 +1,7 @@
 # A flow that signs in on camera, then tours the app.
 #
 # Credentials live in the target, never here:
-#   productvideos/targets/<name>.local.json, productvideos/.env, or DEMO_USERNAME / DEMO_PASSWORD.
+#   targets/<name>.local.json, .env, or DEMO_USERNAME / DEMO_PASSWORD.
 #
 #   node driver.mjs ../scripts/signed-in-tour.demo --target acme-staging
 #

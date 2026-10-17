@@ -1,4 +1,4 @@
-// The C4 model of productvideos/, and the generator for every rendering of it.
+// The C4 model of this repo, and the generator for every rendering of it.
 //
 //   node docs/c4-model.mjs
 //     -> docs/ProductVideo-C4.mdj   StarUML project, four diagrams
@@ -249,12 +249,12 @@ const profileId = uid('profile');
 const project = { _type: 'Project', _id: projectId, name: 'ProductVideo — C4', ownedElements: [] };
 
 const MODEL_DOC =
-  'C4 model of productvideos/ — the scripted pipeline that turns a plain-English flow ' +
+  'C4 model of the ProductVideo repo — the scripted pipeline that turns a plain-English flow ' +
   'into a narrated, branded MP4.\n\n' +
   'Levels: 1 System Context, 2 Containers, 3 Components (two containers drawn).\n\n' +
   'Generated from docs/c4-model.mjs — edit that and re-run rather than editing the ' +
   'generated files.\n\n' +
-  'The Express scaffold at the repository root (app.js, routes/, views/, bin/) is an ' +
+  'The Express scaffold in sample-app/ (app.js, routes/, views/, bin/) is an ' +
   'untouched express-generator skeleton, not part of this system, and is deliberately ' +
   'not modelled.';
 
@@ -391,7 +391,7 @@ const chromeExt = mk(pkgContext, 'external', 'Claude in Chrome extension', 'Brow
   'take itself stays with the CDP driver.');
 const ttsApi = mk(pkgContext, 'external', 'Text-to-speech API', 'ElevenLabs or OpenAI',
   'Chosen by DEMO_TTS, or by whichever key is set. Anthropic has no TTS API, so this is a third ' +
-  'party. Keys come from the shell or productvideos/.env, never a committed file. The only network ' +
+  'party. Keys come from the shell or .env, never a committed file. The only network ' +
   'dependency other than the app under demo.');
 
 const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
@@ -460,10 +460,10 @@ const cCards = mk(pkgContainers, 'container', '8 · Card Renderer', 'cards.mjs �
   'Renders branded intro/outro title cards, voices them with the same provider, and dissolves them ' +
   'on with the concat filter rather than the demuxer.');
 
-const dFlows = mk(pkgContainers, 'store', 'Flow definitions', 'scenarios/ authored, scripts/ generated',
-  'What happens on screen and what is said over it. Split by who writes it: scenarios/ holds the ' +
-  'plain-English .flow and the .trace.json observed from walking it, both authored and worth ' +
-  'reviewing; scripts/ holds the .demo the trace generates, plus its selector sidecar, either of ' +
+const dFlows = mk(pkgContainers, 'store', 'Flow definitions', 'input/ + scenarios/ authored, scripts/ generated',
+  'What happens on screen and what is said over it. Split by who writes it: input/ holds the ' +
+  'plain-English .flow and scenarios/ the .trace.json observed from walking it, both authored and ' +
+  'worth reviewing; scripts/ holds the .demo the trace generates, plus its selector sidecar, either of ' +
   'which can be deleted and rebuilt. Committed; contains no credentials.');
 const dTargets = mk(pkgContainers, 'store', 'Targets & secrets', 'targets/*.json, *.local.json, .env',
   'Which deployment, and how to sign in. The .json is committed and holds no secrets; the ' +
@@ -710,7 +710,7 @@ const kTargetLib = mk(pkgDriver, 'component', 'Target loader', 'target.mjs · sh
   'winning, and resolves env:VAR_NAME values at load time. The one place credentials are allowed ' +
   'to appear.');
 const kLauncher = mk(pkgDriver, 'component', 'Chrome launcher', 'puppeteer-core',
-  'Runs a real Chrome on productvideos/profile, pinned to --force-device-scale-factor=1 so display ' +
+  'Runs a real Chrome on profile/, pinned to --force-device-scale-factor=1 so display ' +
   'scaling cannot change the frame size. On macOS keeps --use-mock-keychain so profile cookies decrypt.');
 const kAuth = mk(pkgDriver, 'component', 'Sign-in step', 'driver.mjs',
   "Fills the target's auth.selectors and waits the app out. auth.start decides whether the take " +

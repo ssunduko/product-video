@@ -12,7 +12,7 @@
 //   OPENAI_API_KEY      -> openai       (cheaper, very close)
 //
 // Keys resolve through the same path as every other credential here: the shell,
-// productvideos/.env, or a target's `secrets` — never a committed file.
+// .env, or a target's `secrets` — never a committed file.
 //
 // Clips are cached under out/tts/ keyed by provider+voice+text, so re-running
 // after a re-cut or a video re-render costs nothing and re-bills nothing.
@@ -69,7 +69,7 @@ const SPEECH_FILTER =
 const PREMIX_LUFS = Number(process.env.NARRATION_PREMIX_LUFS ?? -20);
 const PREMIX_MAX_DB = 6; // never trust a measurement enough to swing further
 
-// loads productvideos/.env so keys can live there rather than the shell
+// loads .env so keys can live there rather than the shell
 loadTarget(undefined);
 
 // ---- args ----

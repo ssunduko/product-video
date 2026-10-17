@@ -7,7 +7,7 @@
 title C4-L3 — Components · Card Renderer (cards.mjs)
 caption Level 3, container "8 · Card Renderer".
 
-ContainerDb(flow_definitions, "Flow definitions", "scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
+ContainerDb(flow_definitions, "Flow definitions", "input/ + scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
 ContainerDb(brand_assets, "Brand assets", "brand/", "StyleGuide.txt (colour and type, the source of truth), the logo, and the font files.")
 ContainerDb(tts_clip_cache, "TTS clip cache", "out/tts/ · mp3", "One mp3 per line, keyed by provider+voice+text, plus the derived .lead.mp3 with the opening breath trimmed.")
 System_Ext(text_to_speech_api, "Text-to-speech API", "ElevenLabs or OpenAI. Chosen by DEMO_TTS, or by whichever key is set.")
