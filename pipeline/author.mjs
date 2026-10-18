@@ -161,8 +161,25 @@ export function demoFromTrace(trace) {
           break;
 
         case 'type':
-          beatLines.push(`  type ${q(step.text)} into ${ref(step)}`);
-          clock += Math.max(1000, String(step.text).length * 30);
+          // A secret is named, never written: the value comes from the target at
+          // record time, so the trace and the .demo stay safe to commit.
+          if (step.secret) {
+            beatLines.push(`  type secret ${step.secret} into ${ref(step)}`);
+            clock += 1500;
+          } else {
+            beatLines.push(`  type ${q(step.text)} into ${ref(step)}`);
+            clock += Math.max(1000, String(step.text).length * 30);
+          }
+          break;
+
+        case 'open':
+          beatLines.push(`  open ${step.url}`);
+          clock += step.observedMs ?? 3000;
+          break;
+
+        case 'scroll':
+          beatLines.push(`  scroll ${step.direction ?? 'down'} ${step.px ?? 300}`);
+          clock += 600;
           break;
 
         case 'press':

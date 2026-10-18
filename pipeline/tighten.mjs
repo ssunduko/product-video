@@ -260,7 +260,15 @@ if (zooms.length) {
 }
 
 if (!merged.length) {
-  console.log('nothing to tighten.');
+  // Still write the output. cards.mjs picks the newest stage it finds, so
+  // leaving the previous take's -tight file in place makes it join THAT video —
+  // a finished take with another take's footage and narration in it.
+  if (dryRun) {
+    console.log(`nothing to tighten (dry run: would copy to ${dst}).`);
+  } else {
+    fs.copyFileSync(src, dst);
+    console.log(`nothing to tighten — copied unchanged to\n${dst}`);
+  }
   process.exit(0);
 }
 
