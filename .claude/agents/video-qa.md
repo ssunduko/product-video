@@ -25,7 +25,12 @@ default to the single-take layout below and say that you assumed it.
   (or the newest of `final-narrated-tight.mp4`, `final-narrated.mp4`); the
   per-line timeline is `out/final-narrated.mp4` with the cues in
   `out/raw.mp4.narration.json` (or `cut.mp4.narration.json`).
-- **Several takes joined:** each part must be checked while its own stage files
+- **Several takes joined with `build.mjs`:** each part has its own folder
+  `out/<name>/<part>/` with its stage files and its `qa/` (report + stills), and
+  the joined file has `out/<name>/qa-joined/`; `out/<name>/build.json` lists the
+  trims. Re-measure a part with `DEMO_OUT=../out/<name>/<part> node qa.mjs
+  --frames ../out/<name>/<part>/qa`. Review every part, then the join.
+- **Several takes joined by hand:** each part must be checked while its own stage files
   are still in `out/` — i.e. right after that part's `cards.mjs` — and the
   joined file is checked once more for whole-video defects only. If the caller
   hands you only the joined file, run the whole-video pass and state plainly

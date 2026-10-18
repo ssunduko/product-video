@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadTarget, describeTarget, requireCredentials } from './target.mjs';
 import { compileScript } from './script.mjs';
+import { OUT } from './paths.mjs';
 
 // usage: node driver.mjs <scenario.mjs|flow.demo> [--target <name|path>]
 //
@@ -34,7 +35,6 @@ if (!inputPath) {
 }
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 const FRAMES = path.join(OUT, 'frames');
 // Overridden per target (target.profile) when a video needs two signed-in users:
 // each records from its own Chrome profile instead of signing in on camera.
@@ -370,6 +370,20 @@ const log = (type, cursorType = 'arrow') =>
 // the same cut maths as the cursor telemetry, so audio stays in sync with cuts.
 const narration = [];
 
+// Every wait the flow makes — for a page to open, an element to appear or go —
+// with its real start and end. assemble.mjs (AUTO_SPEED) fast-forwards the long
+// ones nobody is talking over, so a slow page load costs a second of video
+// instead of however long the app took on the day.
+const waits = [];
+async function timed(kind, spec, fn) {
+  const start = Date.now();
+  try {
+    return await fn();
+  } finally {
+    waits.push({ start, end: Date.now(), kind, spec: String(spec) });
+  }
+}
+
 async function moveTo(x, y, cursorType = 'arrow') {
   const dist = Math.hypot(x - cursor.x, y - cursor.y);
   const dur = Math.max(350, Math.min(1100, dist * 0.9));
@@ -486,8 +500,8 @@ const d = {
   say(text) {
     narration.push({ t: Date.now(), text: String(text) });
   },
-  waitSel: (spec, timeout) => waitSpec(spec, timeout),
-  waitGone: (spec, timeout) => waitGone(spec, timeout),
+  waitSel: (spec, timeout) => timed('wait', spec, () => waitSpec(spec, timeout)),
+  waitGone: (spec, timeout) => timed('waitGone', spec, () => waitGone(spec, timeout)),
   appears: (spec, timeout) => appears(spec, timeout),
   async hoverSel(spec) {
     const c = await center(spec);
@@ -587,7 +601,7 @@ const d = {
       return encodeURIComponent(value);
     });
     const url = new URL(filled, APP).href;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await timed('open', where, () => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }));
     log('move');
     await sleep(400);
   },
@@ -797,7 +811,7 @@ try {
 
   fs.writeFileSync(
     path.join(OUT, 'actions.json'),
-    JSON.stringify({ viewport: VIEWPORT, samples, narration }, null, 1),
+    JSON.stringify({ viewport: VIEWPORT, samples, narration, waits }, null, 1),
   );
 
   if (narration.length) console.log(`narration: ${narration.length} cues`);

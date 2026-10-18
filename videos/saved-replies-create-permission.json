@@ -1,0 +1,21 @@
+{
+  "name": "saved-replies-create-permission",
+  "description": "Saved Replies split into access and create: the admin restricts one member, the member can use replies but not add them",
+  "output": "out/saved-replies-create-permission.mp4",
+  "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },
+  "crossfadeS": 0.75,
+  "leadS": 0.6,
+  "tailS": 1.6,
+  "parts": [
+    {
+      "name": "admin",
+      "script": "scripts/saved-replies-create-permission-admin.demo",
+      "before": "profile/ signed in as the admin; the demo member's 'Can create Saved Replies' ON (this take turns it off and fails fast if it already is)"
+    },
+    {
+      "name": "member",
+      "script": "scripts/saved-replies-create-permission-member.demo",
+      "before": "profile-member/ signed in as the member; 'Can create Saved Replies' OFF for that member (part 1 leaves it so)"
+    }
+  ]
+}

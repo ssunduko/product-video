@@ -23,9 +23,9 @@ import { loadTarget } from './target.mjs';
 import { parseScript } from './script.mjs';
 import { pickProvider, speak, audioDuration } from './tts.mjs';
 import { BRAND_DIR, LOGO_WHITE as LOGO, readStyleGuide, mix, shade } from './brand.mjs';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 
 loadTarget(undefined); // loads .env
