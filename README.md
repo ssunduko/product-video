@@ -175,6 +175,14 @@ npm run                    # lists them all
 | 8 | `narrate.mjs` | `npm run narrate` | `final.mp4` + cues | `out/final-narrated.mp4` |
 | 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
 | 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand` | `out/*-carded.mp4` |
+| 11 | `qa.mjs` | `npm run qa` | the deliverable, the narrated take, the cues | `out/qa/qa.json` + stills; exit 1 on a failure |
+| — | `author.mjs` | `npm run author` | `scenarios/*.trace.json` | `scripts/*.demo` + `*.selectors.json` |
+| — | `build.mjs` | `npm run build` | `videos/<name>.json` | every stage of every part, then the joined video |
+
+Every stage reads and writes the folder in `DEMO_OUT` (default `out/`); that is
+how `build.mjs` gives each part its own. The driver talks to Chrome on
+`CDP_PORT` (default 9333) while a take runs — localhost only, but any local
+process can reach a signed-in session through it for that time.
 
 > **Passing a flag through npm on Windows: quote the separator.** In PowerShell,
 > `npm run tighten -- --dry-run` **silently runs the real thing** — PowerShell
@@ -229,6 +237,14 @@ Copy `targets/signed-in.json` to `targets/<name>.json` and edit it:
 Everything except `app` is optional. Selector strings use the same grammar as a
 scenario (`btn:Exact Text` or a puppeteer selector). Keys starting with `//` are
 treated as comments.
+
+Three more options shape the browser a take records in:
+
+| Option | Does |
+|--------|------|
+| `"profile": "profile-member"` | record from this Chrome profile instead of `profile/` — one signed-in user per profile, so a video can show two users without anyone signing in on camera |
+| `"blockUrls": ["*intercom.io*"]` | keep these from loading during the take (CDP `Network.setBlockedURLs`): chat bubbles and surveys that pop up over the controls a flow clicks |
+| `"hideSelectors": ["[aria-label^=\"AlertBanner\"]"]` | hide these with CSS on every page of the take: app banners that have nothing to do with the flow |
 
 `auth.start` decides what the take opens on:
 
@@ -421,6 +437,17 @@ Commands:
 | `wait <sel> [within 15s]` | wait for something to appear |
 | `wait <sel> gone [within 60s]` | wait for something to **disappear** — a spinner, a Stop button, a skeleton |
 | `say "..."` | a narration line, timestamped here and voiced by `narrate.mjs`. Does not pause the flow |
+| `click <sel>` | glide the cursor over and click (an off-screen element is scrolled into view first) |
+| `hover <sel>` | glide the cursor over |
+| `hold 2s` / `hold 800ms` | pause on camera |
+| `type "text" into <sel>` | click the field and type at human pace |
+| `type secret <name> into <sel>` | same, with a value from the target's `secrets` |
+| `press Enter` / `key Enter` | a key press (`key` is an alias) |
+| `scroll down [px]` / `scroll up [px]` | scroll (default 240) |
+| `open /path` | navigate without clicking. `{name}` in the path is filled from the target's `secrets`, so an internal id stays in `.env`: `open /settings/members/{memberId}/permissions` |
+| `login` / `logout` | sign in or out **on camera**, using the target's credentials |
+| `if <sel> appears [within 20s]` … `end` | optional beat — consent screens, first-run tips |
+| `note <text>` | a comment carried into the generated scenario as `// <text>` |
 
 Header directives for the title cards (read by `cards.mjs`, not the driver):
 
@@ -428,16 +455,6 @@ Header directives for the title cards (read by `cards.mjs`, not the driver):
 |-----------|---------|
 | `intro: Headline \| Subhead` | opening card; both lines appear and are read aloud |
 | `outro: Headline \| Subhead` | closing card |
-| `click <sel>` | glide the cursor over and click |
-| `hover <sel>` | glide the cursor over |
-| `hold 2s` / `hold 800ms` | pause on camera |
-| `type "text" into <sel>` | click the field and type at human pace |
-| `type secret <name> into <sel>` | same, with a value from the target's `secrets` |
-| `press Enter` | a key press |
-| `scroll down [px]` / `scroll up [px]` | scroll (default 240) |
-| `open /path` | navigate without clicking |
-| `login` / `logout` | sign in or out **on camera**, using the target's credentials |
-| `if <sel> appears [within 20s]` … `end` | optional beat — consent screens, first-run tips |
 
 Comments start with `#` at the start of a line or surrounded by spaces, so
 `css #search` keeps its id.
@@ -445,7 +462,7 @@ Comments start with `#` at the start of a line or surrounded by spaces, so
 Compile it to look at, or hand-edit, the generated scenario:
 
 ```powershell
-cd productvideos\pipeline
+cd pipeline
 node script.mjs ..\scripts\<name>.demo          # -> scenarios/<name>.mjs
 node script.mjs ..\scripts\<name>.demo --print  # to stdout
 ```
@@ -543,7 +560,7 @@ a target's `auth.selectors` — the driver puts the app in the state
 ### 3. Record
 
 ```powershell
-cd productvideos\pipeline
+cd pipeline
 node driver.mjs ..\scripts\<name>.demo --target <name>     # script
 node driver.mjs ..\scenarios\<name>.mjs --target <name>    # scenario
 ```
@@ -979,6 +996,46 @@ Take one at each click + 0.6s and one wide per page. Confirm the zoom lands on
 every click, the cursor is visible where it should be, beats are in order, and
 content actually loaded — not skeletons or spinners. Iterate cuts and zooms
 until clean.
+
+## Documentation as code
+
+The docs change in the same commit as the code they describe, and three things
+enforce it — all running one script, `docs/check.mjs`:
+
+```powershell
+node docs/check.mjs         # regenerate the diagrams, check coverage
+node docs/check.mjs --ci    # also fail if regenerating changed a committed file
+```
+
+**What it guarantees**
+
+- **Generated docs cannot drift.** `docs/*.puml`, `docs/C4.md` and
+  `docs/ProductVideo-C4.mdj` are rendered from `docs/c4-model.mjs` (the
+  generator is deterministic), so they are regenerated, never edited.
+- **Prose cannot silently fall behind.** What must be documented is derived from
+  the code itself, and the check fails with the exact list of what is missing:
+
+  | From the code | Must appear in |
+  |---|---|
+  | every `pipeline/*.mjs` file | `docs/c4-model.mjs` and `README.md` |
+  | every `process.env.NAME` a stage reads (OS variables excepted) | `README.md` |
+  | every script in `pipeline/package.json` | `README.md`, as `npm run <name>` |
+  | every option `target.mjs` accepts | `README.md`, as `"key"` or `` `key` `` |
+  | every command `script.mjs` parses | `README.md` or `scripts/grammar-tour.demo` |
+
+  It catches what is *missing*, not what is *wrong*: when a change alters what
+  a stage does, its description in the model and the README still has to be
+  updated by whoever made the change.
+
+**Where it runs**
+
+| When | How | Effect |
+|---|---|---|
+| Claude Code edits a file in `pipeline/`, the model or the README | PostToolUse hook in `.claude/settings.json` | regenerates the diagrams and tells Claude what the docs now miss, so it fixes them in the same change |
+| every commit | `.githooks/pre-commit` — enable once per clone: `git config core.hooksPath .githooks` | regenerates and stages the diagrams; blocks the commit on a coverage gap |
+| every PR and push to `main` | `.github/workflows/docs.yml` | fails if the diagrams were not regenerated or coverage has a gap |
+
+`CLAUDE.md` states the same rule for any Claude session.
 
 ## Differences from the gist
 
