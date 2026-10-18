@@ -1,3 +1,10 @@
 # Shell hooks must keep LF line endings: with CRLF, sh on macOS/Linux reads the
 # carriage return as part of the interpreter name and the hook fails to start.
 .githooks/* text eol=lf
+
+# Generated docs (docs/c4-model.mjs writes LF). Check them out as LF everywhere,
+# or core.autocrlf=true turns them into CRLF and every regeneration rewrites all
+# of them — "modified" with no change in content.
+docs/*.puml text eol=lf
+docs/C4.md text eol=lf
+docs/*.mdj text eol=lf
