@@ -22,11 +22,11 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadTarget } from './target.mjs';
-import { pickProvider, speak } from './tts.mjs';
+import { pickProvider, speak, TTS_CACHE } from './tts.mjs';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
-const CACHE = path.join(OUT, 'tts');
+const CACHE = TTS_CACHE; // shared across output folders (paths.mjs)
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 
 // ---- loudness ----

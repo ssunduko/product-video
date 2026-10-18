@@ -13,7 +13,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+// Shared by every take and output folder, so a line is never billed twice.
 const CACHE = path.join(HERE, '..', 'out', 'tts');
+export const TTS_CACHE = CACHE;
 
 export function pickProvider() {
   const forced = process.env.DEMO_TTS;

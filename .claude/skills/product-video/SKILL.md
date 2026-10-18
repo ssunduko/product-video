@@ -251,6 +251,14 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
 13. **Deliver:** copy to `../../../out/<descriptive-name>.mp4` and report the
     video-qa verdict with it.
 
+**Several takes in one video** (two users, two apps) — write a manifest in
+`../../../videos/<name>.json` and run `node build.mjs ../videos/<name>.json`
+instead of the stages by hand. It records each part into its own folder
+(`DEMO_OUT`), renders it with the manifest's `env` (set `AUTO_SPEED` there to
+fast-forward unnarrated waits), gates every part and the join on `qa.mjs`, and
+trims the silence at each join by measurement. Do not join takes with ad-hoc
+ffmpeg: the result cannot be rebuilt. Then run video-qa on the stills it prints.
+
 ## Gotchas
 
 | Symptom | Cause / fix                                                                                                                                                                                |
