@@ -7,7 +7,7 @@
 title C4-L3 — Components · Compositor (compose.mjs)
 caption Level 3, container "5 · Compositor".
 
-ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
+ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
 ContainerDb(brand_assets, "Brand assets", "brand/", "StyleGuide.txt (colour and type, the source of truth), the logo, and the font files.")
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
 

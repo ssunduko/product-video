@@ -7,7 +7,7 @@
 title C4-L3 — Components · Zoom Projector (project.mjs)
 caption Level 3, container "4 · Zoom Projector".
 
-ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
+ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
 
 Container_Boundary(zoom_projector_2, "4 · Zoom Projector") {
   Component(telemetry_reader, "Telemetry reader", "project.mjs", "Takes the cursor.json beside the newest take, cut.mp4 before raw.mp4, and keeps the clicks.")
