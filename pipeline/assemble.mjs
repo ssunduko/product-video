@@ -1,11 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { loadTarget } from './target.mjs';
+import { pickProvider, TTS_CACHE as OUT_TTS } from './tts.mjs';
+import { speechMs } from './author.mjs';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
+const FFPROBE =
+  process.env.FFPROBE ||
+  (process.env.FFMPEG
+    ? path.join(path.dirname(process.env.FFMPEG), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe')
+    : 'ffprobe');
+
+loadTarget(undefined); // .env, for the TTS provider the clip cache is keyed on
 
 // Two ways to shorten a take, and the difference matters more than it looks.
 //
@@ -19,8 +30,20 @@ const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 // viewer on a finished table having never seen it arrive. Fast-forwarding the
 // same span keeps every frame and still costs eight seconds instead of two
 // minutes, and reads as a deliberate fast-forward rather than a jump.
+//
+// AUTO_SPEED=<factor> adds SPEEDS_MS ranges by itself, from the waits the driver
+// logged: every wait (page open, element appearing or going) of at least
+// AUTO_SPEED_MIN_MS that has no narration over it is played at <factor>. Lines
+// are never sped up — a range is clipped to start after the previous line has
+// finished speaking and to end before the next one starts. Hand-written
+// SPEEDS_MS / CUTS_MS win where they overlap.
 const CUTS = JSON.parse(process.env.CUTS_MS || '[]');
 const SPEEDS = JSON.parse(process.env.SPEEDS_MS || '[]');
+const AUTO_SPEED = Number(process.env.AUTO_SPEED || 0);
+const AUTO_SPEED_MIN_MS = Number(process.env.AUTO_SPEED_MIN_MS || 2000);
+const AUTO_HEAD_MS = 300; // keep the first moment of a wait at 1x: the click registering
+const AUTO_TAIL_MS = 500; // and the last: the result landing
+const AUTO_LINE_AIR_MS = 300; // never closer than this to a line
 const OUT_NAME = process.env.OUT_NAME || 'raw.mp4';
 
 for (const [a, b, factor] of SPEEDS) {
@@ -36,7 +59,7 @@ for (const [a, b] of CUTS) {
 }
 
 const allFrames = JSON.parse(fs.readFileSync(path.join(OUT, 'frames.json'), 'utf8'));
-const { viewport, samples, narration = [] } = JSON.parse(
+const { viewport, samples, narration = [], waits = [] } = JSON.parse(
   fs.readFileSync(path.join(OUT, 'actions.json'), 'utf8'),
 );
 
@@ -44,6 +67,73 @@ if (allFrames.length < 10) throw new Error(`only ${allFrames.length} frames capt
 
 // video timeline starts at the first screencast frame
 const t0 = allFrames[0].ts; // epoch seconds (float)
+
+if (AUTO_SPEED) {
+  if (!(AUTO_SPEED > 1)) throw new Error(`AUTO_SPEED needs a factor above 1, got ${process.env.AUTO_SPEED}`);
+  const auto = autoSpeeds();
+  for (const r of auto) SPEEDS.push(r);
+  console.log(
+    auto.length
+      ? `auto-speed x${AUTO_SPEED}: ${auto.map(([a, b]) => `${(a / 1000).toFixed(1)}-${(b / 1000).toFixed(1)}s`).join(', ')}`
+      : `auto-speed x${AUTO_SPEED}: no unnarrated wait of ${AUTO_SPEED_MIN_MS}ms or more`,
+  );
+}
+
+function autoSpeeds() {
+  if (!waits.length) {
+    console.warn('auto-speed: actions.json has no waits — re-record with the current driver.mjs');
+    return [];
+  }
+  const vt = (epochMs) => epochMs - t0 * 1000;
+
+  // an open() followed by the wait for the page's content is one load
+  const spans = waits
+    .map((w) => [vt(w.start), vt(w.end)])
+    .filter(([, e]) => e > 0)
+    .sort((a, b) => a[0] - b[0])
+    .reduce((acc, [s, e]) => {
+      const last = acc[acc.length - 1];
+      if (last && s - last[1] < 600) last[1] = Math.max(last[1], e);
+      else acc.push([Math.max(0, s), e]);
+      return acc;
+    }, []);
+
+  // where a voice is speaking, at its real length when narrate.mjs has cached
+  // the clip, else at the author's deliberately slow estimate
+  const lines = narration.map((c) => {
+    const s = vt(c.t);
+    return [s - AUTO_LINE_AIR_MS, s + lineMs(c.text) + AUTO_LINE_AIR_MS];
+  });
+
+  const ranges = [];
+  for (const [s, e] of spans) {
+    let free = [[s + AUTO_HEAD_MS, e - AUTO_TAIL_MS]];
+    for (const [ls, le] of lines) {
+      free = free.flatMap(([a, b]) => (le <= a || ls >= b ? [[a, b]] : [[a, ls], [le, b]].filter(([x, y]) => y > x)));
+    }
+    for (const [a, b] of free) {
+      if (b - a < AUTO_SPEED_MIN_MS) continue;
+      const clash = [...SPEEDS, ...CUTS].some(([x, y]) => a < y && b > x);
+      if (!clash) ranges.push([Math.round(a), Math.round(b), AUTO_SPEED]);
+    }
+  }
+  return ranges;
+}
+
+function lineMs(text) {
+  try {
+    const provider = pickProvider();
+    const hash = crypto.createHash('sha256').update(`${provider.name}|${provider.voice}|${text}`).digest('hex').slice(0, 16);
+    const file = [path.join(OUT_TTS, `${hash}.lead.mp3`), path.join(OUT_TTS, `${hash}.mp3`)].find((f) => fs.existsSync(f));
+    if (file) {
+      const s = Number(execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString());
+      if (s > 0) return s * 1000;
+    }
+  } catch {
+    // no provider configured or no clip yet: estimate
+  }
+  return speechMs(text);
+}
 const inCut = (vtMs) => CUTS.some(([a, b]) => vtMs >= a && vtMs < b);
 
 // One time-warp, used for frames, cursor telemetry and narration cues alike.

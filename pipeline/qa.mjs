@@ -35,10 +35,10 @@ import crypto from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadTarget } from './target.mjs';
-import { pickProvider } from './tts.mjs';
+import { pickProvider, TTS_CACHE } from './tts.mjs';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const FFPROBE =
   process.env.FFPROBE ||
@@ -176,8 +176,8 @@ function lineDurationS(text) {
       .slice(0, 16);
     // narrate.mjs plays the head-trimmed clip when there is one
     const file = firstExisting(
-      path.join(OUT, 'tts', `${hash}.lead.mp3`),
-      path.join(OUT, 'tts', `${hash}.mp3`),
+      path.join(TTS_CACHE, `${hash}.lead.mp3`),
+      path.join(TTS_CACHE, `${hash}.mp3`),
     );
     if (!file) return null;
     return Number(
