@@ -1,0 +1,31 @@
+{
+  "name": "salesmessage",
+  "description": "Salesmessage web app as the ADMIN — session comes from profile/ (Google SSO)",
+  "app": "https://app.salesmessage.com",
+  "startUrl": "/settings/roles-permissions",
+  "viewport": {
+    "width": 1440,
+    "height": 810
+  },
+  "pageUrlMatch": [
+    "accounts.google.com"
+  ],
+  "//blockUrls": "kept from loading during a take: the Intercom 'Welcome to Salesmsg' popup covers the permission checkboxes",
+  "blockUrls": [
+    "*intercom.io*",
+    "*intercomcdn.com*",
+    "*intercomassets.com*"
+  ],
+  "//hideSelectors": "hidden with CSS during a take: app banners (Aircall disconnected, notifications blocked) that sit across the top of every frame",
+  "hideSelectors": [
+    "[aria-label^=\"AlertBanner\"]"
+  ],
+  "//auth": "The admin signs in with Google SSO, which the driver cannot fill. mode 'none' means: use whatever session profile/ already holds. Sign in to app.salesmessage.com once by hand in that profile; takes never log it out.",
+  "auth": {
+    "mode": "none"
+  },
+  "//secrets": "internal ids kept out of the repo: a script writes open /settings/members/{memberId}/... and the driver fills it in. Set SALESMSG_DEMO_MEMBER_ID in .env.",
+  "secrets": {
+    "memberId": "env:SALESMSG_DEMO_MEMBER_ID"
+  }
+}

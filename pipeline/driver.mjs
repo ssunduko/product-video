@@ -36,7 +36,9 @@ if (!inputPath) {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(HERE, '..', 'out');
 const FRAMES = path.join(OUT, 'frames');
-const PROFILE = path.join(HERE, '..', 'profile');
+// Overridden per target (target.profile) when a video needs two signed-in users:
+// each records from its own Chrome profile instead of signing in on camera.
+let PROFILE = path.join(HERE, '..', 'profile');
 const PORT = Number(process.env.CDP_PORT || 9333);
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -91,6 +93,11 @@ if (!APP) {
 }
 
 const VIEWPORT = target?.viewport ?? scenario.VIEWPORT ?? { width: 1440, height: 810 };
+
+if (target?.profile) {
+  PROFILE = path.resolve(HERE, '..', target.profile);
+  console.log(`profile: ${PROFILE}`);
+}
 
 // which tabs count as "the app" — always includes the app's own host, plus
 // anything the scenario or target lists (e.g. an external identity provider)
@@ -249,6 +256,34 @@ const page = await findAppPage();
 await page.bringToFront();
 
 const cdp = await page.createCDPSession();
+
+// Third-party widgets that pop up mid-take (a chat bubble, a survey) cover the
+// very controls a flow clicks. A target can keep them from loading at all.
+if (target?.blockUrls?.length) {
+  await cdp.send('Network.enable');
+  await cdp.send('Network.setBlockedURLs', { urls: target.blockUrls });
+  console.log(`blocking: ${target.blockUrls.join(', ')}`);
+}
+
+// App-rendered banners that have nothing to do with the flow ("integration
+// disconnected", "notifications are blocked") eat the top of every frame. A
+// target can hide them with CSS, on this page and on every page loaded later.
+if (target?.hideSelectors?.length) {
+  const css = `${target.hideSelectors.join(',\n')} { display: none !important; }`;
+  const inject = (rules) => {
+    const add = () => {
+      const s = document.createElement('style');
+      s.dataset.demoHide = '1';
+      s.textContent = rules;
+      document.documentElement.appendChild(s);
+    };
+    if (document.documentElement) add();
+    else document.addEventListener('DOMContentLoaded', add);
+  };
+  await page.evaluateOnNewDocument(inject, css);
+  await page.evaluate(inject, css);
+  console.log(`hiding: ${target.hideSelectors.join(', ')}`);
+}
 
 // size window so the viewport is exactly VIEWPORT
 for (let i = 0; i < 5; i++) {
@@ -425,8 +460,22 @@ async function waitGone(spec, timeout = 30000) {
 
 async function center(spec, timeout = 10000) {
   const el = await waitSpec(spec, timeout);
-  const box = await el.boundingBox();
+  let box = await el.boundingBox();
   if (!box) throw new Error(`no box for ${spec}`);
+
+  // The mouse is driven by coordinates, so an element below the fold would be
+  // clicked at a point off the screen. Bring it into view first — smoothly, so
+  // the take shows the page moving rather than jumping — and re-measure.
+  const offscreen = box.y < 0 || box.y + box.height > VIEWPORT.height ||
+    box.x < 0 || box.x + box.width > VIEWPORT.width;
+  if (offscreen) {
+    await el.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    log('move');
+    await sleep(900);
+    box = await el.boundingBox();
+    if (!box) throw new Error(`no box for ${spec} after scrolling it into view`);
+  }
+
   return { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200) };
 }
 
@@ -527,8 +576,17 @@ const d = {
     log('move');
     await sleep(200);
   },
-  async open(target) {
-    const url = new URL(target, APP).href;
+  // `{name}` in the path is filled from the target's secrets, so an internal id
+  // (a member's settings URL, say) lives in .env rather than in a committed script.
+  async open(where) {
+    const filled = String(where).replace(/\{([A-Za-z_]\w*)\}/g, (_, name) => {
+      const value = target?.secrets?.[name];
+      if (value == null) {
+        throw new Error(`open ${where}: target has no secret "${name}" (add it under "secrets", e.g. "env:VAR_NAME")`);
+      }
+      return encodeURIComponent(value);
+    });
+    const url = new URL(filled, APP).href;
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     log('move');
     await sleep(400);

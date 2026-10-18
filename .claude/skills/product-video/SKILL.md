@@ -238,15 +238,18 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
     TTS provider; `--no-voice` for silent. Joins with ffmpeg's concat *filter*,
     not the demuxer, so separately-encoded segments splice cleanly.
 
-12. **Verify before claiming done:** extract frames from `final.mp4` at each
-   click + 0.6s and one wide per page; Read them; confirm zoom-in at every
-   click, the cursor visible where expected, beats in order, content actually
-   loaded (not skeletons/spinners). Iterate cuts/zooms until clean.
-   For a narrated cut, check the audio too — `silencedetect` for gaps the cue
-   placement missed, `ebur128` per line for one that sits below the rest.
+12. **Quality gate — required:** delegate to the **video-qa** agent
+   (`.claude/agents/video-qa.md`). It runs `node qa.mjs` (overlapping
+   narration, line sync, dead air, frozen/loading screens, black frames,
+   loudness) and then checks every narration line against a still of the
+   screen. Do not deliver, and do not call the video done, on its FAIL — fix
+   what it names (usually in the trace) and re-record or re-render, then run it
+   again. For a video joined from several takes, run it on each part right
+   after that part's `cards.mjs`, while its stage files are still in `out/`,
+   and once more on the joined file.
 
-13. **Deliver:** copy to `../../../out/<descriptive-name>.mp4` and report
-    beat-by-beat verification.
+13. **Deliver:** copy to `../../../out/<descriptive-name>.mp4` and report the
+    video-qa verdict with it.
 
 ## Gotchas
 
