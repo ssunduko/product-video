@@ -66,11 +66,15 @@ if (MODE === 'hook') {
 // ---------------------------------------------------------------- 1. regenerate
 const GENERATED_DIR = path.join(ROOT, 'docs');
 const isGenerated = (f) => /\.(puml|mdj)$/.test(f) || f === 'C4.md';
+// Hashed with line endings normalised: a checkout made with core.autocrlf=true
+// holds CRLF while the generator writes LF, and that alone is not a change.
 const snapshot = () =>
   Object.fromEntries(
     fs.readdirSync(GENERATED_DIR)
       .filter(isGenerated)
-      .map((f) => [f, crypto.createHash('sha1').update(fs.readFileSync(path.join(GENERATED_DIR, f))).digest('hex')]),
+      .map((f) => [f, crypto.createHash('sha1')
+        .update(fs.readFileSync(path.join(GENERATED_DIR, f), 'utf8').replace(/\r\n/g, '\n'))
+        .digest('hex')]),
   );
 
 const before = snapshot();
