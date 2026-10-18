@@ -7,23 +7,26 @@
 title C4-L3 — Components · Driver (driver.mjs)
 caption Level 3, container "2 · Driver".
 
-Person(demo_author, "Demo author", "Developer or PM. Writes the flow as a .demo script, points it at a deployment with a target, then runs the stages in turn from a shell and checks the frames.")
-System_Ext(google_chrome, "Google Chrome", "Chrome + DevTools Protocol. Driven by puppeteer-core on a dedicated user-data profile, so a login survives between takes.")
+Person(demo_author, "Demo author", "Developer or PM. Writes the flow in plain English or as a .demo script, points it at a deployment with a target, and builds the video: one stage at a time from a shell, or every part of a video wit...")
+System_Ext(google_chrome, "Google Chrome", "Chrome + DevTools Protocol. Driven by puppeteer-core on a dedicated user-data profile — one per target, so a login survives between takes and a video can show two signed-in users without anyone signing in on camera.")
 ContainerDb(flow_definitions, "Flow definitions", "input/ + scenarios/ authored, scripts/ generated", "What happens on screen and what is said over it.")
 ContainerDb(targets_secrets, "Targets & secrets", "targets/*.json, *.local.json, .env", "Which deployment, and how to sign in.")
-ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
+ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
+ContainerDb(browser_profiles, "Browser profiles", "profile/, profile-*/ · gitignored", "Chrome user-data directories holding signed-in sessions, one per target that needs its own user.")
 
 Container_Boundary(driver_2, "2 · Driver") {
   Component(input_resolver, "Input resolver", "driver.mjs", "Reads argv.")
   Component(script_compiler_3, "Script compiler", "script.mjs · shared", "Parses the .demo grammar — header directives, a selectors block, then beats — and emits a scenario module.")
   Component(target_loader, "Target loader", "target.mjs · shared", "Deep-merges the target JSON, its .local.json sidecar, .env and the DEMO_* env vars, later winning, and resolves env:VAR_NAME values at load time.")
-  Component(chrome_launcher, "Chrome launcher", "puppeteer-core", "Runs a real Chrome on profile/, pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size.")
+  Component(chrome_launcher, "Chrome launcher", "puppeteer-core", "Runs a real Chrome on the target's profile (profile/ unless the target names another), pinned to --force-device-scale-factor=1 so display scaling cannot change the frame size.")
   Component(sign_in_step, "Sign-in step", "driver.mjs", "Fills the target's auth.selectors and waits the app out. auth.start decides whether the take opens signed-out, with the login part of the demo, or signed-in, with the login happening off-camera bef...")
   Component(flow_primitives, "Flow primitives", "driver.mjs · d.*", "hold, waitSel, waitGone, appears, hoverSel, clickSel, type, key, wheel, open, race, login, logout. d.type verifies the click actually focused the element and refuses to type into the wrong one rath...")
   Component(screencast_recorder, "Screencast recorder", "CDP Page.startScreencast", "Acks every frame and writes out/frames/*.jpg plus frames.json.")
   Component(input_telemetry_recorder, "Input telemetry recorder", "driver.mjs", "Samples synthesized pointer moves and clicks into actions.json.")
   Component(narration_cue_collector, "Narration cue collector", "driver.mjs · d.say()", "Stamps { t, text } at wall-clock time and returns immediately — the voice plays over the visuals instead of the flow pausing for it.")
   Component(teardown, "Teardown", "driver.mjs", "Stops the screencast, writes frames.json and actions.json, and closes Chrome by its window rather than killing it, so unflushed session state is not lost.")
+  Component(page_conditioner, "Page conditioner", "CDP Network.setBlockedURLs + injected CSS", "Applies the target to the page before the take: blockUrls keeps third-party widgets such as a chat bubble from loading, and hideSelectors hides app banners on this page and every page loaded after it.")
+  Component(wait_logger, "Wait logger", "driver.mjs · timed()", "Times every open, wait and wait-gone the flow makes, keeping { start, end, kind, spec }. Written to actions.json for the assembler to fast-forward the long ones.")
 }
 
 Rel(demo_author, input_resolver, "Runs", "CLI")
@@ -44,6 +47,12 @@ Rel(screencast_recorder, work_directory, "Writes frames")
 Rel(teardown, input_telemetry_recorder, "Serialises")
 Rel(teardown, narration_cue_collector, "Serialises")
 Rel(teardown, work_directory, "Writes actions.json + frames.json")
+Rel(chrome_launcher, browser_profiles, "Runs Chrome on the target's")
+Rel(chrome_launcher, page_conditioner, "Conditions the page via")
+Rel(page_conditioner, target_loader, "Reads blockUrls and hideSelectors from")
+Rel(page_conditioner, google_chrome, "Blocks URLs and injects CSS", "CDP")
+Rel(flow_primitives, wait_logger, "Every open and wait is timed by")
+Rel(teardown, wait_logger, "Serialises")
 
 LAYOUT_WITH_LEGEND()
 @enduml

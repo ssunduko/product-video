@@ -1,0 +1,28 @@
+# Documentation as code: fail a change whose docs are out of step with its code.
+#   - the generated diagrams (docs/*.puml, C4.md, the StarUML project) must match
+#     docs/c4-model.mjs, i.e. someone ran the generator and committed the result;
+#   - README.md and the C4 model must cover every pipeline stage, env var, npm
+#     script, target option and script command the code defines.
+# The same check runs locally in the pre-commit hook (.githooks/pre-commit) and,
+# for Claude Code, after every edit (.claude/settings.json).
+name: Docs
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Docs match the code
+        run: node docs/check.mjs --ci
