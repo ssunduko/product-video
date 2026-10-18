@@ -33,9 +33,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const FFPROBE =

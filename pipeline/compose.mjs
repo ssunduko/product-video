@@ -18,9 +18,9 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, ImageData } from '@napi-rs/canvas';
 import { readStyleGuide, shade } from './brand.mjs';
+import { OUT } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(HERE, '..', 'out');
 
 const STYLE = readStyleGuide();
 

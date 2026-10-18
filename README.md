@@ -25,6 +25,9 @@ cursor, and a styled window frame.
                     plain English")
     brand.mjs       StyleGuide.txt -> colours and fonts, shared by every stage
     tts.mjs         shared text-to-speech provider + clip cache
+    qa.mjs          quality gate: overlap, sync, dead air, frozen/loading, lineage
+    build.mjs       one command per video: record + render + gate each part, join
+    paths.mjs       where stages read/write (DEMO_OUT, default out/)
   targets/
     signed-in.json          template for an app that needs sign-in
     local-app.json          the Express app in sample-app/
@@ -37,6 +40,8 @@ cursor, and a styled window frame.
                             measured wait times
     <name>.mjs              hand-written scenarios, when a flow needs real
                             control flow — see "b. A scenario" below
+  videos/                   one manifest per finished video: its parts, settings,
+                            and how they join (see "Build a whole video")
   scripts/                  what gets EXECUTED: the DSL, generated or hand-written
     mcp.demo                generated from scenarios/mcp.trace.json
     mcp.selectors.json      its sidecar — must sit beside the .demo (see below)
@@ -108,12 +113,56 @@ your dev server; if it is down, start it yourself first.
 
 ## Usage
 
+### Build a whole video with one command
+
+A video is described by a manifest in `videos/<name>.json`: its parts (one take
+each, in order), the settings every stage runs with, and how the parts are
+joined. `build.mjs` records and renders every part into its own folder,
+gates each on `qa.mjs`, joins them and gates the result:
+
+```powershell
+cd pipeline
+node build.mjs ..\videos\saved-replies-create-permission.json
+node build.mjs ..\videos\<name>.json --only member               # rebuild one part
+node build.mjs ..\videos\<name>.json --only member --no-record   # re-render it, no Chrome
+node build.mjs ..\videos\<name>.json --join-only                 # just re-join and re-check
+```
+
+```jsonc
+{
+  "name": "saved-replies-create-permission",
+  "output": "out/saved-replies-create-permission.mp4",
+  "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },   // every stage of every part
+  "crossfadeS": 0.75,
+  "leadS": 0.6, "tailS": 1.6,     // silence kept either side of a join
+  "parts": [
+    { "name": "admin",  "script": "scripts/...-admin.demo",  "before": "printed before the take" },
+    { "name": "member", "script": "scripts/...-member.demo", "before": "..." }
+  ]
+}
+```
+
+- **Per-part folders.** Each part builds in `out/<name>/<part>/` (the stages
+  honour `DEMO_OUT`), so one take never overwrites another's `raw.mp4`,
+  `final.mp4`... The TTS cache stays shared in `out/tts`.
+- **Joins are measured, not hand-picked.** A part keeps `tailS` of silence after
+  its last word and the next keeps `leadS` before its first; they crossfade for
+  `crossfadeS`.
+- **It stops on the first failed gate** and says which part to fix and how to
+  rerun. `--no-gate` keeps going (failures are still reported).
+- The visual review still belongs to the **video-qa** agent: the build prints the
+  stills folders to hand it.
+- A record of what was built — trims, per-part verdicts — is written to
+  `out/<name>/build.json`.
+
+### Run the stages yourself
+
 Every stage is a script in `pipeline`, run from that directory. Each one also
 has an npm alias, which is the quickest way to see what stages exist:
 
 ```powershell
-cd productvideos\pipeline
-npm run                    # lists all eight
+cd pipeline
+npm run                    # lists them all
 ```
 
 | Step | Stage | npm alias | Reads | Writes |
@@ -519,9 +568,29 @@ inter-frame gaps — the video freezes there. Spot-check beats:
 ffmpeg -ss 12.5 -i ..\out\raw.mp4 -frames:v 1 ..\out\f.png
 ```
 
-### 5. Shorten the long waits by hand (optional)
+### 5. Shorten the long waits (automatic, or by hand)
 
-For a stretch you want dealt with *before* zoom regions are derived from it.
+**Automatic: `AUTO_SPEED=<factor>`.** The driver logs every wait the flow makes
+— an `open`, a `wait ... `, a `wait ... gone` — with its real start and end in
+`actions.json`. With `AUTO_SPEED` set, `assemble.mjs` plays every wait of at
+least `AUTO_SPEED_MIN_MS` (default 2000) that has no narration over it at
+`<factor>`:
+
+```powershell
+$env:AUTO_SPEED='10'; $env:OUT_NAME='cut.mp4'; node assemble.mjs
+# auto-speed x10: 4.9-8.4s, 36.2-43.0s
+```
+
+A range never covers a line: it starts only after the previous line has
+finished speaking (its real length from the TTS cache, or the author's slow
+estimate before narration exists) and ends before the next starts, so speeding
+the picture cannot pull two lines onto each other. Hand-written `SPEEDS_MS` and
+`CUTS_MS` win where they overlap. A page load that took 22s on the day costs
+about two seconds of video. Takes recorded before the driver logged waits have
+none; re-record them.
+
+**By hand** — for a stretch you want dealt with *before* zoom regions are
+derived from it.
 Routine dead air does not belong here: step 9 finds and removes it automatically
 once the narration is on the timeline, and knows the difference between an empty
 pause and a shot the voiceover is playing over. This step is for the two things

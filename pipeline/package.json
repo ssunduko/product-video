@@ -14,7 +14,8 @@
     "tighten": "node tighten.mjs",
     "cards": "node cards.mjs",
     "author": "node author.mjs",
-    "qa": "node qa.mjs"
+    "qa": "node qa.mjs",
+    "build": "node build.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.3",
