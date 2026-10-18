@@ -1,0 +1,30 @@
+#!/bin/sh
+# Documentation as code: regenerate the diagrams and check the docs still cover
+# the code before every commit. Enable once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# Regenerated diagram files are added to the commit automatically. A coverage
+# gap (an undocumented env var, npm script, target option, stage or script
+# command) blocks the commit with the list of what is missing. Bypassing it
+# with --no-verify only moves the failure to the PR check (.github/workflows/docs.yml).
+
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: node not found; skipping the docs check (CI will still run it)" >&2
+  exit 0
+fi
+
+node docs/check.mjs
+status=$?
+
+# stage whatever the generator rewrote, so the commit carries the matching diagrams
+git add -- docs/C4.md docs/ProductVideo-C4.mdj docs/c4-*.puml 2>/dev/null
+
+if [ $status -ne 0 ]; then
+  echo "" >&2
+  echo "pre-commit: the docs are out of step with the code (above). Update them and commit again." >&2
+fi
+exit $status

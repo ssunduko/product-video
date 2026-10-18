@@ -7,8 +7,9 @@
 title C4-L3 — Components · Assembler (assemble.mjs)
 caption Level 3, container "3 · Assembler".
 
-ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
+ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
+ContainerDb(tts_clip_cache, "TTS clip cache", "out/tts/ · mp3", "One mp3 per line, keyed by provider+voice+text, plus the derived .lead.mp3 with the opening breath trimmed.")
 
 Container_Boundary(assembler_2, "3 · Assembler") {
   Component(cut_and_speed_config, "Cut and speed config", "CUTS_MS, SPEEDS_MS · env", "Two ways to shorten a take: a cut drops the frames, a speed keeps them and plays them fast.")
@@ -19,6 +20,7 @@ Container_Boundary(assembler_2, "3 · Assembler") {
   Component(encoder, "Encoder", "ffmpeg libx264", "Scales to 1920x1080 with lanczos at 60fps, CRF 18.")
   Component(telemetry_mapper, "Telemetry mapper", "assemble.mjs", "Normalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps the rest.")
   Component(cue_mapper, "Cue mapper", "assemble.mjs", "The identical filter and warp for narration cues, and it reports how many were dropped inside cuts.")
+  Component(auto_speed_planner, "Auto-speed planner", "assemble.mjs · AUTO_SPEED", "Turns the driver's logged waits into speed ranges: every wait of at least AUTO_SPEED_MIN_MS with no narration over it, clipped to start after the previous line has finished and to end before the ne...")
 }
 
 Rel(cut_and_speed_config, time_warp, "Validated ranges to")
@@ -33,6 +35,9 @@ Rel(encoder, ffmpeg_ffprobe, "Runs", "child process")
 Rel(encoder, work_directory, "Writes raw.mp4 or cut.mp4")
 Rel(telemetry_mapper, work_directory, "Writes cursor.json")
 Rel(cue_mapper, work_directory, "Writes narration.json")
+Rel(work_directory, auto_speed_planner, "Logged waits and cues to")
+Rel(tts_clip_cache, auto_speed_planner, "Line lengths to")
+Rel(auto_speed_planner, time_warp, "Unnarrated waits as sped-up ranges to")
 
 LAYOUT_WITH_LEGEND()
 @enduml

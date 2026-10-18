@@ -251,7 +251,7 @@ const project = { _type: 'Project', _id: projectId, name: 'ProductVideo — C4',
 const MODEL_DOC =
   'C4 model of the ProductVideo repo — the scripted pipeline that turns a plain-English flow ' +
   'into a narrated, branded MP4.\n\n' +
-  'Levels: 1 System Context, 2 Containers, 3 Components (two containers drawn).\n\n' +
+  'Levels: 1 System Context, 2 Containers, 3 Components (every container drawn).\n\n' +
   'Generated from docs/c4-model.mjs — edit that and re-run rather than editing the ' +
   'generated files.\n\n' +
   'The Express scaffold in sample-app/ (app.js, routes/, views/, bin/) is an ' +
@@ -365,20 +365,24 @@ const pkgContext = pkg(
 );
 
 const author = mk(pkgContext, 'person', 'Demo author', '',
-  'Developer or PM. Writes the flow as a .demo script, points it at a deployment with a ' +
-  'target, then runs the stages in turn from a shell and checks the frames.');
+  'Developer or PM. Writes the flow in plain English or as a .demo script, points it at a ' +
+  'deployment with a target, and builds the video: one stage at a time from a shell, or every part ' +
+  'of a video with one build command. Nothing is delivered until it passes the quality gate and ' +
+  'the video-qa review.');
 const viewer = mk(pkgContext, 'person', 'Viewer', '',
   'Prospect, customer or internal audience. Watches the finished MP4; never touches the pipeline.');
 const system = mk(pkgContext, 'system', 'Demo Video Pipeline', 'Node.js CLI stages',
   'Turns a plain-English flow into a narrated, branded MP4. Drives a real browser, captures ' +
   'frames and input telemetry, then assembles, zooms, composites, narrates, tightens and cards ' +
-  'the result. The stages run one at a time, by hand.');
+  'the result. The stages run one at a time by hand, or all of them per video through the build ' +
+  'orchestrator; every video is measured by the quality gate before it is called done.');
 const appUnderDemo = mk(pkgContext, 'external', 'Web application under demo', 'Any web app',
   'The deployment being recorded — localhost, staging, a customer sandbox, or a third-party app ' +
   'such as claude.ai. Named by a target; may require signing in. Flows run against live data, so ' +
   'the pipeline hovers rather than clicking anything destructive.');
 const chrome = mk(pkgContext, 'external', 'Google Chrome', 'Chrome + DevTools Protocol',
-  'Driven by puppeteer-core on a dedicated user-data profile, so a login survives between takes. ' +
+  'Driven by puppeteer-core on a dedicated user-data profile — one per target, so a login survives ' +
+  'between takes and a video can show two signed-in users without anyone signing in on camera. ' +
   'Frames come from Page.startScreencast. The cursor in the finished video is synthesized from ' +
   'telemetry rather than recorded, so the capture needs no real cursor.');
 const ffmpeg = mk(pkgContext, 'external', 'ffmpeg / ffprobe', 'Local CLI',
@@ -394,6 +398,11 @@ const ttsApi = mk(pkgContext, 'external', 'Text-to-speech API', 'ElevenLabs or O
   'party. Keys come from the shell or .env, never a committed file. The only network ' +
   'dependency other than the app under demo.');
 
+const qaAgent = mk(pkgContext, 'external', 'video-qa agent', 'Claude Code subagent',
+  'Reviews a finished video: runs the quality gate, then checks every narration line against a ' +
+  'still of the screen — is the thing being described on screen while it is said? — and returns ' +
+  'PASS or FAIL with the fix for each defect. Read-only. Defined in .claude/agents/video-qa.md.');
+
 const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   'Level 1. The pipeline as one box, with the people who use it and the systems it depends on.');
 {
@@ -405,6 +414,7 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   const vFfmpeg = place(dL1, ffmpeg, 440, 460);
   const vTts = place(dL1, ttsApi, 800, 460);
   const vExt = place(dL1, chromeExt, 800, 620);
+  const vQaAgent = place(dL1, qaAgent, 440, 620);
 
   link(dL1, pkgContext, vAuthor, vSystem, 'Writes flows and runs the stages', 'CLI');
   link(dL1, pkgContext, vSystem, vExt, 'Resolves natural-language selectors before a take via');
@@ -414,14 +424,17 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   link(dL1, pkgContext, vChrome, vApp, 'Loads and interacts with', 'HTTP');
   link(dL1, pkgContext, vSystem, vFfmpeg, 'Encodes, decodes and filters via', 'child process');
   link(dL1, pkgContext, vSystem, vTts, 'Renders speech via', 'HTTPS');
+  link(dL1, pkgContext, vQaAgent, vSystem, 'Reviews every video built by');
 }
 
 // ======================================================= L2 — containers ==
 const pkgContainers = pkg(
   '2 — Containers',
-  'Inside the pipeline. Every stage is a separately-invoked Node CLI, so the stages do not call ' +
-    'each other — they hand work over through out/. The numbers are the order you run them in; ' +
-    'there are deliberately no arrows between stages, because there are no calls between stages.',
+  'Inside the pipeline. Every stage is a separately-invoked Node CLI; the stages never call each ' +
+    'other — they hand work over through the work directory. The numbers are the order they run ' +
+    'in. The build orchestrator is the one thing that runs them: per part of a video, as child ' +
+    'processes, before it joins the parts. There are deliberately no arrows between stages, because ' +
+    'there are no calls between them.',
 );
 
 // Numbered 0 because it runs before the pipeline proper and is optional: a
@@ -437,11 +450,14 @@ const cScript = mk(pkgContainers, 'container', '1 · Script Compiler', 'script.m
   'hand-written scenario. driver.mjs also calls it on the way in.');
 const cDriver = mk(pkgContainers, 'container', '2 · Driver', 'driver.mjs · Node.js + puppeteer-core',
   'Launches Chrome, signs in if the target says to, runs the flow, and records a screencast plus ' +
-  'cursor, click and narration-cue telemetry. Closes Chrome cleanly so cookies flush.');
+  'cursor, click and narration-cue telemetry, plus the real start and end of every wait. Per ' +
+  'target it records from its own Chrome profile, keeps chat widgets from loading and hides app ' +
+  'banners. Closes Chrome cleanly so cookies flush.');
 const cAssemble = mk(pkgContainers, 'container', '3 · Assembler', 'assemble.mjs · Node.js + ffmpeg',
   'Turns frames into raw.mp4 / cut.mp4. Applies CUTS_MS (drop) and SPEEDS_MS (keep, play fast) and ' +
-  'puts the cursor and narration telemetry through the same shift, so nothing desyncs. Prints the ' +
-  'largest inter-frame gaps.');
+  'puts the cursor and narration telemetry through the same shift, so nothing desyncs. With ' +
+  'AUTO_SPEED it fast-forwards every logged wait nobody is talking over. Prints the largest ' +
+  'inter-frame gaps.');
 const cProject = mk(pkgContainers, 'container', '4 · Zoom Projector', 'project.mjs · Node.js',
   'Clusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the ' +
   'compositor pans across, and writes demo.recordly.');
@@ -455,7 +471,8 @@ const cNarrate = mk(pkgContainers, 'container', '6 · Narrator', 'narrate.mjs ·
 const cTighten = mk(pkgContainers, 'container', '7 · Tightener', 'tighten.mjs · Node.js + ffmpeg',
   'Compresses stretches that are frozen AND silent, trims the trailing run, and crossfades every ' +
   'seam. Runs after narrate because silence is only meaningful once the voice is on the timeline. ' +
-  'Refuses to write if a seam lands on speech or a zoom.');
+  'Refuses to write if a seam lands on speech or a zoom. Always writes its output, even with ' +
+  'nothing to cut, so the next stage can never pick up an earlier take.');
 const cCards = mk(pkgContainers, 'container', '8 · Card Renderer', 'cards.mjs · Node.js + canvas + ffmpeg',
   'Renders branded intro/outro title cards, voices them with the same provider, and dissolves them ' +
   'on with the concat filter rather than the demuxer.');
@@ -468,7 +485,8 @@ const dFlows = mk(pkgContainers, 'store', 'Flow definitions', 'input/ + scenario
 const dTargets = mk(pkgContainers, 'store', 'Targets & secrets', 'targets/*.json, *.local.json, .env',
   'Which deployment, and how to sign in. The .json is committed and holds no secrets; the ' +
   '.local.json and .env are gitignored. Any value may be written env:VAR_NAME and is read from the ' +
-  'environment at load time.');
+  'environment at load time. A target can also name its own Chrome profile, URLs to block, ' +
+  'selectors to hide, and secrets that fill {name} placeholders in an open path.');
 const dTraces = mk(pkgContainers, 'store', 'Observed traces', 'scenarios/*.trace.json',
   'What the app actually did on a real walk: the selector each step needs, the evidence for it, and ' +
   'how long every wait took. Authored, not generated — it is the only artifact here that cannot be ' +
@@ -482,13 +500,33 @@ const dResolved = mk(pkgContainers, 'store', 'Selector resolutions', 'scripts/*.
 const dBrand = mk(pkgContainers, 'store', 'Brand assets', 'brand/',
   'StyleGuide.txt (colour and type, the source of truth), the logo, and the font files. One ' +
   'directory is the brand; there is no flag to point elsewhere.');
-const dWork = mk(pkgContainers, 'store', 'Work directory', 'out/',
-  'frames/, frames.json, actions.json, the per-take cursor.json and narration.json, ' +
-  'demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded. ' +
-  'The hand-off between every stage.');
+const dWork = mk(pkgContainers, 'store', 'Work directory', 'out/ · out/{video}/{part}/',
+  'One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets ' +
+  'DEMO_OUT, so takes never overwrite each other. Holds frames/, frames.json, actions.json, the ' +
+  'per-take cursor.json and narration.json, demo.recordly, the MP4 at each stage (raw, cut, final, ' +
+  'final-narrated, -tight, -carded) and the quality gate report with its stills. The hand-off ' +
+  'between every stage.');
 const dTts = mk(pkgContainers, 'store', 'TTS clip cache', 'out/tts/ · mp3',
   'One mp3 per line, keyed by provider+voice+text, plus the derived .lead.mp3 with the opening ' +
-  'breath trimmed. Re-cutting or re-composing re-bills nothing; only changed lines re-render.');
+  'breath trimmed. Re-cutting or re-composing re-bills nothing; only changed lines re-render. ' +
+  'Shared by every take folder.');
+
+const cQa = mk(pkgContainers, 'container', '9 · Quality Gate', 'qa.mjs · Node.js + ffmpeg',
+  'Measures what a viewer notices and a stage only warns about: two narration lines at once, a ' +
+  'line off its cue, dead air, a frozen or loading screen, black frames, mismatched streams, ' +
+  'loudness, and a deliverable built from a previous take. Writes a report and a still per line ' +
+  'and per flagged range, and exits 1 on any failure.');
+const cBuild = mk(pkgContainers, 'container', 'Build Orchestrator', 'build.mjs · Node.js + ffmpeg',
+  'Builds a whole video from its manifest: records and renders every part into its own folder, ' +
+  'gates each on the quality gate, trims the silence at each join by measurement, crossfades the ' +
+  'parts and gates the result. Stops at the first failed gate.');
+const dManifests = mk(pkgContainers, 'store', 'Video manifests', 'videos/*.json',
+  'One per finished video: its parts in recording order with what must be true before each take, ' +
+  'the settings every stage runs with, and how the parts join. Committed.');
+const dProfiles = mk(pkgContainers, 'store', 'Browser profiles', 'profile/, profile-*/ · gitignored',
+  'Chrome user-data directories holding signed-in sessions, one per target that needs its own ' +
+  'user. Signed in by hand once; a take never signs out. Sensitive: whoever has the folder has ' +
+  'the session.');
 
 const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   'Level 2. The stages inside the pipeline and the files they hand work over through.',
@@ -519,6 +557,12 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
 
   const vFfmpeg = place(dL2, ffmpeg, 340, 700);
   const vTts = place(dL2, ttsApi, 1000, 700);
+
+  const v9 = place(dL2, cQa, 620, 700);
+  const vBuild = place(dL2, cBuild, 620, 200);
+  const vManifests = place(dL2, dManifests, 1560, 560);
+  const vProfiles = place(dL2, dProfiles, 1560, 720);
+  const vQaAgent = place(dL2, qaAgent, 60, 860);
 
   link(dL2, pkgContainers, vAuthor, vFlows, 'Writes the flow');
   link(dL2, pkgContainers, vAuthor, vTargets, 'Sets the deployment and credentials');
@@ -557,7 +601,24 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   link(dL2, pkgContainers, v8, vTtsCache, 'Caches card voice');
   link(dL2, pkgContainers, v8, vTts, 'Renders card voice', 'HTTPS');
 
-  for (const v of [v3, v5, v6, v7, v8]) link(dL2, pkgContainers, v, vFfmpeg, 'Runs', 'child process');
+  for (const v of [v3, v5, v6, v7, v8, v9]) link(dL2, pkgContainers, v, vFfmpeg, 'Runs', 'child process');
+
+  link(dL2, pkgContainers, v2, vProfiles, "Records from the target's signed-in profile");
+  link(dL2, pkgContainers, vAuthor, vProfiles, 'Signs in once by hand');
+  link(dL2, pkgContainers, v3, vTtsCache, 'Reads line lengths for auto-speed');
+
+  link(dL2, pkgContainers, v9, vWork, 'Measures the stage outputs; writes the report and stills');
+  link(dL2, pkgContainers, v9, vTtsCache, 'Reads line lengths');
+  link(dL2, pkgContainers, vQaAgent, v9, 'Runs, then reviews the stills');
+
+  link(dL2, pkgContainers, vAuthor, vBuild, 'Runs one build per video', 'CLI');
+  link(dL2, pkgContainers, vAuthor, vManifests, 'Writes the manifest');
+  link(dL2, pkgContainers, vBuild, vManifests, 'Reads');
+  for (const v of [v2, v3, v4, v5, v6, v7, v8, v9]) {
+    link(dL2, pkgContainers, vBuild, v, 'Runs per part', 'child process');
+  }
+  link(dL2, pkgContainers, vBuild, vWork, 'Gives each part its own folder; writes the joined MP4');
+  link(dL2, pkgContainers, vBuild, vFfmpeg, 'Measures and joins via', 'child process');
 }
 
 // ========================================== L3 · 0 — components: author ==
@@ -710,7 +771,8 @@ const kTargetLib = mk(pkgDriver, 'component', 'Target loader', 'target.mjs · sh
   'winning, and resolves env:VAR_NAME values at load time. The one place credentials are allowed ' +
   'to appear.');
 const kLauncher = mk(pkgDriver, 'component', 'Chrome launcher', 'puppeteer-core',
-  'Runs a real Chrome on profile/, pinned to --force-device-scale-factor=1 so display ' +
+  "Runs a real Chrome on the target's profile (profile/ unless the target names another), pinned " +
+  'to --force-device-scale-factor=1 so display ' +
   'scaling cannot change the frame size. On macOS keeps --use-mock-keychain so profile cookies decrypt.');
 const kAuth = mk(pkgDriver, 'component', 'Sign-in step', 'driver.mjs',
   "Fills the target's auth.selectors and waits the app out. auth.start decides whether the take " +
@@ -719,7 +781,8 @@ const kAuth = mk(pkgDriver, 'component', 'Sign-in step', 'driver.mjs',
 const kPrimitives = mk(pkgDriver, 'component', 'Flow primitives', 'driver.mjs · d.*',
   'hold, waitSel, waitGone, appears, hoverSel, clickSel, type, key, wheel, open, race, login, ' +
   'logout. d.type verifies the click actually focused the element and refuses to type into the ' +
-  'wrong one rather than sending text to whatever has focus.');
+  'wrong one rather than sending text to whatever has focus. Click and hover scroll an off-screen ' +
+  "element into view first; open fills {name} placeholders from the target's secrets.");
 const kScreencast = mk(pkgDriver, 'component', 'Screencast recorder', 'CDP Page.startScreencast',
   'Acks every frame and writes out/frames/*.jpg plus frames.json. Gated on the take, so an ' +
   'off-camera sign-in never reaches the video.');
@@ -733,6 +796,14 @@ const kCues = mk(pkgDriver, 'component', 'Narration cue collector', 'driver.mjs 
 const kTeardown = mk(pkgDriver, 'component', 'Teardown', 'driver.mjs',
   'Stops the screencast, writes frames.json and actions.json, and closes Chrome by its window ' +
   'rather than killing it, so unflushed session state is not lost.');
+
+const kConditioner = mk(pkgDriver, 'component', 'Page conditioner', 'CDP Network.setBlockedURLs + injected CSS',
+  "Applies the target to the page before the take: blockUrls keeps third-party widgets such as a " +
+  'chat bubble from loading, and hideSelectors hides app banners on this page and every page ' +
+  'loaded after it.');
+const kWaits = mk(pkgDriver, 'component', 'Wait logger', 'driver.mjs · timed()',
+  'Times every open, wait and wait-gone the flow makes, keeping { start, end, kind, spec }. ' +
+  'Written to actions.json for the assembler to fast-forward the long ones.');
 
 const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver (driver.mjs)',
   'Level 3, container "2 · Driver".',
@@ -756,6 +827,9 @@ const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver 
   const vFlows = place(dL3a, dFlows, 1020, 200);
   const vTargets = place(dL3a, dTargets, 1020, 340);
   const vWork = place(dL3a, dWork, 1020, 500, 220, 180);
+  const vCond = place(dL3a, kConditioner, 60, 200);
+  const vWaits = place(dL3a, kWaits, 380, 500);
+  const vProfiles = place(dL3a, dProfiles, 1020, 720);
 
   link(dL3a, pkgDriver, vAuthor, vInput, 'Runs', 'CLI');
   link(dL3a, pkgDriver, vInput, vScriptLib, 'Compiles a .demo via');
@@ -775,6 +849,12 @@ const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver 
   link(dL3a, pkgDriver, vTeardown, vTele, 'Serialises');
   link(dL3a, pkgDriver, vTeardown, vCues, 'Serialises');
   link(dL3a, pkgDriver, vTeardown, vWork, 'Writes actions.json + frames.json');
+  link(dL3a, pkgDriver, vLauncher, vProfiles, "Runs Chrome on the target's");
+  link(dL3a, pkgDriver, vLauncher, vCond, 'Conditions the page via');
+  link(dL3a, pkgDriver, vCond, vTargetLib, 'Reads blockUrls and hideSelectors from');
+  link(dL3a, pkgDriver, vCond, vChrome, 'Blocks URLs and injects CSS', 'CDP');
+  link(dL3a, pkgDriver, vPrim, vWaits, 'Every open and wait is timed by');
+  link(dL3a, pkgDriver, vTeardown, vWaits, 'Serialises');
 }
 
 // =========================================== L3 · 3 — components: assembler ==
@@ -811,14 +891,21 @@ const aCues = mk(pkgAssemble, 'component', 'Cue mapper', 'assemble.mjs',
   'The identical filter and warp for narration cues, and it reports how many were dropped inside ' +
   'cuts. Doing this anywhere else silently desyncs the voiceover from the picture.');
 
+const aAuto = mk(pkgAssemble, 'component', 'Auto-speed planner', 'assemble.mjs · AUTO_SPEED',
+  "Turns the driver's logged waits into speed ranges: every wait of at least AUTO_SPEED_MIN_MS " +
+  'with no narration over it, clipped to start after the previous line has finished and to end ' +
+  'before the next begins, so speeding the picture can never pull two lines together. Line ' +
+  "lengths come from the TTS clip cache, or the author's slow estimate before narration exists. " +
+  'Hand-written ranges win where they overlap.');
+
 const dL3assemble = diagram(pkgAssemble, 'c4-l3-assembler',
   'C4-L3 — Components · Assembler (assemble.mjs)',
   'Level 3, container "3 · Assembler".',
   { macro: 'Container_Boundary', name: '3 · Assembler' });
 {
-  const [vCfg, vWarp, vFrames, vGaps, vList, vEnc, vTel, vCue] = grid(dL3assemble,
-    [aConfig, aWarp, aFrames, aGaps, aList, aEncode, aTelemetry, aCues], { cols: 3 });
-  const [vWork, vFfmpeg] = column(dL3assemble, [dWork, ffmpeg]);
+  const [vCfg, vWarp, vFrames, vGaps, vList, vEnc, vTel, vCue, vAuto] = grid(dL3assemble,
+    [aConfig, aWarp, aFrames, aGaps, aList, aEncode, aTelemetry, aCues, aAuto], { cols: 3 });
+  const [vWork, vFfmpeg, vCache] = column(dL3assemble, [dWork, ffmpeg, dTts]);
 
   link(dL3assemble, pkgAssemble, vCfg, vWarp, 'Validated ranges to');
   link(dL3assemble, pkgAssemble, vWork, vFrames, 'frames.json and actions.json to');
@@ -832,6 +919,9 @@ const dL3assemble = diagram(pkgAssemble, 'c4-l3-assembler',
   link(dL3assemble, pkgAssemble, vEnc, vWork, 'Writes raw.mp4 or cut.mp4');
   link(dL3assemble, pkgAssemble, vTel, vWork, 'Writes cursor.json');
   link(dL3assemble, pkgAssemble, vCue, vWork, 'Writes narration.json');
+  link(dL3assemble, pkgAssemble, vWork, vAuto, 'Logged waits and cues to');
+  link(dL3assemble, pkgAssemble, vCache, vAuto, 'Line lengths to');
+  link(dL3assemble, pkgAssemble, vAuto, vWarp, 'Unnarrated waits as sped-up ranges to');
 }
 
 // ====================================== L3 · 4 — components: zoom projector ==
@@ -1145,6 +1235,131 @@ const dL3cards = diagram(pkgCards, 'c4-l3-card-renderer',
   link(dL3cards, pkgCards, vWork, vJoin, 'The tightened video to');
   link(dL3cards, pkgCards, vJoin, vFfmpeg, 'Runs', 'child process');
   link(dL3cards, pkgCards, vJoin, vWork, 'Writes the carded MP4');
+}
+
+// ========================================= L3 · 9 — components: quality gate ==
+const pkgQa = pkg(
+  '3.9 — Components · Quality Gate',
+  "Inside qa.mjs. Per-line checks run where cue times are still the take's own timeline — the " +
+    'narrated video; whole-video checks run on the deliverable. It reports; it never fixes.',
+);
+
+const qInputs = mk(pkgQa, 'component', 'Input resolver', 'qa.mjs',
+  'The deliverable (the newest stage output, or --video), the narrated video, the cue file the ' +
+  'narrator used, and the intro and outro card lengths to leave out of the whole-video checks.');
+const qLineage = mk(pkgQa, 'component', 'Lineage check', 'qa.mjs · file times',
+  'Every stage output the deliverable is built from must be newer than the one before it. A stage ' +
+  "that did not write leaves an older take's file behind and the next stage joins it: a " +
+  'clean-looking video of the wrong take.');
+const qStreams = mk(pkgQa, 'component', 'Stream check', 'ffprobe',
+  'Audio and video of the same length and with the same start, or the whole track is shifted.');
+const qLines = mk(pkgQa, 'component', 'Line checker', 'qa.mjs + TTS clip cache',
+  'Overlap: a line still speaking when the next starts — two voices at once. Sync: every line has ' +
+  'to start within 250ms of its cue in the narrated video. Line lengths come from the clip cache, ' +
+  'so it never calls the TTS API.');
+const qDead = mk(pkgQa, 'component', 'Dead-air detector', 'ffmpeg silencedetect',
+  '4s without narration warns and 6s fails, outside the title cards.');
+const qFreeze = mk(pkgQa, 'component', 'Freeze classifier', 'ffmpeg freezedetect',
+  'A still picture with the voice over most of it is a deliberate hold and only warns; a still ' +
+  'picture in silence is a wait and fails at 5s. Pauses under 0.8s count as speech, or the gaps ' +
+  'between the clauses of one line would score a correctly paced hold as silent.');
+const qBlack = mk(pkgQa, 'component', 'Black and loudness', 'ffmpeg blackdetect + ebur128',
+  'Black frames fail. Integrated loudness outside -19..-13 LUFS, or a true peak above -1 dBFS, warns.');
+const qStills = mk(pkgQa, 'component', 'Still extractor', 'ffmpeg',
+  'One still mid-line for every narration line and one for every flagged range: what the visual ' +
+  'review looks at.');
+const qReport = mk(pkgQa, 'component', 'Report writer', 'qa.json',
+  'The verdict, findings ordered fail-first, every line with its timing and still. Exits 1 on any ' +
+  'failure, so it can end a build.');
+
+const dL3qa = diagram(pkgQa, 'c4-l3-quality-gate',
+  'C4-L3 — Components · Quality Gate (qa.mjs)',
+  'Level 3, container "9 · Quality Gate".',
+  { macro: 'Container_Boundary', name: '9 · Quality Gate' });
+{
+  const [vIn, vLin, vStr, vLines, vDead, vFreeze, vBlack, vStills, vRep] = grid(dL3qa,
+    [qInputs, qLineage, qStreams, qLines, qDead, qFreeze, qBlack, qStills, qReport], { cols: 3 });
+  const [vWork, vCache, vFfmpeg, vAgent] = column(dL3qa, [dWork, dTts, ffmpeg, qaAgent], { dy: 150 });
+
+  link(dL3qa, pkgQa, vWork, vIn, 'Stage outputs and the cue file to');
+  link(dL3qa, pkgQa, vIn, vLin, 'The stage chain to');
+  link(dL3qa, pkgQa, vIn, vStr, 'The deliverable to');
+  link(dL3qa, pkgQa, vIn, vLines, 'Cues and the narrated video to');
+  link(dL3qa, pkgQa, vCache, vLines, 'Line lengths to');
+  link(dL3qa, pkgQa, vIn, vDead, 'The deliverable and card lengths to');
+  link(dL3qa, pkgQa, vIn, vFreeze, 'The deliverable and card lengths to');
+  link(dL3qa, pkgQa, vIn, vBlack, 'The deliverable to');
+  for (const v of [vLin, vStr, vLines, vDead, vFreeze, vBlack]) link(dL3qa, pkgQa, v, vRep, 'Findings to');
+  link(dL3qa, pkgQa, vLines, vStills, 'Line times to');
+  link(dL3qa, pkgQa, vFreeze, vStills, 'Flagged ranges to');
+  link(dL3qa, pkgQa, vDead, vStills, 'Flagged ranges to');
+  for (const v of [vStr, vLines, vDead, vFreeze, vBlack, vStills]) link(dL3qa, pkgQa, v, vFfmpeg, 'Runs', 'child process');
+  link(dL3qa, pkgQa, vStills, vWork, 'Writes the stills');
+  link(dL3qa, pkgQa, vRep, vWork, 'Writes qa.json');
+  link(dL3qa, pkgQa, vAgent, vRep, 'Reads the report and stills of');
+}
+
+// ===================================== L3 · 10 — components: build orchestrator ==
+const pkgBuild = pkg(
+  '3.10 — Components · Build Orchestrator',
+  'Inside build.mjs. One command per video, and the only place stages are run by code rather ' +
+    'than by hand. Everything it decides — trims included — is measured, so a video can be ' +
+    'rebuilt from the repo.',
+);
+
+// The flags are named without their leading dashes on purpose: PlantUML reads
+// text between two double-dashes as strikethrough.
+const bManifest = mk(pkgBuild, 'component', 'Manifest reader', 'videos/*.json',
+  'The parts in recording order, the env every stage gets, the crossfade and the silence to keep ' +
+  'either side of a join. The only, no-record, join-only and no-gate flags pick what runs.');
+const bFolders = mk(pkgBuild, 'component', 'Part folders', 'paths.mjs · DEMO_OUT',
+  "Each part builds in out/{video}/{part}/, so no take overwrites another's fixed-name stage " +
+  'files. The TTS clip cache stays shared.');
+const bRunner = mk(pkgBuild, 'component', 'Part runner', 'child processes',
+  "driver, assemble, project, compose, narrate, tighten and cards, in order, each with the part's " +
+  "folder and the manifest env. Prints the part's before-the-take note first.");
+const bGate = mk(pkgBuild, 'component', 'Part gate', 'qa.mjs',
+  'Runs the quality gate on each part and stops the build on a failure, naming the part to fix ' +
+  'and how to rerun it.');
+const bTrim = mk(pkgBuild, 'component', 'Join planner', 'ffmpeg silencedetect',
+  "Measures each part's first and last word and keeps leadS before and tailS after them, so " +
+  'joins are trimmed by measurement rather than by hand-picked times.');
+const bJoin = mk(pkgBuild, 'component', 'Joiner', 'ffmpeg xfade + acrossfade',
+  'Chains a crossfade between every pair of parts, video and audio together.');
+const bJoinGate = mk(pkgBuild, 'component', 'Joined gate', 'qa.mjs --cues none',
+  'Whole-video checks on the result, with the first part intro card and the last part outro card ' +
+  'left out.');
+const bReport = mk(pkgBuild, 'component', 'Build report', 'build.json',
+  'The trims and every verdict, beside the parts.');
+
+const dL3build = diagram(pkgBuild, 'c4-l3-build',
+  'C4-L3 — Components · Build Orchestrator (build.mjs)',
+  'Level 3, container "Build Orchestrator".',
+  { macro: 'Container_Boundary', name: 'Build Orchestrator' });
+{
+  const vAuthor = place(dL3build, author, 60, 40);
+  const [vMan, vFold, vRun, vGate, vTrim, vJoin, vJGate, vRep] = grid(dL3build,
+    [bManifest, bFolders, bRunner, bGate, bTrim, bJoin, bJoinGate, bReport], { y: 200, cols: 3 });
+  const [vManifests, vWork, vStages, vQa, vFfmpeg] =
+    column(dL3build, [dManifests, dWork, cDriver, cQa, ffmpeg], { dy: 150 });
+
+  link(dL3build, pkgBuild, vAuthor, vMan, 'Runs', 'CLI');
+  link(dL3build, pkgBuild, vMan, vManifests, 'Reads');
+  link(dL3build, pkgBuild, vMan, vFold, 'Parts to');
+  link(dL3build, pkgBuild, vFold, vRun, 'Each part with its folder to');
+  link(dL3build, pkgBuild, vRun, vStages, 'Runs driver.mjs, then every later stage', 'child process');
+  link(dL3build, pkgBuild, vRun, vWork, "Each stage writes the part's files in");
+  link(dL3build, pkgBuild, vRun, vGate, 'Then');
+  link(dL3build, pkgBuild, vGate, vQa, 'Runs', 'child process');
+  link(dL3build, pkgBuild, vGate, vTrim, 'Passed parts to');
+  link(dL3build, pkgBuild, vTrim, vFfmpeg, 'Measures speech via', 'child process');
+  link(dL3build, pkgBuild, vTrim, vJoin, 'Trims to');
+  link(dL3build, pkgBuild, vJoin, vFfmpeg, 'Runs', 'child process');
+  link(dL3build, pkgBuild, vJoin, vWork, 'Writes the joined MP4');
+  link(dL3build, pkgBuild, vJoin, vJGate, 'The joined video to');
+  link(dL3build, pkgBuild, vJGate, vQa, 'Runs', 'child process');
+  link(dL3build, pkgBuild, vJGate, vRep, 'Verdict to');
+  link(dL3build, pkgBuild, vRep, vWork, 'Writes build.json');
 }
 
 // --------------------------------------------------------------- validate

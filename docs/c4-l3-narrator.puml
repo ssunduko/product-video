@@ -9,7 +9,7 @@ caption Level 3, container "6 · Narrator".
 
 ContainerDb(tts_clip_cache, "TTS clip cache", "out/tts/ · mp3", "One mp3 per line, keyed by provider+voice+text, plus the derived .lead.mp3 with the opening breath trimmed.")
 System_Ext(text_to_speech_api, "Text-to-speech API", "ElevenLabs or OpenAI. Chosen by DEMO_TTS, or by whichever key is set.")
-ContainerDb(work_directory, "Work directory", "out/", "frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, and the MP4 at each stage: raw, cut, final, final-narrated, -tight, -carded.")
+ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
 
 Container_Boundary(narrator_2, "6 · Narrator") {
