@@ -876,7 +876,31 @@ a different video: `node cards.mjs out/final.mp4 -o out/x.mp4`.
 
 ### 11. Verify before calling it done
 
-Extract frames from `final.mp4` and actually look at them:
+**Run the quality gate.** `qa.mjs` measures what viewers notice and the stages
+only warn about, and exits 1 on any of it:
+
+```powershell
+node qa.mjs        # checks out/final-narrated-tight-carded.mp4 (or the newest stage output)
+```
+
+| Check | Fails when |
+|---|---|
+| `overlap` | a narration line is still speaking when the next starts — two voices at once |
+| `sync` | a line's speech starts more than 250ms off its cue in `final-narrated.mp4` |
+| `deadair` | 6s+ with no narration (4s+ warns) outside the title cards |
+| `frozen` | the picture barely changes for 5s+ (2.5s+ warns) — usually loading |
+| `black`, `streams` | black frames; audio and video of different length or offset |
+| `loudness` | integrated loudness outside -19..-13 LUFS, true peak above -1 dBFS (warns) |
+
+It writes `out/qa/qa.json` and a still per narration line and per flagged
+range. The **video-qa** agent (`.claude/agents/video-qa.md`) runs it, looks at
+those stills — does the screen show what the voice says, while it says it? —
+and returns PASS/FAIL with the fix for each defect. Line lengths come from the
+TTS cache, so it never calls the TTS API. For a video joined from several
+takes, run it per part right after that part's `cards.mjs`, then on the joined
+file with `--cues none --intro-s <s> --outro-s <s>`.
+
+Then extract frames from `final.mp4` and actually look at them:
 
 ```powershell
 ffmpeg -y -v error -ss 4.7 -i ..\out\final.mp4 -frames:v 1 -vf scale=860:-1 ..\out\check.png

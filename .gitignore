@@ -18,6 +18,7 @@ node_modules/
 out/
 # signed-in Chrome profile: cookies, saved logins, history
 profile/
+profile-*/
 
 # commercial font (Hanken Design Co): licence does not allow redistribution
 brand/fonts/Hanken Design Co - Neue Einstellung*.otf

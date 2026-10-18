@@ -58,7 +58,9 @@ const zoomRegions = groups.map((g, i) => ({
   id: `z${i + 1}`,
   startMs: Math.max(0, g.first - 1200),
   endMs: Math.min(g.last + 1600, lastTelemetryMs + 1500),
-  depth: 3,
+  // 3 = 1.75x (compose.mjs DEPTH_SCALE). Dense settings pages want 2 (1.5x):
+  // at 1.75x a click on a right-hand checkbox crops away the row's label.
+  depth: Number(process.env.ZOOM_DEPTH ?? 3),
   // `focus` is the region's framing when nothing pans; `focusTrack` is what the
   // compositor follows when a merged region covers several click positions
   focus: { cx: clamp(g.points[0].cx), cy: clamp(g.points[0].cy) },
