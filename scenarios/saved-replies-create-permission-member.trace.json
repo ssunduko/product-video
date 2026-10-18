@@ -1,0 +1,267 @@
+{
+  "name": "saved-replies-create-permission-member",
+  "description": "part 2 of 2 - the restricted member can use Saved Replies but not create them",
+  "target": "salesmessage-member",
+  "observedAt": "2026-10-17",
+  "resolvedBy": "claude-in-chrome walk of app.salesmessage.com, as the admin (Google SSO) and as the member",
+  "provenance": "input/saved-replies-create-permission.flow (Show & Tell steps)",
+  "outro": "Thanks for watching | Questions? Reach out any time - we are happy to help",
+  "warnings": [
+    "PART 2 OF 2. Part 1 is scenarios/saved-replies-create-permission-admin.trace.json.",
+    "Demo Demo's 'Can create Saved Replies' must be OFF (part 1 leaves it that way) - otherwise Create is\nenabled and the take records the opposite of the story.",
+    "profile-member/ must hold the member session (signed in by hand once).",
+    "Rebuilt from video-qa 2026-10-17: line holds sized from measured TTS length; narration waits for loaded content (picker list, settings list), not for the empty shell."
+  ],
+  "beats": [
+    {
+      "title": "The same app, as that member",
+      "steps": [
+        {
+          "op": "wait",
+          "name": "ready",
+          "intent": "the New message button, proving Conversations has loaded",
+          "spec": "[aria-label=\"ButtonNewMessage\"]",
+          "evidence": "Named \"ready\" so the driver waits for it OFF camera (video-qa 2026-10-17: ~10s of loading and silence at the start of the take).",
+          "observedMs": 500
+        },
+        {
+          "op": "hold",
+          "ms": 600
+        },
+        {
+          "op": "say",
+          "text": "Now the same app, as that member."
+        },
+        {
+          "op": "hold",
+          "ms": 2600
+        }
+      ]
+    },
+    {
+      "title": "Use replies, but not create them",
+      "steps": [
+        {
+          "op": "click",
+          "name": "newMessage",
+          "intent": "the New message button on the Conversations page",
+          "spec": "[aria-label=\"ButtonNewMessage\"]",
+          "evidence": "accessibility name ButtonNewMessage; clicked in the take, works."
+        },
+        {
+          "op": "wait",
+          "name": "composer",
+          "intent": "the message box in the composer",
+          "spec": "[aria-label=\"TextInput_MessageField\"]",
+          "evidence": "1 match, watched live (contenteditable, aria-label TextInput_MessageField).",
+          "observedMs": 2700
+        },
+        {
+          "op": "wait",
+          "name": "savedRepliesButton",
+          "intent": "the Saved replies icon in the message composer toolbar",
+          "spec": "[aria-label=\"IconButtonSendActionSend_Default\"]",
+          "evidence": "1 match, watched live: tooltip \"Saved replies /\". The aria-label is misleading - it is NOT the send button.",
+          "observedMs": 300
+        },
+        {
+          "op": "hover",
+          "name": "savedRepliesButton",
+          "intent": "the Saved replies icon in the message composer toolbar",
+          "spec": "[aria-label=\"IconButtonSendActionSend_Default\"]",
+          "evidence": "1 match, watched live: tooltip \"Saved replies /\". The aria-label is misleading - it is NOT the send button."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "say",
+          "text": "Saved Replies open right from the message box."
+        },
+        {
+          "op": "hold",
+          "ms": 1200
+        },
+        {
+          "op": "click",
+          "name": "savedRepliesButton",
+          "intent": "the Saved replies icon in the message composer toolbar",
+          "spec": "[aria-label=\"IconButtonSendActionSend_Default\"]",
+          "evidence": "1 match, watched live: tooltip \"Saved replies /\". The aria-label is misleading - it is NOT the send button."
+        },
+        {
+          "op": "wait",
+          "name": "pickerLoaded",
+          "intent": "a reply in the Saved replies picker list, proving the list has loaded",
+          "spec": "[aria-label=\"DefaultModal_Card\"] ::-p-text(Another Demo)",
+          "evidence": "the picker opens on a spinner (video-qa 2026-10-17); narrate only once a reply is listed.",
+          "observedMs": 1500
+        },
+        {
+          "op": "say",
+          "text": "Every shared reply is still here."
+        },
+        {
+          "op": "hold",
+          "ms": 2600
+        },
+        {
+          "op": "hover",
+          "name": "pickerCreate",
+          "intent": "the Create button in the Saved replies picker",
+          "spec": "[aria-label=\"ButtonCreate\"]",
+          "evidence": "1 match, disabled for the restricted member, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 400
+        },
+        {
+          "op": "say",
+          "text": "But Create and Manage are disabled - contact your admin to enable saved reply management."
+        },
+        {
+          "op": "hold",
+          "ms": 5900
+        },
+        {
+          "op": "click",
+          "name": "pickerSearch",
+          "intent": "the search box in the Saved replies picker",
+          "spec": "[aria-label=\"DefaultModal_Card\"] input[placeholder=\"Search...\"]",
+          "evidence": "1 match, watched live."
+        },
+        {
+          "op": "type",
+          "name": "pickerSearch",
+          "intent": "the search box in the Saved replies picker",
+          "text": "Demo"
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "say",
+          "text": "Search narrows it down instantly."
+        },
+        {
+          "op": "hold",
+          "ms": 2400
+        },
+        {
+          "op": "wait",
+          "name": "pickerResult",
+          "intent": "the 'For the Demo' reply in the picker results",
+          "spec": "btn:For the Demo",
+          "evidence": "btn: = the clickable element with exactly this text. It is in the list BEFORE filtering too, so the hold after typing (search settles ~0.8s) is what makes the click land on the filtered position.",
+          "observedMs": 800
+        },
+        {
+          "op": "click",
+          "name": "pickerResult",
+          "intent": "the 'For the Demo' reply in the picker results",
+          "spec": "btn:For the Demo",
+          "evidence": "btn: finds the clickable element whose text is exactly 'For the Demo'. The ::-p-text form matched a hidden copy of the text, so the click missed and nothing was inserted (take 2026-10-17)."
+        },
+        {
+          "op": "waitGone",
+          "name": "pickerOpen",
+          "intent": "the Saved replies picker dialog",
+          "spec": "[aria-label=\"DefaultModal_Card\"]",
+          "evidence": "clicking a reply inserts it and closes the picker (watched live). The dialog is present before the click, so waiting for it to be gone cannot pass early.",
+          "observedMs": 600,
+          "narration": []
+        },
+        {
+          "op": "hover",
+          "name": "composer",
+          "intent": "the message box in the composer",
+          "spec": "[aria-label=\"TextInput_MessageField\"]",
+          "evidence": "1 match, watched live (contenteditable, aria-label TextInput_MessageField)."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "say",
+          "text": "One click drops it straight into the message."
+        },
+        {
+          "op": "hold",
+          "ms": 3200
+        }
+      ]
+    },
+    {
+      "title": "The Saved Replies page",
+      "steps": [
+        {
+          "op": "open",
+          "url": "/settings/saved-replies",
+          "observedMs": 6000
+        },
+        {
+          "op": "wait",
+          "name": "pageLoaded",
+          "intent": "a reply in the Saved replies settings list, proving the page has loaded",
+          "spec": "::-p-text(Another Demo)",
+          "evidence": "the settings page shows a spinner for several seconds (video-qa 2026-10-17); narrate only once the list is there.",
+          "observedMs": 6000
+        },
+        {
+          "op": "hold",
+          "ms": 400
+        },
+        {
+          "op": "say",
+          "text": "On the Saved Replies page, the library is visible but read-only."
+        },
+        {
+          "op": "hold",
+          "ms": 2500
+        },
+        {
+          "op": "hover",
+          "name": "newReply",
+          "intent": "the New reply button on the Saved replies settings page",
+          "spec": "[aria-label=\"ButtonNewReply\"]",
+          "evidence": "1 match, disabled, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 2400
+        },
+        {
+          "op": "say",
+          "text": "New reply and Duplicate are disabled, and there is no edit or delete."
+        },
+        {
+          "op": "hold",
+          "ms": 2200
+        },
+        {
+          "op": "hover",
+          "name": "duplicate",
+          "intent": "the disabled Duplicate button in the reply detail panel",
+          "spec": "::-p-text(Duplicate)",
+          "evidence": "Duplicate shown disabled in the detail panel, watched live 2026-10-17; hover shows 'Contact your admin to enable saved reply management'. Adds motion to a 13s hold the joined-video QA failed."
+        },
+        {
+          "op": "hold",
+          "ms": 3200
+        },
+        {
+          "op": "say",
+          "text": "Members use the curated library. Admins decide what goes in it."
+        },
+        {
+          "op": "hold",
+          "ms": 4400
+        }
+      ]
+    }
+  ]
+}

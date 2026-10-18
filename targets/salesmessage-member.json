@@ -1,0 +1,25 @@
+{
+  "name": "salesmessage-member",
+  "description": "Salesmessage web app as a MEMBER — session comes from profile-member/",
+  "app": "https://app.salesmessage.com",
+  "startUrl": "/conversations",
+  "viewport": {
+    "width": 1440,
+    "height": 810
+  },
+  "//profile": "a second Chrome profile, so a video can show two users without signing in on camera (no password typed, no 2FA prompt, no reCAPTCHA)",
+  "profile": "profile-member",
+  "blockUrls": [
+    "*intercom.io*",
+    "*intercomcdn.com*",
+    "*intercomassets.com*"
+  ],
+  "//hideSelectors": "hidden with CSS during a take: app banners (Aircall disconnected, notifications blocked) that sit across the top of every frame",
+  "hideSelectors": [
+    "[aria-label^=\"AlertBanner\"]"
+  ],
+  "//auth": "Sign in to app.salesmessage.com once by hand in profile-member/ as the member; takes never log it out.",
+  "auth": {
+    "mode": "none"
+  }
+}
