@@ -38,6 +38,8 @@ cursor, and a styled window frame.
   scenarios/                what the walk OBSERVED, and hand-written scenarios
     mcp.trace.json          the observed walk of input/mcp.flow: selectors +
                             measured wait times
+    grammar-tour.trace.json example trace: every step op author.mjs reads,
+                            annotated (authors to grammar-tour-trace.demo)
     <name>.mjs              hand-written scenarios, when a flow needs real
                             control flow — see "b. A scenario" below
   videos/                   one manifest per finished video: its parts, settings,
