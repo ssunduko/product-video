@@ -34,9 +34,9 @@ cursor, and a styled window frame.
     <name>.local.json       credentials — gitignored
   input/                    START HERE: the text description of each video
     _template.flow          copy to <name>.flow and write your steps
-    mcp.flow                plain English, one step per line — the human input
+    <name>.flow             plain English, one step per line — the human input
   scenarios/                what the walk OBSERVED, and hand-written scenarios
-    mcp.trace.json          the observed walk of input/mcp.flow: selectors +
+    <name>.trace.json       the observed walk of input/<name>.flow: selectors +
                             measured wait times
     grammar-tour.trace.json example trace: every step op author.mjs reads,
                             annotated (authors to grammar-tour-trace.demo)
@@ -47,8 +47,8 @@ cursor, and a styled window frame.
     grammar-tour.json       example manifest, annotated: records the example
                             trace against the sample app
   scripts/                  what gets EXECUTED: the DSL, generated or hand-written
-    mcp.demo                generated from scenarios/mcp.trace.json
-    mcp.selectors.json      its sidecar — must sit beside the .demo (see below)
+    <name>.demo             generated from scenarios/<name>.trace.json
+    <name>.selectors.json   its sidecar — must sit beside the .demo (see below)
     grammar-tour-trace.demo generated from scenarios/grammar-tour.trace.json
     grammar-tour.demo       plain-text flow, every command documented
     signed-in-tour.demo     a flow that signs in on camera
@@ -128,7 +128,7 @@ gates each on `qa.mjs`, joins them and gates the result:
 
 ```powershell
 cd pipeline
-node build.mjs ..\videos\saved-replies-create-permission.json
+node build.mjs ..\videos\grammar-tour.json                       # the annotated example
 node build.mjs ..\videos\<name>.json --only member               # rebuild one part
 node build.mjs ..\videos\<name>.json --only member --no-record   # re-render it, no Chrome
 node build.mjs ..\videos\<name>.json --join-only                 # just re-join and re-check
@@ -136,8 +136,8 @@ node build.mjs ..\videos\<name>.json --join-only                 # just re-join 
 
 ```jsonc
 {
-  "name": "saved-replies-create-permission",
-  "output": "out/saved-replies-create-permission.mp4",
+  "name": "<name>",
+  "output": "out/<name>.mp4",
   "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },   // every stage of every part
   "crossfadeS": 0.75,
   "leadS": 0.6, "tailS": 1.6,     // silence kept either side of a join
