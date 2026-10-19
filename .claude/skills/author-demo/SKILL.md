@@ -25,7 +25,9 @@ New flows start from `input/_template.flow` (header fields + step shapes);
 point a user who has no `.flow` yet at it. Never author from the template itself.
 
 `scenarios/` is authored, `scripts/` is generated. Never hand-edit a generated
-`.demo` and expect it to survive — change the trace and re-run.
+`.demo`: change the trace and re-run. `node pipeline/author.mjs --check` (in the
+pre-commit hook and CI) fails while a committed script differs from what its
+trace generates.
 
 **Do not hand-write the `.demo`.** Write the trace and let `author.mjs` emit it.
 The generator is what stops the timings being guesses — see below.
@@ -134,18 +136,23 @@ the number in the trace, and let the generator size the narration to it.
   "observedAt": "2026-08-09",
   "intro": "Headline | Subhead",   // optional title cards
   "outro": "Headline | Subhead",
+  "selectors": {                   // each element ONCE: what it is, its selector, how you know
+    "composer":   { "intent": "the message box at the bottom",
+                    "spec": "div[data-testid=\"chat-input\"]",
+                    "evidence": "1 match, contenteditable" },
+    "generating": { "intent": "the stop control",
+                    "spec": "button[aria-label=\"Stop response\"]",
+                    "evidence": "present only while the reply streams" }
+  },
   "beats": [
     {
       "title": "Ask about response times",
       "steps": [
         { "op": "say",   "text": "..." },
-        { "op": "wait",  "name": "composer", "intent": "the message box at the bottom",
-                         "spec": "div[data-testid=\"chat-input\"]",
-                         "evidence": "1 match, contenteditable", "observedMs": 412 },
-        { "op": "type",  "name": "composer", "intent": "...", "text": "What were our..." },
+        { "op": "wait",  "name": "composer", "observedMs": 412 },
+        { "op": "type",  "name": "composer", "text": "What were our..." },
         { "op": "press", "key": "Enter" },
-        { "op": "waitGone", "name": "generating", "intent": "the stop control",
-                            "spec": "button[aria-label=\"Stop response\"]",
+        { "op": "waitGone", "name": "generating",
                             "observedMs": 43000,
                             "narration": ["line 1", "line 2", "line 3", "one more in case"],
                             "result": "Both periods come back side by side." },
@@ -158,8 +165,15 @@ the number in the trace, and let the generator size the narration to it.
 
 `name` is the selector's DSL name and `intent` its plain-English description —
 the generator writes `name = ask "intent"` into the selectors block and the
-`spec` into the sidecar, so the two always agree. Reuse the same `name`+`intent`
-for the same element across steps.
+`spec` into the sidecar, so the two always agree. Define each element once in the
+`selectors` table and refer to it from steps by `name` alone. A step may carry
+its own `intent`/`spec`/`evidence` to override the table. A step naming a
+selector the table lacks is an error. `scenarios/grammar-tour.trace.json` is the
+annotated example.
+
+Write the trace by hand in `scenarios/`. Never generate it from a helper script
+kept outside the repo: the trace is the source, and it must be the thing
+reviewed.
 
 `result` on a `waitGone` is the line that fires the instant the wait ends. Always
 supply one: it self-syncs to however long the work took, which a fixed offset
