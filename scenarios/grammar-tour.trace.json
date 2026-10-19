@@ -11,6 +11,7 @@
     "  cd pipeline",
     "  node author.mjs ../scenarios/grammar-tour.trace.json",
     "    -> scripts/grammar-tour-trace.demo + scripts/grammar-tour-trace.selectors.json",
+    "  node author.mjs --check      (pre-commit and CI: every generated script matches its trace)",
     "",
     "`name` is grammar-tour-trace, NOT grammar-tour: author.mjs writes scripts/<name>.demo",
     "and would otherwise overwrite the hand-written scripts/grammar-tour.demo.",
@@ -39,75 +40,63 @@
     "BEFORE EVERY TAKE: start the sample app (cd sample-app && npm start) so localhost:3000 answers."
   ],
 
+  "//selectors": [
+    "Each selector is defined ONCE here - what it is (intent), the selector it answers to",
+    "(spec) and how you know (evidence) - and steps refer to it by name. A step may still",
+    "carry its own intent/spec/evidence; those win over the table."
+  ],
+  "selectors": {
+    "ready": {
+      "intent": "the welcome paragraph under the main heading, proving the page has loaded",
+      "spec": "::-p-text(Welcome to Express)",
+      "evidence": "1 match in sample-app/views/index.pug. Named \"ready\" so the driver waits for it OFF camera and the take starts on a loaded page."
+    },
+    "heading": {
+      "intent": "the main page heading",
+      "spec": "h1",
+      "evidence": "the only h1 in index.pug"
+    },
+    "cookieAccept": {
+      "intent": "the Accept button on a cookie banner, if one shows",
+      "spec": "btn:Accept",
+      "evidence": "the sample app has no banner, so the guard waits its 2s and skips - which is the point"
+    }
+  },
+
   "beats": [
     {
       "title": "Landing page",
       "steps": [
-        {
-          "op": "wait",
-          "name": "ready",
-          "intent": "the welcome paragraph under the main heading, proving the page has loaded",
-          "spec": "::-p-text(Welcome to Express)",
-          "evidence": "1 match in sample-app/views/index.pug. Named \"ready\" so the driver waits for it OFF camera and the take starts on a loaded page.",
-          "observedMs": 300,
-          "//": "wait: observedMs is how long it really took; the script's timeout becomes 3x that (min 10s)."
-        },
+        { "op": "wait", "name": "ready", "observedMs": 300,
+          "//": "observedMs is how long it really took; the script's timeout becomes 3x that (min 10s)" },
         { "op": "hold", "ms": 800 },
-        {
-          "op": "say",
-          "text": "This is the sample app: one heading and one line of text."
-        },
+        { "op": "say", "text": "This is the sample app: one heading and one line of text." },
         { "op": "hold", "ms": 4700, "//": "the hold after a line must cover the line on its own (~72ms a character)" }
       ]
     },
     {
       "title": "Point at things",
       "steps": [
-        {
-          "op": "hover",
-          "name": "heading",
-          "intent": "the main page heading",
-          "spec": "h1",
-          "evidence": "the only h1 in index.pug",
-          "//": "hover moves the cursor without a zoom; use it for anything you only want to point at"
-        },
+        { "op": "hover", "name": "heading", "//": "hover moves the cursor without a zoom; use it for anything you only want to point at" },
         { "op": "hold", "ms": 300 },
         { "op": "say", "text": "A hover points at something without zooming in." },
         { "op": "hold", "ms": 3600 },
-        {
-          "op": "click",
-          "name": "heading",
-          "intent": "the main page heading",
-          "spec": "h1",
-          "evidence": "the only h1 in index.pug",
-          "//": "every click becomes a zoom region in the finished video"
-        },
+        { "op": "click", "name": "heading", "//": "every click becomes a zoom region in the finished video" },
         { "op": "say", "text": "A click zooms in on where it lands." },
         { "op": "hold", "ms": 2700 },
         { "op": "scroll", "direction": "down", "px": 240 },
         { "op": "hold", "ms": 800 },
         { "op": "scroll", "direction": "up", "px": 240 },
-        { "op": "press", "key": "Tab", "//": "press: one key, by its puppeteer name (Enter, Tab, Escape, ArrowDown...)" },
+        { "op": "press", "key": "Tab", "//": "one key, by its puppeteer name (Enter, Tab, Escape, ArrowDown...)" },
         { "op": "hold", "ms": 600 }
       ]
     },
     {
       "title": "Open a page directly",
       "steps": [
-        {
-          "op": "open",
-          "url": "/",
-          "observedMs": 400,
-          "//": "open navigates without clicking. {name} in the path is filled from the target's secrets."
-        },
-        {
-          "op": "wait",
-          "name": "ready",
-          "intent": "the welcome paragraph under the main heading, proving the page has loaded",
-          "spec": "::-p-text(Welcome to Express)",
-          "evidence": "1 match in sample-app/views/index.pug.",
-          "observedMs": 300
-        },
+        { "op": "open", "url": "/", "observedMs": 400,
+          "//": "open navigates without clicking. {name} in the path is filled from the target's secrets." },
+        { "op": "wait", "name": "ready", "observedMs": 300 },
         { "op": "hold", "ms": 500 }
       ]
     },
@@ -115,21 +104,10 @@
       "title": "Guard for something that only sometimes appears",
       "steps": [
         {
-          "op": "ifAppears",
-          "name": "cookieAccept",
-          "intent": "the Accept button on a cookie banner, if one shows",
-          "spec": "btn:Accept",
-          "evidence": "the sample app has no banner, so the guard waits its 2s and skips - which is the point",
-          "timeoutS": 2,
+          "op": "ifAppears", "name": "cookieAccept", "timeoutS": 2,
           "//": "keep timeoutS short: absent is the normal case, and the guard costs its full window every time",
           "then": [
-            {
-              "op": "click",
-              "name": "cookieAccept",
-              "intent": "the Accept button on a cookie banner, if one shows",
-              "spec": "btn:Accept",
-              "evidence": "guarded by the ifAppears above"
-            },
+            { "op": "click", "name": "cookieAccept" },
             { "op": "hold", "ms": 500 }
           ]
         }
@@ -146,22 +124,21 @@
 
   "//more ops": [
     "Three more ops, not used above because the sample app has no field and nothing slow.",
-    "Copy them into a beat's steps when your app has them:",
+    "Add their selectors to the table, then copy the steps into a beat:",
     "",
     "type text into a field (the driver clicks it, selects all, then types):",
-    "  { \"op\": \"type\", \"name\": \"search\", \"intent\": \"the search box at the top of the page\",",
-    "    \"spec\": \"input[name=\\\"q\\\"]\", \"evidence\": \"...\", \"text\": \"saved replies\" }",
+    "  \"search\": { \"intent\": \"the search box at the top of the page\", \"spec\": \"input[name=\\\"q\\\"]\", \"evidence\": \"...\" }",
+    "  { \"op\": \"type\", \"name\": \"search\", \"text\": \"saved replies\" }",
     "",
     "type a secret - named, never written; the value comes from the target's secrets at record time:",
-    "  { \"op\": \"type\", \"name\": \"workspace\", \"intent\": \"the workspace id field\",",
-    "    \"spec\": \"#workspace\", \"secret\": \"workspaceId\" }",
+    "  \"workspace\": { \"intent\": \"the workspace id field\", \"spec\": \"#workspace\", \"evidence\": \"...\" }",
+    "  { \"op\": \"type\", \"name\": \"workspace\", \"secret\": \"workspaceId\" }",
     "",
     "waitGone - wait for a loading indicator to go away, with narration budgeted over the",
     "measured time. Lines that do not fit are reported; time narration cannot cover becomes",
     "a SPEEDS_MS fast-forward note in the .demo header. measured:false marks a guessed time.",
-    "  { \"op\": \"waitGone\", \"name\": \"generating\", \"intent\": \"the spinner while the answer is written\",",
-    "    \"spec\": \"[data-is-streaming=\\\"true\\\"]\", \"evidence\": \"...\",",
-    "    \"observedMs\": 20000, \"measured\": true,",
+    "  \"generating\": { \"intent\": \"the spinner while the answer is written\", \"spec\": \"[data-is-streaming=\\\"true\\\"]\", \"evidence\": \"...\" }",
+    "  { \"op\": \"waitGone\", \"name\": \"generating\", \"observedMs\": 20000, \"measured\": true,",
     "    \"narration\": [\"First line said over the wait.\", \"Second line, if it fits.\"],",
     "    \"result\": \"Said once the wait is over, about what just appeared.\" }"
   ]

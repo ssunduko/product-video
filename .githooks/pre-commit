@@ -27,4 +27,13 @@ if [ $status -ne 0 ]; then
   echo "" >&2
   echo "pre-commit: the docs are out of step with the code (above). Update them and commit again." >&2
 fi
+
+# generated scripts must match the traces they come from
+node pipeline/author.mjs --check
+scripts_status=$?
+if [ $scripts_status -ne 0 ]; then
+  echo "" >&2
+  echo "pre-commit: a generated script is out of step with its trace (above). Regenerate it and commit again." >&2
+  status=$scripts_status
+fi
 exit $status
