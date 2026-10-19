@@ -1,0 +1,16 @@
+{
+  "name": "enhance-agent-instructions",
+  "description": "Enhance asks what to improve, shows current and enhanced instructions side by side, refines, and accepts into the field unsaved",
+  "output": "out/enhance-agent-instructions.mp4",
+  "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },
+  "crossfadeS": 0.75,
+  "leadS": 0.6,
+  "tailS": 1.6,
+  "parts": [
+    {
+      "name": "admin",
+      "script": "scripts/enhance-agent-instructions.demo",
+      "before": "profile/ signed in as the admin; SALESMSG_DEMO_AGENT_ID names a DRAFT test agent whose instructions have no refund rule (the take never saves)"
+    }
+  ]
+}

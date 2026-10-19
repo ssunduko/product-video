@@ -1,0 +1,520 @@
+{
+  "name": "enhance-agent-instructions",
+  "description": "tell Enhance what to improve, review the result, refine, and accept",
+  "target": "salesmessage",
+  "startUrl": "/chatbot/{agentId}/config",
+  "observedAt": "2026-10-18",
+  "resolvedBy": "claude-in-chrome walk of app.salesmessage.com as the admin, on a draft test agent",
+  "provenance": "input/enhance-agent-instructions.flow (Show & Tell steps)",
+  "intro": "Enhance agent instructions | Choose what to improve, then review before you accept",
+  "outro": "Thanks for watching | Questions? Reach out any time - we are happy to help",
+  "warnings": [
+    "TEST AGENT ONLY. The take ends with the enhanced text in the Instructions field, UNSAVED. It never\nclicks Save or Activate. The driver closes the browser, which drops the change; the ready wait\nfails fast if a refund rule was ever saved.",
+    "profile/ must hold the admin session, and SALESMSG_DEMO_AGENT_ID in .env must name a draft test agent.",
+    "Enhance calls a model: each result differs, and Recommendations may not appear at all, so the\nnarration names only what the chips and notes asked for. Each line is said while that result is on screen.",
+    "Rebuilt from qa 2026-10-18 (7 fail): lines now play OVER the clicks, typing and scrolls they describe\n(sayOver: only the part of a line the measured actions do not cover is held), fewer scrolls, motion\nunder the opening lines, holds at 72ms/char (TTS measured ~65ms/char). Typing in the modal runs\n~0.25s a character, so the notes are short: a long note is seconds of near-frozen picture."
+  ],
+  "beats": [
+    {
+      "title": "The starting instructions",
+      "steps": [
+        {
+          "op": "wait",
+          "name": "ready",
+          "intent": "the agent's Instructions field holding the starting version (no refund rule yet)",
+          "spec": "::-p-xpath(//*[@aria-label=\"TextInput_MessageField\"][contains(., \"AGENT ROLE\")][not(contains(., \"refund\"))])",
+          "evidence": "Watched live 2026-10-18: the field is TextInput_MessageField; the editor loads in ~10s. Named \"ready\" so the load is off camera; fails fast if the last take's refund rule was saved.",
+          "observedMs": 10000
+        },
+        {
+          "op": "hold",
+          "ms": 800
+        },
+        {
+          "op": "hover",
+          "name": "instructions",
+          "intent": "the agent's Instructions field",
+          "spec": "[aria-label=\"TextInput_MessageField\"]",
+          "evidence": "1 match on the config page, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "say",
+          "text": "Here are this agent's instructions - the starting version, with no rules yet for age, competitors or refunds."
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 250
+        },
+        {
+          "op": "hold",
+          "ms": 2200
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 250
+        },
+        {
+          "op": "hold",
+          "ms": 2200
+        },
+        {
+          "op": "hover",
+          "name": "enhanceOpen",
+          "intent": "the Enhance link above the Instructions field",
+          "spec": "[aria-label=\"ButtonEnhance\"]",
+          "evidence": "1 match while the modal is closed; the modal adds a second."
+        },
+        {
+          "op": "hold",
+          "ms": 1200
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "say",
+          "text": "Enhance no longer rewrites them straight away. First, it asks what to improve."
+        },
+        {
+          "op": "hold",
+          "ms": 1200
+        },
+        {
+          "op": "click",
+          "name": "enhanceOpen",
+          "intent": "the Enhance link above the Instructions field",
+          "spec": "[aria-label=\"ButtonEnhance\"]",
+          "evidence": "1 match while the modal is closed; the modal adds a second."
+        },
+        {
+          "op": "wait",
+          "name": "ageChip",
+          "intent": "the Age restriction chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonAgeRestriction\"]",
+          "evidence": "1 match, watched live.",
+          "observedMs": 300
+        },
+        {
+          "op": "hold",
+          "ms": 3000
+        },
+        {
+          "op": "hold",
+          "ms": 1200
+        }
+      ]
+    },
+    {
+      "title": "Choose what to improve",
+      "steps": [
+        {
+          "op": "say",
+          "text": "Nothing is generated yet. Pick any of three improvements, add a note of your own, or both."
+        },
+        {
+          "op": "hold",
+          "ms": 6500
+        },
+        {
+          "op": "say",
+          "text": "I'll ask for all three: an age restriction, competitor mentions, and a clearer goal."
+        },
+        {
+          "op": "click",
+          "name": "ageChip",
+          "intent": "the Age restriction chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonAgeRestriction\"]",
+          "evidence": "1 match, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "click",
+          "name": "competitorChip",
+          "intent": "the Competitor mentions chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonCompetitorMentions\"]",
+          "evidence": "1 match, watched live; no selected-state attribute."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "click",
+          "name": "goalChip",
+          "intent": "the Clearer goal chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonClearerGoal\"]",
+          "evidence": "1 match, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 1700
+        },
+        {
+          "op": "say",
+          "text": "Plus a note in my own words. Here, I'm asking for one more rule: how to handle customer complaints."
+        },
+        {
+          "op": "type",
+          "name": "note",
+          "intent": "the custom note box in the Enhance modal",
+          "spec": "[aria-label=\"DefaultModal_Card\"] textarea",
+          "evidence": "1 match; placeholder \"e.g., Add a rule for handling refund requests\".",
+          "text": "Add a rule for complaints"
+        },
+        {
+          "op": "hold",
+          "ms": 1700
+        },
+        {
+          "op": "click",
+          "name": "modalEnhance",
+          "intent": "the Enhance button at the bottom of the modal's first step",
+          "spec": "[aria-label=\"DefaultModal_Card\"] [aria-label=\"ButtonEnhance\"]",
+          "evidence": "Scoped to the modal: the page has its own ButtonEnhance underneath."
+        },
+        {
+          "op": "say",
+          "text": "Enhance rewrites the instructions with exactly those changes."
+        },
+        {
+          "op": "hover",
+          "name": "current",
+          "intent": "the current instructions panel on the left of the result",
+          "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[1])",
+          "evidence": "1st of 2 Scrollbar_View in the modal."
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 300
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "wait",
+          "name": "resultReady",
+          "intent": "the Refine button, shown only once the enhanced version is ready",
+          "spec": "[aria-label=\"ButtonRefine\"]",
+          "evidence": "Try again / I like it are on screen WHILE it generates; Refine appears only when done. Measured 7s and 9.3s.",
+          "observedMs": 7000
+        }
+      ]
+    },
+    {
+      "title": "Review before you accept",
+      "steps": [
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "hover",
+          "name": "current",
+          "intent": "the current instructions panel on the left of the result",
+          "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[1])",
+          "evidence": "1st of 2 Scrollbar_View in the modal."
+        },
+        {
+          "op": "say",
+          "text": "The current instructions stay on the left, so you can compare."
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 300
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 300
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "hold",
+          "ms": 900
+        },
+        {
+          "op": "hover",
+          "name": "enhanced",
+          "intent": "the enhanced instructions panel on the right of the result",
+          "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[2])",
+          "evidence": "2nd of 2 Scrollbar_View in the modal; the additions sit far down it."
+        },
+        {
+          "op": "say",
+          "text": "On the right, the new version: an age check, a competitor rule, a clear main goal, and the complaints rule you asked for."
+        },
+        {
+          "op": "hold",
+          "ms": 1000
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 2000
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 2000
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 1800
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 1200
+        },
+        {
+          "op": "hold",
+          "ms": 400
+        },
+        {
+          "op": "hover",
+          "name": "refine",
+          "intent": "the Refine button under the result",
+          "spec": "[aria-label=\"ButtonRefine\"]",
+          "evidence": "1 match once the result is ready."
+        },
+        {
+          "op": "say",
+          "text": "Not quite right? Refine goes back a step, with your choices still in place."
+        },
+        {
+          "op": "hold",
+          "ms": 1500
+        },
+        {
+          "op": "click",
+          "name": "refine",
+          "intent": "the Refine button under the result",
+          "spec": "[aria-label=\"ButtonRefine\"]",
+          "evidence": "1 match once the result is ready."
+        },
+        {
+          "op": "wait",
+          "name": "competitorChip",
+          "intent": "the Competitor mentions chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonCompetitorMentions\"]",
+          "evidence": "1 match, watched live; no selected-state attribute.",
+          "observedMs": 300
+        },
+        {
+          "op": "hold",
+          "ms": 3000
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        }
+      ]
+    },
+    {
+      "title": "Refine",
+      "steps": [
+        {
+          "op": "say",
+          "text": "This time, I'll drop the competitor rule, and ask for a refund rule instead of complaints."
+        },
+        {
+          "op": "click",
+          "name": "competitorChip",
+          "intent": "the Competitor mentions chip in the Enhance modal",
+          "spec": "[aria-label=\"ButtonCompetitorMentions\"]",
+          "evidence": "1 match, watched live; no selected-state attribute."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "type",
+          "name": "note",
+          "intent": "the custom note box in the Enhance modal",
+          "spec": "[aria-label=\"DefaultModal_Card\"] textarea",
+          "evidence": "1 match; placeholder \"e.g., Add a rule for handling refund requests\".",
+          "text": "Add a rule for refunds"
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "click",
+          "name": "modalEnhance",
+          "intent": "the Enhance button at the bottom of the modal's first step",
+          "spec": "[aria-label=\"DefaultModal_Card\"] [aria-label=\"ButtonEnhance\"]",
+          "evidence": "Scoped to the modal: the page has its own ButtonEnhance underneath."
+        },
+        {
+          "op": "say",
+          "text": "Enhance builds a fresh version from the new choices."
+        },
+        {
+          "op": "hold",
+          "ms": 3800
+        },
+        {
+          "op": "wait",
+          "name": "resultReady",
+          "intent": "the Refine button, shown only once the enhanced version is ready",
+          "spec": "[aria-label=\"ButtonRefine\"]",
+          "evidence": "Try again / I like it are on screen WHILE it generates; Refine appears only when done. Measured 7s and 9.3s.",
+          "observedMs": 9300
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "hover",
+          "name": "enhanced",
+          "intent": "the enhanced instructions panel on the right of the result",
+          "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[2])",
+          "evidence": "2nd of 2 Scrollbar_View in the modal; the additions sit far down it."
+        },
+        {
+          "op": "say",
+          "text": "The new version keeps the age check and the goal, and now covers refunds."
+        },
+        {
+          "op": "hold",
+          "ms": 600
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 2000
+        },
+        {
+          "op": "scroll",
+          "direction": "down",
+          "px": 500
+        },
+        {
+          "op": "hold",
+          "ms": 1800
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        }
+      ]
+    },
+    {
+      "title": "Accept",
+      "steps": [
+        {
+          "op": "hover",
+          "name": "likeIt",
+          "intent": "the I like it button under the result",
+          "spec": "[aria-label=\"ButtonILikeIt\"]",
+          "evidence": "1 match, watched live."
+        },
+        {
+          "op": "say",
+          "text": "Happy with it? I like it puts the enhanced text into the Instructions field."
+        },
+        {
+          "op": "hold",
+          "ms": 1800
+        },
+        {
+          "op": "click",
+          "name": "likeIt",
+          "intent": "the I like it button under the result",
+          "spec": "[aria-label=\"ButtonILikeIt\"]",
+          "evidence": "1 match, watched live."
+        },
+        {
+          "op": "wait",
+          "name": "accepted",
+          "intent": "the Instructions field now holding the enhanced text with the refund rule",
+          "spec": "::-p-xpath(//*[@aria-label=\"TextInput_MessageField\"][contains(., \"refund\")])",
+          "evidence": "Watched live: modal closes and the field fills at once.",
+          "observedMs": 500
+        },
+        {
+          "op": "hover",
+          "name": "instructions",
+          "intent": "the agent's Instructions field",
+          "spec": "[aria-label=\"TextInput_MessageField\"]",
+          "evidence": "1 match on the config page, watched live."
+        },
+        {
+          "op": "hold",
+          "ms": 800
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "hover",
+          "name": "saveChanges",
+          "intent": "the Save changes button at the top of the editor",
+          "spec": "[aria-label=\"ButtonSaveChanges\"]",
+          "evidence": "Enabled after I like it. The take only hovers it - never clicks."
+        },
+        {
+          "op": "hold",
+          "ms": 300
+        },
+        {
+          "op": "say",
+          "text": "Nothing changes for your contacts until you save - review it, then save when you're ready."
+        },
+        {
+          "op": "hold",
+          "ms": 6500
+        },
+        {
+          "op": "hold",
+          "ms": 600
+        }
+      ]
+    }
+  ]
+}

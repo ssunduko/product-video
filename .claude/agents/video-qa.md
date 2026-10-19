@@ -114,3 +114,8 @@ Stills: <frames directory>
 Order fails by time. Quote narration lines exactly. Never soften a FAIL into a
 warning because the fix is expensive — that is the caller's decision, and they
 can only make it if you report it.
+
+Your fixes are proposals. The caller presents your verdict and fixes to the user
+and asks before applying any of them — no trace, script or manifest edit, no
+re-render, no re-record on the strength of this report alone. End the report
+with that reminder: "Fixes above are proposals — ask the user before applying."

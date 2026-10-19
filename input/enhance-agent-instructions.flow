@@ -1,0 +1,110 @@
+# Enhance agent instructions: tell Enhance what to improve — Show & Tell
+#
+# Feature: on an agent's Edit page, Enhance no longer fires the moment you click
+# it. It opens a modal where you choose what to improve, then shows the current
+# and the enhanced instructions side by side with a short list of
+# recommendations:
+#   Step 1  "What to improve?" (after Refine: "Refine") — three chips, multi-
+#           select: Age restriction, Competitor mentions, Clearer goal — and a
+#           free-text note. Chips, text, both or neither; Enhance is always on.
+#   Result  left: current instructions (read-only); right: enhanced instructions;
+#           Recommendations: at most 3 one-sentence, single-line items (hidden
+#           when there are none: absent on the walk, present on both results
+#           of the first take — so never narrate them as a sure thing).
+#           Buttons: Try again, I like it, Refine.
+# This flow shows the unified agent: chips + a custom note, refine, accept.
+#
+# Author it with:  "author a demo from input/enhance-agent-instructions.flow"
+#
+# ---- measured on the walk (test agent, draft) ---------------------------------
+# * A DRAFT agent's row opens its editor directly (/chatbot/{agentId}/config);
+#   there is no Edit button. Open it with `open /chatbot/{agentId}/config`
+#   (agentId is a target secret from SALESMSG_DEMO_AGENT_ID in .env).
+# * Enhance opens the modal instantly; nothing generates until step 1's Enhance.
+#   Scope that button: [aria-label="DefaultModal_Card"] [aria-label="ButtonEnhance"]
+#   — the page has its own ButtonEnhance underneath.
+# * Generation took ~7 s (first) and ~9 s (refine). "Try again" and "I like it"
+#   are on screen WHILE it loads; ButtonRefine appears only when it is done, so
+#   wait for [aria-label="ButtonRefine"].
+# * The enhanced text is the 2nd [aria-label="Scrollbar_View"] in the modal;
+#   the additions are far down, so hover it and scroll to show them.
+# * Chips expose no selected-state attribute; check the text result instead.
+# * The note placeholder reads "e.g., Add a rule for handling refund requests";
+#   the driver selects all before typing, so the refine note replaces the first.
+# * After "I like it": modal gone, [aria-label="TextInput_MessageField"] holds
+#   the new text, [aria-label="ButtonSaveChanges"] is enabled. Do NOT click it.
+# * Leaving the editor unsaved raises Chrome's native "Leave site?" dialog in an
+#   everyday browser; the driver's take just closes its own Chrome, which drops
+#   the change (verified: saved instructions unchanged after three takes).
+#
+# ---- before the walk ---------------------------------------------------------
+# * RUN THIS AGAINST A TEST ORGANIZATION and a TEST unified agent. "I like it"
+#   writes the enhanced text into the agent's Instructions field. Do NOT save or
+#   publish in the take; discard the change afterwards (see the last note).
+# * Account: the admin session in profile/ (target salesmessage). One user, so
+#   one take — no second profile needed.
+# * The agent: a unified agent whose instructions are deliberately thin, so
+#   Enhance has something to add and returns 2-3 recommendations. Keep its id out
+#   of this file: put it in .env (e.g. SALESMSG_DEMO_AGENT_ID) as a target secret
+#   and open its page with `open /.../{agentId}/...` if a direct URL exists.
+# * Enhance calls a model: every wait for "the enhanced version is ready" takes a
+#   different, unknowable time. Time it on the walk (waitGone on the loading
+#   state, not on a button that might vanish), give it more narration lines than
+#   will fit, and let AUTO_SPEED fast-forward whatever narration does not cover.
+# * Rules from earlier videos that apply here:
+#   - a line is spoken only once what it describes is ON SCREEN: after the modal
+#     opens, after the enhanced text is in, after the field is filled;
+#   - the holds after a line must cover the line on their own;
+#   - prefer btn:Exact Text for chips and buttons; ::-p-text is case-sensitive
+#     and can match a hidden copy of the text;
+#   - check the starting state (the instructions must be the thin version) so a
+#     take that starts from an already-enhanced agent fails fast.
+
+name: enhance-agent-instructions
+description: tell Enhance what to improve, review the recommendations, refine, and accept
+target: salesmessage
+intro: Enhance agent instructions | Choose what to improve, then review before you accept
+outro: Thanks for watching | Questions? Reach out any time - we are happy to help
+
+Steps:
+
+# -- open the agent --
+Open the test agent's editor directly (/chatbot/{agentId}/config)
+Confirm the agent's current Instructions are on screen (the thin starting version)
+
+# -- step 1: say what to improve --
+Click Enhance
+Confirm the modal opens on step 1 and NOTHING is generating yet — the model is not called until you ask
+Confirm the chip group "What to improve?" with Age restriction, Competitor mentions and Clearer goal
+Click Age restriction
+Click Competitor mentions
+Click Clearer goal
+Type "Add a rule for complaints" into the custom note (keep notes short: typing in the modal runs ~0.25s a character)
+Click Enhance
+
+# -- the result --
+Wait for the enhanced version to be ready
+Confirm the result view: current instructions on the left, enhanced instructions on the right
+Confirm Recommendations pinned above the enhanced text, if any: at most 3 short, single-line, actionable items (sometimes none — do not narrate them unconditionally)
+Confirm the enhanced instructions now contain an age verification constraint, a competitor deflection rule, a clear goal for the agent, and a rule for handling complaints
+Pause on the enhanced instructions, scrolling to each addition as it is named
+
+# -- refine --
+Click Refine
+Confirm the modal is back on step 1, now titled "Refine", with the earlier choices and note still in place
+Deselect Competitor mentions
+Change the custom note to "Add a rule for refunds"
+Click Enhance
+Wait for the new enhanced version to be ready
+Confirm the new enhanced instructions keep the age check and goal, add the refund rule, and drop the competitor and complaint rules
+
+# -- accept --
+Click I like it
+Confirm the modal closes and the enhanced instructions are now in the Instructions field
+Pause on the Instructions field — do NOT click Save or Publish
+
+# ---- after the take (off camera, not part of the video) ----------------------
+# Discard the change: close the tab without saving and click Leave on Chrome's
+# "Leave site?" dialog, so the next take starts from the same state.
+# Not covered here (separate flow if wanted): the calling agent's pre-publish
+# validation modal — "Skip for now" / "Edit instructions".
