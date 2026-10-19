@@ -65,7 +65,8 @@ cursor, and a styled window frame.
   profile/          generated: the Chrome user-data-dir the takes run under
 ```
 
-`out/`, `profile/`, `.env` and `targets/*.local.json` are gitignored. Note what
+Everything inside `out/` (the folder itself stays, via `out/.gitkeep`), plus
+`profile/`, `.env` and `targets/*.local.json`, is gitignored. Note what
 that means for `scenarios/*.trace.json`: it is the one artifact here that cannot
 be rebuilt from anything else, which is why it lives in `scenarios/` and not in
 `out/`.
