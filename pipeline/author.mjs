@@ -294,6 +294,7 @@ export function demoFromTrace(trace) {
   if (trace.target) out.push(`target: ${trace.target}`);
   if (trace.app && !trace.target) out.push(`app: ${trace.app}`);
   if (trace.viewport) out.push(`viewport: ${trace.viewport}`);
+  if (trace.startUrl) out.push(`start: ${trace.startUrl}`);
   if (trace.intro) out.push(`intro: ${trace.intro}`);
   if (trace.outro) out.push(`outro: ${trace.outro}`);
 

@@ -109,10 +109,23 @@ const PAGE_URL_MATCH = [
   ]),
 ];
 
+// `{name}` in a path is filled from the target's secrets, so an internal id
+// (a member's settings URL, say) lives in .env rather than in a committed script.
+function fillSecrets(where, op) {
+  return String(where).replace(/\{([A-Za-z_]\w*)\}/g, (_, name) => {
+    const value = target?.secrets?.[name];
+    if (value == null) {
+      throw new Error(`${op} ${where}: target has no secret "${name}" (add it under "secrets", e.g. "env:VAR_NAME")`);
+    }
+    return encodeURIComponent(value);
+  });
+}
+
 // where the take begins; an explicit start path is re-applied after any
-// off-camera sign-in, which usually redirects elsewhere
-const explicitStart = target?.startUrl ?? scenario.START_URL ?? null;
-const START_URL = explicitStart ? new URL(explicitStart, APP).href : new URL(APP).href;
+// off-camera sign-in, which usually redirects elsewhere. The script's own
+// start wins over the target's: one target serves many flows.
+const explicitStart = scenario.START_URL ?? target?.startUrl ?? null;
+const START_URL = explicitStart ? new URL(fillSecrets(explicitStart, 'start'), APP).href : new URL(APP).href;
 
 const auth = target?.auth && target.auth.mode !== 'none' ? target.auth : null;
 const authSel = auth?.selectors ?? {};
@@ -590,17 +603,8 @@ const d = {
     log('move');
     await sleep(200);
   },
-  // `{name}` in the path is filled from the target's secrets, so an internal id
-  // (a member's settings URL, say) lives in .env rather than in a committed script.
   async open(where) {
-    const filled = String(where).replace(/\{([A-Za-z_]\w*)\}/g, (_, name) => {
-      const value = target?.secrets?.[name];
-      if (value == null) {
-        throw new Error(`open ${where}: target has no secret "${name}" (add it under "secrets", e.g. "env:VAR_NAME")`);
-      }
-      return encodeURIComponent(value);
-    });
-    const url = new URL(filled, APP).href;
+    const url = new URL(fillSecrets(where, 'open'), APP).href;
     await timed('open', where, () => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }));
     log('move');
     await sleep(400);
