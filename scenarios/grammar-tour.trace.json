@@ -1,0 +1,168 @@
+{
+  "//": [
+    "Example trace. Every step op pipeline/author.mjs understands is shown here, against",
+    "the local Express app in sample-app/ (target local-app), so it authors and records.",
+    "",
+    "A trace is the observed walk of a .flow: Claude drives the real app in Chrome, does",
+    "each step, and writes down the element it touched, the selector that element answers",
+    "to, and HOW LONG each wait really took. author.mjs turns it into a .demo plus a",
+    "selector sidecar, sizing holds and narration from those measured times.",
+    "",
+    "  cd pipeline",
+    "  node author.mjs ../scenarios/grammar-tour.trace.json",
+    "    -> scripts/grammar-tour-trace.demo + scripts/grammar-tour-trace.selectors.json",
+    "",
+    "`name` is grammar-tour-trace, NOT grammar-tour: author.mjs writes scripts/<name>.demo",
+    "and would otherwise overwrite the hand-written scripts/grammar-tour.demo.",
+    "",
+    "Keys starting with // are notes for people; author.mjs ignores them."
+  ],
+
+  "name": "grammar-tour-trace",
+  "description": "trace tour - every trace step op, recorded against the local Express app",
+  "target": "local-app",
+  "//target": "A target names the deployment. With no target, set \"app\": \"http://localhost:3000\" instead.",
+  "startUrl": "/",
+  "//startUrl": "Where the take opens; becomes `start:`. Wins over the target's startUrl and may use {secret} placeholders, e.g. /chatbot/{agentId}/config.",
+  "viewport": "1440x810",
+
+  "observedAt": "2026-10-18",
+  "resolvedBy": "hand-authored example (selectors match sample-app/views/index.pug, not observed live)",
+  "provenance": "scenarios/grammar-tour.trace.json - the example trace; there is no .flow behind it",
+  "//provenance": "observedAt, resolvedBy and provenance are copied into the selector sidecar. Never claim 'observed live' for a hand-written trace.",
+
+  "intro": "Trace tour | Every step a trace can hold",
+  "outro": "Thanks for watching | Now write your own flow in input/",
+
+  "warnings": [
+    "Warnings are hazards the walk found that the script cannot express. Each one is copied\ninto the header of the generated .demo, so the next person to record reads it.",
+    "BEFORE EVERY TAKE: start the sample app (cd sample-app && npm start) so localhost:3000 answers."
+  ],
+
+  "beats": [
+    {
+      "title": "Landing page",
+      "steps": [
+        {
+          "op": "wait",
+          "name": "ready",
+          "intent": "the welcome paragraph under the main heading, proving the page has loaded",
+          "spec": "::-p-text(Welcome to Express)",
+          "evidence": "1 match in sample-app/views/index.pug. Named \"ready\" so the driver waits for it OFF camera and the take starts on a loaded page.",
+          "observedMs": 300,
+          "//": "wait: observedMs is how long it really took; the script's timeout becomes 3x that (min 10s)."
+        },
+        { "op": "hold", "ms": 800 },
+        {
+          "op": "say",
+          "text": "This is the sample app: one heading and one line of text."
+        },
+        { "op": "hold", "ms": 4700, "//": "the hold after a line must cover the line on its own (~72ms a character)" }
+      ]
+    },
+    {
+      "title": "Point at things",
+      "steps": [
+        {
+          "op": "hover",
+          "name": "heading",
+          "intent": "the main page heading",
+          "spec": "h1",
+          "evidence": "the only h1 in index.pug",
+          "//": "hover moves the cursor without a zoom; use it for anything you only want to point at"
+        },
+        { "op": "hold", "ms": 300 },
+        { "op": "say", "text": "A hover points at something without zooming in." },
+        { "op": "hold", "ms": 3600 },
+        {
+          "op": "click",
+          "name": "heading",
+          "intent": "the main page heading",
+          "spec": "h1",
+          "evidence": "the only h1 in index.pug",
+          "//": "every click becomes a zoom region in the finished video"
+        },
+        { "op": "say", "text": "A click zooms in on where it lands." },
+        { "op": "hold", "ms": 2700 },
+        { "op": "scroll", "direction": "down", "px": 240 },
+        { "op": "hold", "ms": 800 },
+        { "op": "scroll", "direction": "up", "px": 240 },
+        { "op": "press", "key": "Tab", "//": "press: one key, by its puppeteer name (Enter, Tab, Escape, ArrowDown...)" },
+        { "op": "hold", "ms": 600 }
+      ]
+    },
+    {
+      "title": "Open a page directly",
+      "steps": [
+        {
+          "op": "open",
+          "url": "/",
+          "observedMs": 400,
+          "//": "open navigates without clicking. {name} in the path is filled from the target's secrets."
+        },
+        {
+          "op": "wait",
+          "name": "ready",
+          "intent": "the welcome paragraph under the main heading, proving the page has loaded",
+          "spec": "::-p-text(Welcome to Express)",
+          "evidence": "1 match in sample-app/views/index.pug.",
+          "observedMs": 300
+        },
+        { "op": "hold", "ms": 500 }
+      ]
+    },
+    {
+      "title": "Guard for something that only sometimes appears",
+      "steps": [
+        {
+          "op": "ifAppears",
+          "name": "cookieAccept",
+          "intent": "the Accept button on a cookie banner, if one shows",
+          "spec": "btn:Accept",
+          "evidence": "the sample app has no banner, so the guard waits its 2s and skips - which is the point",
+          "timeoutS": 2,
+          "//": "keep timeoutS short: absent is the normal case, and the guard costs its full window every time",
+          "then": [
+            {
+              "op": "click",
+              "name": "cookieAccept",
+              "intent": "the Accept button on a cookie banner, if one shows",
+              "spec": "btn:Accept",
+              "evidence": "guarded by the ifAppears above"
+            },
+            { "op": "hold", "ms": 500 }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Settle",
+      "steps": [
+        { "op": "say", "text": "That is every step a trace can hold." },
+        { "op": "hold", "ms": 3500, "//": "end on a hold so the last line finishes and the last zoom settles" }
+      ]
+    }
+  ],
+
+  "//more ops": [
+    "Three more ops, not used above because the sample app has no field and nothing slow.",
+    "Copy them into a beat's steps when your app has them:",
+    "",
+    "type text into a field (the driver clicks it, selects all, then types):",
+    "  { \"op\": \"type\", \"name\": \"search\", \"intent\": \"the search box at the top of the page\",",
+    "    \"spec\": \"input[name=\\\"q\\\"]\", \"evidence\": \"...\", \"text\": \"saved replies\" }",
+    "",
+    "type a secret - named, never written; the value comes from the target's secrets at record time:",
+    "  { \"op\": \"type\", \"name\": \"workspace\", \"intent\": \"the workspace id field\",",
+    "    \"spec\": \"#workspace\", \"secret\": \"workspaceId\" }",
+    "",
+    "waitGone - wait for a loading indicator to go away, with narration budgeted over the",
+    "measured time. Lines that do not fit are reported; time narration cannot cover becomes",
+    "a SPEEDS_MS fast-forward note in the .demo header. measured:false marks a guessed time.",
+    "  { \"op\": \"waitGone\", \"name\": \"generating\", \"intent\": \"the spinner while the answer is written\",",
+    "    \"spec\": \"[data-is-streaming=\\\"true\\\"]\", \"evidence\": \"...\",",
+    "    \"observedMs\": 20000, \"measured\": true,",
+    "    \"narration\": [\"First line said over the wait.\", \"Second line, if it fits.\"],",
+    "    \"result\": \"Said once the wait is over, about what just appeared.\" }"
+  ]
+}
