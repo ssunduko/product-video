@@ -14,8 +14,10 @@ node_modules/
 *.local.json
 
 # renders, frames, narration and TTS cache: regenerable, and they show live
-# account data (claude.ai sidebar, Salesmessage analytics)
-out/
+# account data (claude.ai sidebar, Salesmessage analytics). The folder itself
+# stays in the repo (out/.gitkeep); nothing inside it is ever committed.
+out/*
+!out/.gitkeep
 # signed-in Chrome profile: cookies, saved logins, history
 profile/
 profile-*/
