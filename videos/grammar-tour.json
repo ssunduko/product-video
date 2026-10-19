@@ -1,0 +1,57 @@
+{
+  "//": [
+    "Example manifest. A manifest builds one finished video from one or more takes",
+    "(parts): it records and renders each part, gates each on qa.mjs, joins them, and",
+    "gates the joined result. This one records the example trace against the local",
+    "Express app in sample-app/, so it runs anywhere.",
+    "",
+    "  cd sample-app && npm start                    (in another terminal)",
+    "  cd pipeline && node build.mjs ../videos/grammar-tour.json",
+    "",
+    "  --only <part>   rebuild just that part; the others are reused",
+    "  --no-record     re-render from frames already recorded (no Chrome)",
+    "  --no-gate       keep going when qa.mjs fails (failures are still reported)",
+    "  --join-only     skip the parts, just re-join and re-check",
+    "",
+    "Then run the video-qa agent on the output - and ask before applying its fixes.",
+    "Keys starting with // are notes for people; build.mjs ignores them."
+  ],
+
+  "name": "grammar-tour",
+  "//name": "Each part records into out/<name>/<part>/, so no take overwrites another's files.",
+  "description": "the example trace, recorded against the local Express app",
+  "output": "out/grammar-tour.mp4",
+  "//output": "Relative to the repo root. Defaults to out/<name>.mp4.",
+
+  "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },
+  "//env": [
+    "Environment for every stage of every part; values are strings.",
+    "ZOOM_DEPTH: how deep the click zooms go (project.mjs, default 3). AUTO_SPEED: fast-forward factor for logged waits",
+    "nobody is talking over (loading, AI generation) - 10 squeezes a 7s spinner to 0.7s."
+  ],
+
+  "crossfadeS": 0.75,
+  "leadS": 0.6,
+  "tailS": 1.6,
+  "//joins": "Only used with two or more parts: the crossfade between parts, and the silence kept before a part's first word (leadS) and after its last (tailS). Joins are trimmed by measurement, not by hand.",
+
+  "parts": [
+    {
+      "name": "tour",
+      "script": "scripts/grammar-tour-trace.demo",
+      "before": "the sample app answers on http://localhost:3000 (cd sample-app && npm start)",
+      "//": "script is relative to the repo root; it is generated from scenarios/grammar-tour.trace.json. `before` is printed before the take - say what must be true for it to work."
+    }
+  ],
+
+  "//more parts": [
+    "Split a video into parts when one take cannot hold it - typically two users, each",
+    "recorded from its own signed-in profile, so nobody signs in on camera. Parts record",
+    "in the order listed. A part's target, profile, intro and outro come from its script,",
+    "so give the FIRST part's script the intro: and the LAST part's the outro: - a card",
+    "on a middle part plays mid-video. A second part looks like this:",
+    "",
+    "  { \"name\": \"member\", \"script\": \"scripts/<name>-member.demo\",",
+    "    \"before\": \"profile-member/ signed in as the member; part 1 left the setting OFF\" }"
+  ]
+}
