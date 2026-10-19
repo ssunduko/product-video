@@ -449,6 +449,12 @@ Commands:
 | `if <sel> appears [within 20s]` … `end` | optional beat — consent screens, first-run tips |
 | `note <text>` | a comment carried into the generated scenario as `// <text>` |
 
+Header directive for where the take opens: `start: /path` overrides the
+target's `startUrl` (one target serves many flows), and fills `{name}` from the
+target's `secrets` just like `open`: `start: /chatbot/{agentId}/config`. The
+`ready` selector is then waited for off camera on that page. A trace's
+`startUrl` becomes this line when `author.mjs` writes the script.
+
 Header directives for the title cards (read by `cards.mjs`, not the driver):
 
 | Directive | Meaning |
