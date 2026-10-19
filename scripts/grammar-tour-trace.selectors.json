@@ -1,0 +1,20 @@
+{
+  "resolvedAgainst": "local-app",
+  "resolvedAt": "2026-10-18",
+  "resolvedBy": "hand-authored example (selectors match sample-app/views/index.pug, not observed live)",
+  "note": "scenarios/grammar-tour.trace.json - the example trace; there is no .flow behind it",
+  "selectors": {
+    "the welcome paragraph under the main heading, proving the page has loaded": {
+      "spec": "::-p-text(Welcome to Express)",
+      "evidence": "1 match in sample-app/views/index.pug. Named \"ready\" so the driver waits for it OFF camera and the take starts on a loaded page."
+    },
+    "the main page heading": {
+      "spec": "h1",
+      "evidence": "the only h1 in index.pug"
+    },
+    "the Accept button on a cookie banner, if one shows": {
+      "spec": "btn:Accept",
+      "evidence": "the sample app has no banner, so the guard waits its 2s and skips - which is the point"
+    }
+  }
+}

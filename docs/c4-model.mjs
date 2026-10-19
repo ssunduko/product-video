@@ -444,7 +444,8 @@ const cAuthor = mk(pkgContainers, 'container', '0 · Author', 'author.mjs · Nod
   'Turns an observed walk of the app into the DSL. Reads a trace — the selectors found and the ' +
   'wait times measured — and emits the .demo and its selector sidecar together. Sizes the narration ' +
   'to each measured wait, reports any line that will not fit, and proposes a SPEEDS_MS range for ' +
-  'whatever narration cannot cover. Optional: a .demo can be written by hand.');
+  'whatever narration cannot cover. With --check it re-authors every trace in memory and fails while a ' +
+  'committed script differs (pre-commit and CI). Optional: a .demo can be written by hand.');
 const cScript = mk(pkgContainers, 'container', '1 · Script Compiler', 'script.mjs · Node.js',
   'Compiles a .demo flow into a normal, inspectable scenario module. Refuses to clobber a ' +
   'hand-written scenario. driver.mjs also calls it on the way in.');
@@ -645,7 +646,8 @@ const aBudget = mk(pkgAuthor, 'component', 'Narration budgeter', 'author.mjs · 
 const aRegistry = mk(pkgAuthor, 'component', 'Selector registry', 'author.mjs · ref()',
   'Runs once per step that touches an element and feeds both outputs from that one call: the name and ' +
   'intent go to the .demo selectors block, the spec and evidence to the sidecar. Neither file is ' +
-  'written independently, so they cannot drift apart.');
+  'written independently, so they cannot drift apart. A step names an element defined once in the ' +
+  "trace's selectors table, and a name the table lacks is an error, not a guess.");
 const aEmit = mk(pkgAuthor, 'component', 'Step emitter', 'author.mjs · emitOne()',
   'One DSL line per trace step: say, hold, wait, type, press, click, hover. A waitGone pulls in the ' +
   'budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured ' +
@@ -661,7 +663,8 @@ const aProv = mk(pkgAuthor, 'component', 'Provenance stamper', 'author.mjs',
 const aWrite = mk(pkgAuthor, 'component', 'Writer', 'author.mjs',
   'Writes the .demo and derives the sidecar path by swapping the extension — the same rule script.mjs ' +
   'uses to find it, which is why the two must sit together. Unused lines and SPEEDS_MS candidates are ' +
-  'printed as notes for the person running it.');
+  'printed as notes for the person running it. --check compares instead of writing: a missing, stale or ' +
+  'orphaned generated script fails, line endings ignored.');
 
 const dL3author = diagram(pkgAuthor, 'c4-l3-author',
   'C4-L3 — Components · Author (author.mjs)',

@@ -44,9 +44,12 @@ cursor, and a styled window frame.
                             control flow — see "b. A scenario" below
   videos/                   one manifest per finished video: its parts, settings,
                             and how they join (see "Build a whole video")
+    grammar-tour.json       example manifest, annotated: records the example
+                            trace against the sample app
   scripts/                  what gets EXECUTED: the DSL, generated or hand-written
     mcp.demo                generated from scenarios/mcp.trace.json
     mcp.selectors.json      its sidecar — must sit beside the .demo (see below)
+    grammar-tour-trace.demo generated from scenarios/grammar-tour.trace.json
     grammar-tour.demo       plain-text flow, every command documented
     signed-in-tour.demo     a flow that signs in on camera
   brand/
@@ -86,7 +89,8 @@ Three pieces, separable on purpose:
 plain-English `.flow` in `input/` and the `.trace.json` observed from walking it
 in `scenarios/` are inputs — hand-written,
 diffable, the things worth arguing about in review. The `.demo` is generated from
-the trace and can be thrown away and rebuilt. Keeping them apart stops the
+the trace and can be thrown away and rebuilt; `node pipeline/author.mjs --check`
+fails while a committed one differs from what its trace generates. Keeping them apart stops the
 question "is this file the source or the output?" from ever coming up.
 
 The one exception is `<name>.selectors.json`, which stays in `scripts` beside
@@ -359,6 +363,20 @@ double-digit silences that had to be found and fixed afterwards.
 
 Supply *more* narration lines than you think will fit; the generator places what
 the measurement allows and tells you what it dropped.
+
+**Define each selector once.** A trace's top-level `selectors` table gives each
+element a name with its `intent`, `spec` and `evidence`. Steps then say only
+`"name": "heading"`, and a step's own intent/spec/evidence override the table.
+`scenarios/grammar-tour.trace.json` shows the shape. A step that names a
+selector missing from the table is an error, not a guess.
+
+**Generated scripts are checked against their traces.** A trace's script lives at
+`scripts/<trace name>.demo`, and `node pipeline/author.mjs --check` re-authors
+every `scenarios/*.trace.json` in memory and fails if a committed script or
+sidecar is missing or different. It also fails if a `.demo` says it was
+generated but no trace has its name. Line endings are ignored. The check runs in
+the pre-commit hook and on every PR (`.github/workflows/docs.yml`), so change the
+trace and regenerate, never the `.demo`.
 
 **Start from the template.** `input/_template.flow` lists the header fields
 (`name`, `description`, `target`, `intro`, `outro`) and the step shapes the

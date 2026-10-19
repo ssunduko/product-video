@@ -2,7 +2,9 @@
 #   - the generated diagrams (docs/*.puml, C4.md, the StarUML project) must match
 #     docs/c4-model.mjs, i.e. someone ran the generator and committed the result;
 #   - README.md and the C4 model must cover every pipeline stage, env var, npm
-#     script, target option and script command the code defines.
+#     script, target option and script command the code defines;
+#   - every scripts/*.demo generated from a trace must match what that trace
+#     generates today (node pipeline/author.mjs --check).
 # The same check runs locally in the pre-commit hook (.githooks/pre-commit) and,
 # for Claude Code, after every edit (.claude/settings.json).
 name: Docs
@@ -26,3 +28,5 @@ jobs:
           node-version: 22
       - name: Docs match the code
         run: node docs/check.mjs --ci
+      - name: Generated scripts match their traces
+        run: node pipeline/author.mjs --check

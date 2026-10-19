@@ -21,6 +21,14 @@ Docs change in the same commit as the code they describe.
 - The same check runs as a git pre-commit hook (`git config core.hooksPath
   .githooks`) and on every PR (`.github/workflows/docs.yml`).
 
+## Traces and scripts
+
+A generated `scripts/<name>.demo` and its `.selectors.json` come from
+`scenarios/<name>.trace.json`. Change the trace and run `node author.mjs` on it;
+never edit the generated files. `node pipeline/author.mjs --check` (pre-commit
+and CI) fails while they disagree. Define each selector once in the trace's
+`selectors` table and refer to it by name from the steps.
+
 ## Videos
 
 Never call a video done without the quality gate: `node pipeline/qa.mjs`, then
