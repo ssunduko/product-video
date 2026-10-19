@@ -24,8 +24,9 @@
   "auth": {
     "mode": "none"
   },
-  "//secrets": "internal ids kept out of the repo: a script writes open /settings/members/{memberId}/... and the driver fills it in. Set SALESMSG_DEMO_MEMBER_ID in .env.",
+  "//secrets": "internal ids kept out of the repo: a script writes open /settings/members/{memberId}/... (or start: /chatbot/{agentId}/config) and the driver fills it in. Set SALESMSG_DEMO_MEMBER_ID and SALESMSG_DEMO_AGENT_ID in .env.",
   "secrets": {
-    "memberId": "env:SALESMSG_DEMO_MEMBER_ID"
+    "memberId": "env:SALESMSG_DEMO_MEMBER_ID",
+    "agentId": "env:SALESMSG_DEMO_AGENT_ID"
   }
 }

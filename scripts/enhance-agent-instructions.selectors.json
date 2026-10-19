@@ -1,0 +1,68 @@
+{
+  "resolvedAgainst": "salesmessage",
+  "resolvedAt": "2026-10-18",
+  "resolvedBy": "claude-in-chrome walk of app.salesmessage.com as the admin, on a draft test agent",
+  "note": "input/enhance-agent-instructions.flow (Show & Tell steps)",
+  "selectors": {
+    "the agent's Instructions field holding the starting version (no refund rule yet)": {
+      "spec": "::-p-xpath(//*[@aria-label=\"TextInput_MessageField\"][contains(., \"AGENT ROLE\")][not(contains(., \"refund\"))])",
+      "evidence": "Watched live 2026-10-18: the field is TextInput_MessageField; the editor loads in ~10s. Named \"ready\" so the load is off camera; fails fast if the last take's refund rule was saved."
+    },
+    "the agent's Instructions field": {
+      "spec": "[aria-label=\"TextInput_MessageField\"]",
+      "evidence": "1 match on the config page, watched live."
+    },
+    "the Enhance link above the Instructions field": {
+      "spec": "[aria-label=\"ButtonEnhance\"]",
+      "evidence": "1 match while the modal is closed; the modal adds a second."
+    },
+    "the Age restriction chip in the Enhance modal": {
+      "spec": "[aria-label=\"ButtonAgeRestriction\"]",
+      "evidence": "1 match, watched live."
+    },
+    "the Competitor mentions chip in the Enhance modal": {
+      "spec": "[aria-label=\"ButtonCompetitorMentions\"]",
+      "evidence": "1 match, watched live; no selected-state attribute."
+    },
+    "the Clearer goal chip in the Enhance modal": {
+      "spec": "[aria-label=\"ButtonClearerGoal\"]",
+      "evidence": "1 match, watched live."
+    },
+    "the custom note box in the Enhance modal": {
+      "spec": "[aria-label=\"DefaultModal_Card\"] textarea",
+      "evidence": "1 match; placeholder \"e.g., Add a rule for handling refund requests\"."
+    },
+    "the Enhance button at the bottom of the modal's first step": {
+      "spec": "[aria-label=\"DefaultModal_Card\"] [aria-label=\"ButtonEnhance\"]",
+      "evidence": "Scoped to the modal: the page has its own ButtonEnhance underneath."
+    },
+    "the current instructions panel on the left of the result": {
+      "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[1])",
+      "evidence": "1st of 2 Scrollbar_View in the modal."
+    },
+    "the Refine button, shown only once the enhanced version is ready": {
+      "spec": "[aria-label=\"ButtonRefine\"]",
+      "evidence": "Try again / I like it are on screen WHILE it generates; Refine appears only when done. Measured 7s and 9.3s."
+    },
+    "the enhanced instructions panel on the right of the result": {
+      "spec": "::-p-xpath((//*[@aria-label=\"DefaultModal_Card\"]//*[@aria-label=\"Scrollbar_View\"])[2])",
+      "evidence": "2nd of 2 Scrollbar_View in the modal; the additions sit far down it."
+    },
+    "the Refine button under the result": {
+      "spec": "[aria-label=\"ButtonRefine\"]",
+      "evidence": "1 match once the result is ready."
+    },
+    "the I like it button under the result": {
+      "spec": "[aria-label=\"ButtonILikeIt\"]",
+      "evidence": "1 match, watched live."
+    },
+    "the Instructions field now holding the enhanced text with the refund rule": {
+      "spec": "::-p-xpath(//*[@aria-label=\"TextInput_MessageField\"][contains(., \"refund\")])",
+      "evidence": "Watched live: modal closes and the field fills at once."
+    },
+    "the Save changes button at the top of the editor": {
+      "spec": "[aria-label=\"ButtonSaveChanges\"]",
+      "evidence": "Enabled after I like it. The take only hovers it - never clicks."
+    }
+  }
+}
