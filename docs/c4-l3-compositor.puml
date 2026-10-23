@@ -12,7 +12,7 @@ ContainerDb(brand_assets, "Brand assets", "brand/", "StyleGuide.txt (colour and 
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
 
 Container_Boundary(compositor_2, "5 · Compositor") {
-  Component(project_reader, "Project reader", "compose.mjs", "Reads demo.recordly and the take it names, so the composite is always of the video the project was built from.")
+  Component(project_reader, "Project reader", "compose.mjs", "Reads {take}.recordly and the take it names, so the composite is always of the video the project was built from.")
   Component(look_resolver, "Look resolver", "compose.mjs + brand.mjs", "padding, radius, shadow, background, ramp and pan timings, from the project frame block and overridable by NO_FRAME and PADDING. The mat the window sits on is the brand blue: it is most of what the...")
   Component(probe, "Probe", "ffprobe", "Dimensions, frame rate and frame count of the take.")
   Component(cursor_track, "Cursor track", "compose.mjs", "Splits telemetry into moves and clicks, then works out when the cursor actually left one point and settled on the next.")
@@ -23,7 +23,7 @@ Container_Boundary(compositor_2, "5 · Compositor") {
   Component(encoder_pipe, "Encoder pipe", "ffmpeg libx264", "Takes rendered frames straight back, with faststart.")
 }
 
-Rel(work_directory, project_reader, "demo.recordly and the take to")
+Rel(work_directory, project_reader, "{take}.recordly and the take to")
 Rel(look_resolver, brand_assets, "Reads colours")
 Rel(project_reader, look_resolver, "Frame block to")
 Rel(project_reader, probe, "Take path to")

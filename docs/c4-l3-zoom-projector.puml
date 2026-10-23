@@ -15,7 +15,7 @@ Container_Boundary(zoom_projector_2, "4 · Zoom Projector") {
   Component(flutter_guard, "Flutter guard", "project.mjs", "Two regions that would sit less than 800ms apart are merged, so the zoom holds instead of bouncing out and straight back in.")
   Component(region_builder, "Region builder", "project.mjs", "Starts 1200ms before the first click and ends 1600ms after the last, at depth 3, with focus clamped to 0.08..0.92 so a corner click still frames something.")
   Component(focus_track_builder, "Focus track builder", "project.mjs", "Keeps every click position in a cluster, not only the last.")
-  Component(project_writer, "Project writer", "demo.recordly · JSON", "videoPath plus the regions, and it prints each region with its focus track so the framing can be reviewed before composing.")
+  Component(project_writer, "Project writer", "{take}.recordly · JSON", "videoPath plus the regions, and it prints each region with its focus track so the framing can be reviewed before composing.")
 }
 
 Rel(work_directory, telemetry_reader, "cursor.json to")
@@ -24,7 +24,7 @@ Rel(click_clusterer, flutter_guard, "Candidate regions to")
 Rel(flutter_guard, region_builder, "Merged clusters to")
 Rel(region_builder, focus_track_builder, "Each region to")
 Rel(focus_track_builder, project_writer, "Regions with focus tracks to")
-Rel(project_writer, work_directory, "Writes demo.recordly")
+Rel(project_writer, work_directory, "Writes {take}.recordly")
 
 LAYOUT_WITH_LEGEND()
 @enduml

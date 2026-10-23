@@ -15,8 +15,8 @@ cursor, and a styled window frame.
     target.mjs      loads a target: app URL + credentials
     script.mjs      compiles a plain-text script into a scenario module
     assemble.mjs    frames -> raw.mp4 (+ raw.mp4.cursor.json), applies cuts / fast-forwards
-    project.mjs     click telemetry -> demo.recordly (one zoom region per click cluster)
-    compose.mjs     demo.recordly + video -> final.mp4 (zoom, cursor, window frame)
+    project.mjs     click telemetry -> <take>.recordly (one zoom region per click cluster)
+    compose.mjs     <take>.recordly + video -> final.mp4 (zoom, cursor, window frame)
     narrate.mjs     say-cues -> speech, muxed onto the video (optional)
     tighten.mjs     removes dead air: frozen + silent stretches, and the tail
     cards.mjs       branded intro/outro cards, joined onto the video (optional)
@@ -59,9 +59,10 @@ cursor, and a styled window frame.
     *.ttf / *.otf           optional: brand font files, registered at render time
   docs/             C4 architecture model and its renderings
   sample-app/       a small Express app to record against (npm install && npm start)
+  sample/           model videos new ones should match: cards, outro, pacing
   .env.example      template for .env — copy and fill in
   .env              optional, gitignored: KEY=VALUE for env: references in targets
-  out/              generated: frames/, frames.json, actions.json, *.mp4, demo.recordly
+  out/              generated: frames/, frames.json, actions.json, *.mp4, <take>.recordly
   profile/          generated: the Chrome user-data-dir the takes run under
 ```
 
@@ -177,7 +178,7 @@ npm run                    # lists them all
 | 2 | `script.mjs` | `npm run compile` | `scripts/*.demo` | `scenarios/*.mjs` |
 | 3 | `driver.mjs` | `npm run record` | a flow + a target | `out/frames/`, `actions.json`, `frames.json` |
 | 4 | `assemble.mjs` | `npm run assemble` | `frames.json`, `actions.json` | `out/raw.mp4` (or `cut.mp4`) + telemetry |
-| 6 | `project.mjs` | `npm run project` | `<take>.cursor.json` | `out/demo.recordly` |
+| 6 | `project.mjs` | `npm run project` | `<take>.cursor.json` | `out/<take>.recordly` |
 | 7 | `compose.mjs` | `npm run compose` | the take + the project | `out/final.mp4` |
 | 8 | `narrate.mjs` | `npm run narrate` | `final.mp4` + cues | `out/final-narrated.mp4` |
 | 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
@@ -675,7 +676,10 @@ bounds are roughly `previous cue end` to `next cue start`.
 node project.mjs
 ```
 
-Writes `out/demo.recordly` — one zoom region per click cluster (clicks under
+Writes `out/<take>.recordly`, named after the script the take ran
+(`scripts/click-tracking.demo` -> `click-tracking.recordly`; `driver.mjs` stores
+the name in `actions.json`, and a take recorded before that falls back to
+`demo.recordly`) — one zoom region per click cluster (clicks under
 2.5s apart merge), derived from the cut telemetry. Review the printed regions
 and hand-edit the JSON if framing needs it, e.g. a region crossing a cut
 boundary or focus too tight on a corner. Explicit regions beat any auto-zoom.
@@ -690,7 +694,7 @@ compositor pans between them instead of framing only the final one.
 node compose.mjs
 ```
 
-Defaults to `out/demo.recordly` and writes `out/final.mp4`. Override with
+Defaults to `out/<take>.recordly` and writes `out/final.mp4`. Override with
 `node compose.mjs <project.recordly> -o <output.mp4>`.
 
 This is the step that replaces Recordly. It renders every frame itself:
@@ -896,7 +900,7 @@ turning a considered move into a snap.
 Inside the run there is nothing to damage: frozen picture, silent audio, so the
 seam is invisible and inaudible and the pause simply gets shorter.
 
-Zoom regions are read from `demo.recordly` and subtracted from the dead runs
+Zoom regions are read from `<take>.recordly` and subtracted from the dead runs
 outright. Then a **placement check** re-verifies every seam against the detected
 silence and the zoom list, and refuses to write if one is over either. That check
 is not belt-and-braces: this failure produces a clean file of an entirely

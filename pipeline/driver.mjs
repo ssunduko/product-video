@@ -815,7 +815,11 @@ try {
 
   fs.writeFileSync(
     path.join(OUT, 'actions.json'),
-    JSON.stringify({ viewport: VIEWPORT, samples, narration, waits }, null, 1),
+    JSON.stringify({
+      // the take's name, from the script's file name: names its zoom project (paths.mjs projectPath)
+      name: path.basename(resolvedInput).replace(/\.[^.]+$/, ''),
+      viewport: VIEWPORT, samples, narration, waits,
+    }, null, 1),
   );
 
   if (narration.length) console.log(`narration: ${narration.length} cues`);

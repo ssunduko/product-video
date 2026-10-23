@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath as projectFile } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,7 +72,7 @@ const zoomRegions = groups.map((g, i) => ({
   mode: 'manual',
 }));
 
-const projectPath = path.join(OUT, 'demo.recordly');
+const projectPath = projectFile();
 fs.writeFileSync(
   projectPath,
   JSON.stringify({ version: 1, videoPath, editor: { zoomRegions } }, null, 1),
