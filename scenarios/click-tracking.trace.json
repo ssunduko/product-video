@@ -1,0 +1,331 @@
+{
+  "name": "click-tracking",
+  "description": "Click tracking analytics - the link grid, one link's detail page, and the sources view (SWR-11033)",
+  "target": "salesmessage",
+  "startUrl": "/conversations/",
+  "//startUrl": "Salesmessage takes always start at the app entry, /conversations/, not the target's default.",
+
+  "observedAt": "2026-10-18",
+  "resolvedBy": "observed live in Chrome via the Claude in Chrome extension, admin session on app.salesmessage.com",
+  "provenance": "input/click-tracking.flow - SWR-11033 Click Tracking",
+
+  "intro": "Click tracking | See who clicks the links you send",
+  "outro": "Thanks for watching | Questions? Reach out any time - we are happy to help",
+  "//outro": "the standard Salesmessage outro, as in sample/enhance-agent-instructions.mp4",
+
+  "warnings": [
+    "The prepared link is short code NIqoQk (https://salesmsg.org/NIqoQk, Campaign 'Analytics Campaign', 3 clicks, link id 834033).\nIf that link is deleted or the account changes, update the type step and re-walk.",
+    "The Contacts tab shows the recipient's real name, phone number and email on camera. Use a demo contact before publishing.",
+    "Search is debounced: the grid empties, then the single match returns ~1.4s after the last keystroke.\nThe old rows match `gridRow` until then, so the take waits on `gridOneRow` (tbody tr:only-child) instead.",
+    "Load times vary a lot: Sources 0.8s-11.9s, the Overview grid 1.5s-8.8s, the detail page 0.85s-3.5s, and twice the app stalled outright\n(Sources empty for 32s+, the detail page spinning 10s+). Timeouts are sized from the slow loads; if a take aborts on a wait, check the app before changing the script.",
+    "The Aircall 'integration disconnected' banner across the top is hidden by the target's hideSelectors.",
+    "A 'Plan credits exceeded!' alert pops up bottom-left in profile/ about 11s after load and stays for the whole take.\nOne 1s ifAppears guard at 'Find one link' (~30s in) closes it; if it shows, it is on screen from ~11s until then.\nClosing it snoozes it for 30 days in profile/ (localStorage subscription_credits_alert_closed_at_<user>), so usually the guard does not fire.\nNo guard at the start: the take begins ~3s after load, before the alert can appear, and a start guard only adds a frozen, silent opening (failed qa twice)."
+  ],
+
+  "selectors": {
+    "ready": {
+      "intent": "the Analytics icon in the far-left app sidebar, proving the app shell has loaded",
+      "spec": "[aria-label=\"NavLink_Analytics\"]",
+      "evidence": "1 match; app aria-label convention NavLink_*. Part of the app shell. Appeared 2.9s after loading /conversations/"
+    },
+    "creditsAlert": {
+      "intent": "the 'Plan credits exceeded!' alert in the bottom-left corner",
+      "spec": "[aria-label=\"TypographyPlanCreditsExceeded\"]",
+      "evidence": "1 match in profile/ on /conversations/, inside div[aria-label=Alert]; appeared 11.5s after load. Not shown in the user's own Chrome (snoozed there)"
+    },
+    "creditsAlertClose": {
+      "intent": "the close (x) button on the 'Plan credits exceeded!' alert",
+      "spec": "[aria-label=\"Alert\"]:has([aria-label=\"TypographyPlanCreditsExceeded\"]) [aria-label=\"IconButtonAlertClose_Default\"]",
+      "evidence": "button inside the same Alert as the title (Alert_IconClose > IconButtonAlertClose). Scoped with :has so no other Alert's close can match"
+    },
+    "navAnalytics": {
+      "intent": "the Analytics icon in the far-left app sidebar",
+      "spec": "[aria-label=\"NavLink_Analytics\"]",
+      "evidence": "1 match, links to /analytics (redirects to /analytics/overall)"
+    },
+    "clickTrackingLabel": {
+      "intent": "the 'Click tracking' group heading in the Analytics menu",
+      "spec": "::-p-text(Click tracking)",
+      "evidence": "1 leaf match on /analytics/overall: div[aria-label=TypographyMenuSubLabel], which is shared with 'Credit usage', so the text is the discriminator"
+    },
+    "ctOverview": {
+      "intent": "the Overview item under Click tracking in the Analytics menu",
+      "spec": "[aria-label=\"NavLink_AnalyticsClickTrackingOverview\"]",
+      "evidence": "1 match, href /analytics/click-tracking/overview. Credit usage's Overview is NavLink_AnalyticsCreditUsageAll, so no clash"
+    },
+    "ctSources": {
+      "intent": "the Sources item under Click tracking in the Analytics menu",
+      "spec": "[aria-label=\"NavLink_AnalyticsClickTrackingSources\"]",
+      "evidence": "1 match, href /analytics/click-tracking/sources"
+    },
+    "gridRow": {
+      "intent": "a row in the Click tracking overview grid",
+      "spec": "tbody tr",
+      "evidence": "the only table on the page (MUI); 3 rows unfiltered, 1 after searching NIqoQk. First match is used"
+    },
+    "colSent": {
+      "intent": "the Sent column heading in the overview grid",
+      "spec": "thead th:nth-child(4)",
+      "evidence": "1 match, text 'Sent'. Headings carry no aria-label/testid, only scope=col; column order Target URL, Short URL, Source, Sent, Clicks, Unique clicks, Unique click rate, Credits per click, Inbox, Created at"
+    },
+    "colClicks": {
+      "intent": "the Clicks column heading in the overview grid",
+      "spec": "thead th:nth-child(5)",
+      "evidence": "1 match, text 'Clicks', x=1084 of 1463"
+    },
+    "colUnique": {
+      "intent": "the Unique clicks column heading in the overview grid",
+      "spec": "thead th:nth-child(6)",
+      "evidence": "1 match, text 'Unique clicks', x=1174 of 1463"
+    },
+    "colRate": {
+      "intent": "the Unique click rate column heading in the overview grid",
+      "spec": "thead th:nth-child(7)",
+      "evidence": "1 match, text 'Unique click rate' (truncated on screen at 1440 wide)"
+    },
+    "gridOneRow": {
+      "intent": "the overview grid holding exactly one row, after a search narrows it",
+      "spec": "tbody tr:only-child",
+      "evidence": "the page's only table: 3 rows unfiltered (no match), 0 while the search spinner shows, 1 after NIqoQk (1 match, verified live). Not scoped to div[aria-label=TableClickTrackingOverviewTable]: that wrapper exists only while loading, which made the first scoped spec time out mid-take. A plain row wait passed instantly on the stale rows"
+    },
+    "search": {
+      "intent": "the search box above the overview grid",
+      "spec": "input[placeholder=\"Search...\"]",
+      "evidence": "the only input on the page; no aria-label or name. Filters by short code"
+    },
+    "rowOpen": {
+      "intent": "the Unique clicks cell of the first grid row, which opens the link's detail page",
+      "spec": "tbody tr td:nth-child(6)",
+      "evidence": "cursor:pointer, x=1225 of 1463; click navigates to /analytics/click-tracking/overview/834033 (verified 2026-10-19). Chosen over the Source cell (col 3) so the click zoom pans right and keeps the figure columns in frame. Never the Short URL cell (col 2) - a live link that would register a click"
+    },
+    "detailShortUrl": {
+      "intent": "the short link shown under the destination in the link detail header",
+      "spec": "[aria-label=\"LinkDetailShortUrlRow\"]",
+      "evidence": "1 match, text https://salesmsg.org/NIqoQk; sits under TypographyPageTitle (the destination host + path). Appeared ~1.0s after the row click"
+    },
+    "detailTitle": {
+      "intent": "the destination URL heading at the top of the link detail page",
+      "spec": "[aria-label=\"LinkDetailTargetUrlRow\"]",
+      "evidence": "1 match, help.salesmessage.com/en/articles/15859165-click-tracking"
+    },
+    "tileSent": {
+      "intent": "the Total sent tile on the link detail page",
+      "spec": "[aria-label=\"MetricTile_total_sent\"]",
+      "evidence": "1 match, x=303 of 1463"
+    },
+    "tileClicks": {
+      "intent": "the Total clicks tile on the link detail page",
+      "spec": "[aria-label=\"MetricTile_total_clicks\"]",
+      "evidence": "1 match, x=531"
+    },
+    "tileUnique": {
+      "intent": "the Unique clicks tile on the link detail page",
+      "spec": "[aria-label=\"MetricTile_unique_clicks\"]",
+      "evidence": "1 match, x=759"
+    },
+    "tileRate": {
+      "intent": "the Unique click rate tile on the link detail page",
+      "spec": "[aria-label=\"MetricTile_unique_click_rate\"]",
+      "evidence": "1 match, x=987"
+    },
+    "tileCredits": {
+      "intent": "the Credits per click tile, the last of the five",
+      "spec": "[aria-label=\"MetricTile_credits_per_click\"]",
+      "evidence": "1 match; the last tile to fill. All five present ~2.4s after the row click"
+    },
+    "countryChart": {
+      "intent": "the Countries by clicks chart on the link detail page",
+      "spec": "[aria-label=\"CountryDistribution\"]",
+      "evidence": "1 match, title 'Countries · by clicks'"
+    },
+    "deviceChart": {
+      "intent": "the Device type by clicks chart on the link detail page",
+      "spec": "[aria-label=\"DeviceDistribution\"]",
+      "evidence": "1 match, title 'Device type · by clicks'; legend Mobile, Tablet, Desktop, Other"
+    },
+    "countryBar": {
+      "intent": "the first country segment in the Countries bar",
+      "spec": "[data-testid=\"country-bar-0\"]",
+      "evidence": "1 match (US, 100% of clicks for this link)"
+    },
+    "countryTooltip": {
+      "intent": "the tooltip naming the country and its clicks while a country segment is hovered",
+      "spec": "::-p-text(total clicks)",
+      "evidence": "role=tooltip, text 'US: 3 total clicks'; only in the DOM while the bar is hovered"
+    },
+    "tabUsage": {
+      "intent": "the Usage tab below the charts",
+      "spec": "[aria-label=\"Tab_Usage\"]",
+      "evidence": "1 match; selected by default"
+    },
+    "usageRow": {
+      "intent": "a source row in the Usage table, with its own figures",
+      "spec": "[aria-label=\"TypographySourceRecordName\"]",
+      "evidence": "1 match on the detail page ('Analytics Campaign', Campaign, 1 sent, 3 clicks, 1 unique, 100%, 1 credit). Absent on the Contacts tab"
+    },
+    "tabContacts": {
+      "intent": "the Contacts tab below the charts",
+      "spec": "[aria-label=\"Tab_Contacts\"]",
+      "evidence": "1 match"
+    },
+    "contactsSendTime": {
+      "intent": "the Send time column heading in the Contacts list",
+      "spec": "[aria-label=\"TableHeadColumn_SendTime\"]",
+      "evidence": "1 match, only on the Contacts tab (columns Name, Number, Email, Tags, Send time). Present ~0.2-1.4s after the tab click"
+    },
+    "contactRow": {
+      "intent": "a recipient's name in the Contacts list",
+      "spec": "[aria-label=\"TableBody\"] [aria-label=\"Avatar_Name\"]",
+      "evidence": "1 row for this link"
+    },
+    "sourcesTiles": {
+      "intent": "the four summary tiles at the top of Click tracking: Sources",
+      "spec": "[aria-label=\"ClickTrackingSourcesTiles\"]",
+      "evidence": "1 match; children SourcesTile_total_sent, total clicks, unique clicks, avg. credits per click (4). Appears ~0.2s after the menu click"
+    },
+    "sourcesLoading": {
+      "intent": "the loading spinner over the Click tracking: Sources table",
+      "spec": "[role=\"progressbar\"]",
+      "evidence": "present immediately after clicking Sources, gone together with the rows (11.9s on 2026-10-19); 0 matches on the loaded page"
+    },
+    "sourcesTileValue": {
+      "intent": "a filled-in number in the Click tracking: Sources summary tiles",
+      "spec": "[aria-label=\"ClickTrackingSourcesTiles\"] [aria-label=\"TypographyMetricValue\"]",
+      "evidence": "absent while the tiles load (each shows span[aria-label=TypographyEmptyCellText] '—'); 4 matches once filled (3 / 7 / 1 / 3)"
+    },
+    "sourcesRow": {
+      "intent": "a source record row on Click tracking: Sources",
+      "spec": "[aria-label=\"TypographySourceRecordName\"]",
+      "evidence": "3 matches (Analytics Broadcast, Analytics Campaign, Analytics Tracking). A progressbar shows while they load; measured 0.8s, 3.0s, 10.4s"
+    }
+  },
+
+  "beats": [
+    {
+      "title": "Open Analytics",
+      "steps": [
+        { "op": "wait", "name": "ready", "observedMs": 2926 },
+        { "op": "hold", "ms": 200 },
+        { "op": "say", "text": "Open Analytics.",
+          "//": "never 'lives in' - the voice reads it as the plural of 'life'" },
+        { "op": "click", "name": "navAnalytics" },
+        { "op": "wait", "name": "ctOverview", "observedMs": 945 },
+        { "op": "say", "text": "Here is where you will find click tracking, with Overview and Sources beneath it.",
+          "//": "wording asked for by the user; starts as soon as the menu shows so it covers the Overall page's spinner, and the cursor moves to the Click tracking heading under it" },
+        { "op": "hover", "name": "clickTrackingLabel" },
+        { "op": "hold", "ms": 5000 }
+      ]
+    },
+    {
+      "title": "The link grid",
+      "steps": [
+        { "op": "say", "text": "Start with Overview." },
+        { "op": "click", "name": "ctOverview" },
+        { "op": "wait", "name": "gridRow", "observedMs": 8761,
+          "//": "1.5s on the walk, 8.8s on 2026-10-19; timeout sized from the slow one, unnarrated so AUTO_SPEED compresses it" },
+        { "op": "hold", "ms": 500, "//": "the DOM lands ~0.4s before the rows paint in the screencast" },
+        { "op": "say", "text": "Overview lists one row for every short link you've delivered." },
+        { "op": "hold", "ms": 3800 },
+        { "op": "say", "text": "Each row carries four figures: sent, clicks, unique clicks, and the unique click rate.",
+          "//": "7.2s spoken (~12 chars/s). Each hover lands on its column as the word is said: sent ~2.6s, clicks ~3.1s, unique clicks ~3.8s, unique click rate ~5.7s" },
+        { "op": "hold", "ms": 1800 },
+        { "op": "hover", "name": "colSent" },
+        { "op": "hover", "name": "colClicks" },
+        { "op": "hold", "ms": 300 },
+        { "op": "hover", "name": "colUnique" },
+        { "op": "hold", "ms": 1100 },
+        { "op": "hover", "name": "colRate" },
+        { "op": "hold", "ms": 300 }
+      ]
+    },
+    {
+      "title": "Find one link",
+      "steps": [
+        { "op": "hover", "name": "search" },
+        { "op": "say", "text": "To find one link, search by its short code." },
+        {
+          "op": "ifAppears", "name": "creditsAlert", "timeoutS": 1,
+          "//": "runs under the search line so the 1s check is not silent",
+          "then": [
+            { "op": "click", "name": "creditsAlertClose" },
+            { "op": "hold", "ms": 600 }
+          ]
+        },
+        { "op": "type", "name": "search", "text": "NIqoQk" },
+        { "op": "wait", "name": "gridOneRow", "observedMs": 2500,
+          "//": "debounce + spinner; no fixed hold, so the line fires when the single row lands and unnarrated loading is auto-sped" },
+        { "op": "say", "text": "One row comes back. Open it." },
+        { "op": "hold", "ms": 1200 }
+      ]
+    },
+    {
+      "title": "Link detail",
+      "steps": [
+        { "op": "click", "name": "rowOpen" },
+        { "op": "wait", "name": "detailShortUrl", "observedMs": 3494,
+          "//": "1.0s on the walk, 3.5s on 2026-10-19" },
+        { "op": "hold", "ms": 500, "//": "the DOM lands ~0.5s before the header paints in the screencast" },
+        { "op": "say", "text": "The header shows where the link goes, with the short link right beneath it." },
+        { "op": "hover", "name": "detailTitle" },
+        { "op": "hold", "ms": 5400 },
+        { "op": "wait", "name": "tileCredits", "observedMs": 2362 },
+        { "op": "say", "text": "Five tiles sum it up: total sent, total clicks, unique clicks, unique click rate, and credits per click.",
+          "//": "7.7s spoken (~13.4 chars/s). Each hover lands on its tile as it is named: ~1.6s, 2.5s, 3.6s, 4.7s, 6.7s" },
+        { "op": "hold", "ms": 1150 },
+        { "op": "hover", "name": "tileSent" },
+        { "op": "hold", "ms": 400 },
+        { "op": "hover", "name": "tileClicks" },
+        { "op": "hold", "ms": 650 },
+        { "op": "hover", "name": "tileUnique" },
+        { "op": "hold", "ms": 650 },
+        { "op": "hover", "name": "tileRate" },
+        { "op": "hold", "ms": 1550 },
+        { "op": "hover", "name": "tileCredits" },
+        { "op": "hold", "ms": 700 },
+        { "op": "hover", "name": "countryChart" },
+        { "op": "say", "text": "Below them, clicks are broken down by country" },
+        { "op": "hold", "ms": 3400 },
+        { "op": "hover", "name": "deviceChart" },
+        { "op": "say", "text": "and by device type." },
+        { "op": "hold", "ms": 1200 },
+        { "op": "hover", "name": "countryBar" },
+        { "op": "wait", "name": "countryTooltip", "observedMs": 300 },
+        { "op": "say", "text": "Hover a country to see its name and how many clicks came from it." },
+        { "op": "hold", "ms": 4200 }
+      ]
+    },
+    {
+      "title": "Usage and contacts",
+      "steps": [
+        { "op": "click", "name": "tabUsage" },
+        { "op": "wait", "name": "usageRow", "observedMs": 300 },
+        { "op": "say", "text": "The Usage tab lists each source that delivered the link, each with its own figures." },
+        { "op": "hold", "ms": 6200 },
+        { "op": "click", "name": "tabContacts" },
+        { "op": "wait", "name": "contactsSendTime", "observedMs": 1439 },
+        { "op": "wait", "name": "contactRow", "observedMs": 300 },
+        { "op": "say", "text": "Contacts shows who received it, and when." },
+        { "op": "hold", "ms": 2700 }
+      ]
+    },
+    {
+      "title": "Sources",
+      "steps": [
+        { "op": "say", "text": "Last stop: Sources." },
+        { "op": "click", "name": "ctSources" },
+        { "op": "wait", "name": "sourcesTiles", "observedMs": 237 },
+        { "op": "wait", "name": "sourcesRow", "observedMs": 10387 },
+        { "op": "wait", "name": "sourcesTileValue", "observedMs": 4000,
+          "//": "tiles show '—' until filled; rows and tiles land in either order (3.3s/3.9s live, rows then tiles +4s in a take). Unnarrated so AUTO_SPEED compresses it" },
+        { "op": "waitGone", "name": "sourcesLoading", "observedMs": 3500 },
+        { "op": "hover", "name": "sourcesTiles",
+          "//": "the screencast sent no frame for 3.6s after the rows painted (frames.json gap, 2026-10-19); a mouse move forces a fresh frame before the line" },
+        { "op": "hold", "ms": 600 },
+        { "op": "say", "text": "Sources turns it around, by what sent the links." },
+        { "op": "hold", "ms": 3300 },
+        { "op": "say", "text": "Four tiles up top, and one row for every broadcast, campaign or workflow that carried a link." },
+        { "op": "hold", "ms": 7400 }
+      ]
+    }
+  ]
+}

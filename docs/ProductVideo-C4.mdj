@@ -3184,7 +3184,7 @@
               "stereotype": {
                 "$ref": "c4-st-0007"
               },
-              "documentation": "Technology: project.mjs · Node.js\n\nClusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the compositor pans across, and writes demo.recordly."
+              "documentation": "Technology: project.mjs · Node.js\n\nClusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the compositor pans across, and writes {take}.recordly."
             },
             {
               "_type": "UMLClass",
@@ -3304,7 +3304,7 @@
               "stereotype": {
                 "$ref": "c4-st-0008"
               },
-              "documentation": "Technology: out/ · out/{video}/{part}/\n\nOne folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other. Holds frames/, frames.json, actions.json, the per-take cursor.json and narration.json, demo.recordly, the MP4 at each stage (raw, cut, final, final-narrated, -tight, -carded) and the quality gate report with its stills. The hand-off between every stage."
+              "documentation": "Technology: out/ · out/{video}/{part}/\n\nOne folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other. Holds frames/, frames.json, actions.json, the per-take cursor.json and narration.json, {take}.recordly, the MP4 at each stage (raw, cut, final, final-narrated, -tight, -carded) and the quality gate report with its stills. The hand-off between every stage."
             },
             {
               "_type": "UMLClass",
@@ -35055,7 +35055,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: demo.recordly · JSON\n\nvideoPath plus the regions, and it prints each region with its focus track so the framing can be reviewed before composing."
+              "documentation": "Technology: {take}.recordly · JSON\n\nvideoPath plus the regions, and it prints each region with its focus track so the framing can be reviewed before composing."
             },
             {
               "_type": "UMLClassDiagram",
@@ -36162,7 +36162,7 @@
                           "top": 215,
                           "width": 210,
                           "height": 13,
-                          "text": "«component: demo.recordly · JSON»",
+                          "text": "«component: {take}.recordly · JSON»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -37160,7 +37160,7 @@
                       },
                       "visible": true,
                       "font": "Arial;11;0",
-                      "text": "Writes demo.recordly",
+                      "text": "Writes {take}.recordly",
                       "left": 830,
                       "top": 125,
                       "width": 150,
@@ -37329,7 +37329,7 @@
               "_parent": {
                 "$ref": "c4-pkg-1653"
               },
-              "name": "Writes demo.recordly",
+              "name": "Writes {take}.recordly",
               "source": {
                 "$ref": "c4-el-1659"
               },
@@ -37358,7 +37358,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: compose.mjs\n\nReads demo.recordly and the take it names, so the composite is always of the video the project was built from."
+              "documentation": "Technology: compose.mjs\n\nReads {take}.recordly and the take it names, so the composite is always of the video the project was built from."
             },
             {
               "_type": "UMLClass",
@@ -40031,7 +40031,7 @@
                       },
                       "visible": true,
                       "font": "Arial;11;0",
-                      "text": "demo.recordly and the take to",
+                      "text": "{take}.recordly and the take to",
                       "left": 530,
                       "top": 40,
                       "width": 150,
@@ -41586,7 +41586,7 @@
               "_parent": {
                 "$ref": "c4-pkg-1766"
               },
-              "name": "demo.recordly and the take to",
+              "name": "{take}.recordly and the take to",
               "source": {
                 "$ref": "c4-el-0171"
               },
@@ -41825,7 +41825,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: narrate.mjs\n\nReads videoPath out of demo.recordly to find the cue file belonging to the take that was actually composed, falling back to newest-mtime. Using another take’s cues does not error — it silently narrates over the wrong footage — so the project file, not the timestamp, is the authority."
+              "documentation": "Technology: narrate.mjs\n\nReads videoPath out of {take}.recordly to find the cue file belonging to the take that was actually composed, falling back to newest-mtime. Using another take’s cues does not error — it silently narrates over the wrong footage — so the project file, not the timestamp, is the authority."
             },
             {
               "_type": "UMLClass",
@@ -44710,7 +44710,7 @@
                       },
                       "visible": true,
                       "font": "Arial;11;0",
-                      "text": "Reads demo.recordly + the cue file",
+                      "text": "Reads {take}.recordly + the cue file",
                       "left": 540,
                       "top": 210,
                       "width": 150,
@@ -46167,7 +46167,7 @@
               "_parent": {
                 "$ref": "c4-pkg-1977"
               },
-              "name": "Reads demo.recordly + the cue file",
+              "name": "Reads {take}.recordly + the cue file",
               "source": {
                 "$ref": "c4-el-1978"
               },
@@ -46428,7 +46428,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: tighten.mjs + demo.recordly\n\nZoom windows are subtracted from the dead runs outright. A dead run butts right up against a zoom, because the zoom is triggered by a click and the screen goes still immediately after it, so a seam there dissolves the move and turns it into a snap."
+              "documentation": "Technology: tighten.mjs + {take}.recordly\n\nZoom windows are subtracted from the dead runs outright. A dead run butts right up against a zoom, because the zoom is triggered by a click and the screen goes still immediately after it, so a seam there dissolves the move and turns it into a snap."
             },
             {
               "_type": "UMLClass",
@@ -47147,7 +47147,7 @@
                           "top": 215,
                           "width": 210,
                           "height": 13,
-                          "text": "«component: tighten.mjs + demo.recordly»",
+                          "text": "«component: tighten.mjs + {take}.recordly»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },
@@ -48993,7 +48993,7 @@
                       },
                       "visible": true,
                       "font": "Arial;11;0",
-                      "text": "demo.recordly zoom regions to",
+                      "text": "{take}.recordly zoom regions to",
                       "left": 530,
                       "top": 125,
                       "width": 150,
@@ -49750,7 +49750,7 @@
               "_parent": {
                 "$ref": "c4-pkg-2193"
               },
-              "name": "demo.recordly zoom regions to",
+              "name": "{take}.recordly zoom regions to",
               "source": {
                 "$ref": "c4-el-0171"
               },

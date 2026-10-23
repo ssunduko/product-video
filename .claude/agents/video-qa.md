@@ -82,7 +82,7 @@ Be specific: name the beat, the line and the number to change.
 |---|---|
 | `overlap` (two voices) | The line is longer than the gap before the next `say`. Lengthen the `hold` after it in the trace by at least the overlap + 0.3s, shorten the line, or move the next `say` after a later wait. Re-record is needed — narration timing is fixed at record time. |
 | line spoken before its result is on screen | Move the `say` after the `wait` for that result in the trace, or turn it into the `result` of the `waitGone` that ends the loading. |
-| `sync` (onset off its cue) | Audio really is shifted: check the narrated video was rendered from the take whose cues were used (`out/demo.recordly` `videoPath`), then re-run narrate. |
+| `sync` (onset off its cue) | Audio really is shifted: check the narrated video was rendered from the take whose cues were used (`out/<video>/<part>/<take>.recordly` `videoPath`), then re-run narrate. |
 | `frozen` on a loading screen | Fast-forward it at assemble time (`SPEEDS_MS='[[startMs,endMs,factor]]'`, take timeline) or wait for the loaded state before the beat's narration; if it is the start of a take, start the take on the loaded page. |
 | `frozen` on finished content, with narration over it | Usually fine; WARN only. |
 | `deadair` | Add narration over the stretch (over-supply lines in the trace's `waitGone.narration`), shorten the `hold`, or let `tighten.mjs` take it (`--min` lower). At a join between takes: trim the end of the first part / the start of the second before joining. |

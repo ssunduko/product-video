@@ -23,7 +23,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadTarget } from './target.mjs';
 import { pickProvider, speak, TTS_CACHE } from './tts.mjs';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath as projectFile } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CACHE = TTS_CACHE; // shared across output folders (paths.mjs)
@@ -111,7 +111,7 @@ const output = path.resolve(
 // both files by hand, which the README suggests for fixing a line, is enough to
 // trigger it.)
 function cueCandidates() {
-  const projectPath = path.join(OUT, 'demo.recordly');
+  const projectPath = projectFile();
   const ordered = [];
 
   if (fs.existsSync(projectPath)) {
@@ -293,7 +293,7 @@ if (padMs > PAD_LIMIT_MS) {
       `Cues came from ${path.relative(OUT, cuePath)}, whose last cue is at ` +
       `${(Math.max(...clips.map((c) => c.atMs)) / 1000).toFixed(1)}s.\n` +
       'That file is almost certainly from a different take than the video. Check ' +
-      '`videoPath` in out/demo.recordly, or re-run assemble.mjs for this take.',
+      `\`videoPath\` in ${path.relative(OUT, projectFile())}, or re-run assemble.mjs for this take.`,
   );
 }
 

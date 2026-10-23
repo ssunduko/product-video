@@ -1,0 +1,21 @@
+{
+  "//": [
+    "SWR-11033 Click Tracking - one take, admin session from profile/.",
+    "  cd pipeline && node build.mjs ../videos/click-tracking.json",
+    "Then run the video-qa agent on the output - and ask before applying its fixes."
+  ],
+
+  "name": "click-tracking",
+  "description": "Click tracking analytics - the link grid, one link's detail page, and the sources view (SWR-11033)",
+  "output": "out/click-tracking.mp4",
+
+  "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },
+
+  "parts": [
+    {
+      "name": "tour",
+      "script": "scripts/click-tracking.demo",
+      "before": "profile/ is signed in to app.salesmessage.com as the admin, and link NIqoQk still exists"
+    }
+  ]
+}

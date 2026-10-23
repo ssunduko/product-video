@@ -1,6 +1,6 @@
 // Compositor: raw take -> polished demo video.
 //
-// Replaces the macOS-only Recordly step. Reads the same demo.recordly project
+// Replaces the macOS-only Recordly step. Reads the same <take>.recordly project
 // and <video>.cursor.json telemetry, then renders every frame itself:
 //   * eased zoom/pan per zoom region
 //   * a synthesized cursor (arrow / pointing hand) with click ripples
@@ -18,7 +18,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, ImageData } from '@napi-rs/canvas';
 import { readStyleGuide, shade } from './brand.mjs';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath as projectFile } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,7 +44,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!projectPath) projectPath = argv[i];
 }
 
-projectPath ??= path.join(OUT, 'demo.recordly');
+projectPath ??= projectFile();
 if (!fs.existsSync(projectPath)) {
   throw new Error(`no project at ${projectPath}; run project.mjs first`);
 }

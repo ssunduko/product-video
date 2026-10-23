@@ -13,7 +13,7 @@ ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "On
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
 
 Container_Boundary(narrator_2, "6 · Narrator") {
-  Component(cue_file_resolver, "Cue file resolver", "narrate.mjs", "Reads videoPath out of demo.recordly to find the cue file belonging to the take that was actually composed, falling back to newest-mtime.")
+  Component(cue_file_resolver, "Cue file resolver", "narrate.mjs", "Reads videoPath out of {take}.recordly to find the cue file belonging to the take that was actually composed, falling back to newest-mtime.")
   Component(tts_gateway, "TTS gateway", "tts.mjs · shared", "Shared with cards.mjs, which is why both stages voice a script identically.")
   Component(breath_trimmer, "Breath trimmer", "tts.mjs · ffmpeg astats", "TTS does not start on the word; it starts on 100-160ms at -50 to -85 dB. Cued at the file start that is heard as the line fading up, and normalising a breath just gives a louder breath.")
   Component(loudness_meter, "Loudness meter", "ffmpeg ebur128", "Integrated LUFS per clip.")
@@ -24,7 +24,7 @@ Container_Boundary(narrator_2, "6 · Narrator") {
   Component(muxer, "Muxer", "ffmpeg", "Copies the video stream untouched unless the tail guard needed extra room, so the stage costs seconds rather than a re-render.")
 }
 
-Rel(cue_file_resolver, work_directory, "Reads demo.recordly + the cue file")
+Rel(cue_file_resolver, work_directory, "Reads {take}.recordly + the cue file")
 Rel(cue_file_resolver, tts_gateway, "One line at a time to")
 Rel(tts_gateway, tts_clip_cache, "Hits before spending")
 Rel(tts_gateway, text_to_speech_api, "Renders a miss", "HTTPS")

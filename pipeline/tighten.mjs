@@ -33,7 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath as projectFile } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -214,7 +214,7 @@ for (const run of dead) {
 // reads as a snap, which is the opposite of what the compositor spent its
 // effort on. The regions come from the project file compose.mjs rendered from.
 function zoomWindows() {
-  const projectPath = path.join(OUT, 'demo.recordly');
+  const projectPath = projectFile();
   if (!fs.existsSync(projectPath)) return [];
   try {
     const project = JSON.parse(fs.readFileSync(projectPath, 'utf8').replace(/^﻿/, ''));

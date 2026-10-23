@@ -1,0 +1,26 @@
+# SWR-11033 Click Tracking - https://salesmsg.atlassian.net/browse/SWR-11033
+
+name: click-tracking
+description: Click tracking analytics - the link grid, one link's detail page, and the sources view
+target: salesmessage
+intro: Click tracking | See who clicks the links you send
+outro: Thanks for watching | Analytics > Click tracking
+
+Steps:
+Log in and open Analytics from the left navigation
+Confirm the menu carries "Click tracking" with "Overview" and "Sources" beneath it
+Select "Overview"
+Confirm the grid lists one row per delivered short link
+Point out the four figures on a row: Sent, Clicks, Unique clicks and Unique click rate
+Search for the prepared link by its short code
+Confirm one row is returned
+Select the row
+Confirm the page header shows the destination with the short link beneath it
+Confirm five tiles: Total sent, Total clicks, Unique clicks, Unique click rate and Credits per click
+Observe the two charts below the tiles: Countries and Device type
+Hover one country segment and confirm the tooltip names the country and its clicks
+Open the "Usage" tab
+Confirm one row per source that delivered the link, each with its own figures
+Open the "Contacts" tab
+Confirm the list shows who received the link and when
+Select "Sources" in the left navigation and confirm four tiles above one row per source record
