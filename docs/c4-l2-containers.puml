@@ -21,7 +21,7 @@ System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   Container(script_compiler, "1 · Script Compiler", "script.mjs · Node.js", "Compiles a .demo flow into a normal, inspectable scenario module.")
   Container(driver, "2 · Driver", "driver.mjs · Node.js + puppeteer-core", "Launches Chrome, signs in if the target says to, runs the flow, and records a screencast plus cursor, click and narration-cue telemetry, plus the real start and end of every wait.")
   Container(assembler, "3 · Assembler", "assemble.mjs · Node.js + ffmpeg", "Turns frames into raw.mp4 / cut.mp4.")
-  Container(zoom_projector, "4 · Zoom Projector", "project.mjs · Node.js", "Clusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the compositor pans across, and writes demo.recordly.")
+  Container(zoom_projector, "4 · Zoom Projector", "project.mjs · Node.js", "Clusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the compositor pans across, and writes {take}.recordly.")
   Container(compositor, "5 · Compositor", "compose.mjs · Node.js + canvas + ffmpeg", "Renders every frame: eased zoom/pan, a synthesized cursor with click ripples, and a styled window frame.")
   Container(narrator, "6 · Narrator", "narrate.mjs · Node.js + ffmpeg", "Voices the say-cues, trims the breath off each clip, levels every clip to a common loudness, and mixes them onto the video.")
   Container(tightener, "7 · Tightener", "tighten.mjs · Node.js + ffmpeg", "Compresses stretches that are frozen AND silent, trims the trailing run, and crossfades every seam.")

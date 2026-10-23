@@ -461,7 +461,7 @@ const cAssemble = mk(pkgContainers, 'container', '3 · Assembler', 'assemble.mjs
   'inter-frame gaps.');
 const cProject = mk(pkgContainers, 'container', '4 · Zoom Projector', 'project.mjs · Node.js',
   'Clusters clicks less than 2.5s apart into zoom regions, each carrying a focusTrack the ' +
-  'compositor pans across, and writes demo.recordly.');
+  'compositor pans across, and writes {take}.recordly.');
 const cCompose = mk(pkgContainers, 'container', '5 · Compositor', 'compose.mjs · Node.js + canvas + ffmpeg',
   'Renders every frame: eased zoom/pan, a synthesized cursor with click ripples, and a styled ' +
   'window frame. Frames stream through ffmpeg both ways; nothing hits disk.');
@@ -504,7 +504,7 @@ const dBrand = mk(pkgContainers, 'store', 'Brand assets', 'brand/',
 const dWork = mk(pkgContainers, 'store', 'Work directory', 'out/ · out/{video}/{part}/',
   'One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets ' +
   'DEMO_OUT, so takes never overwrite each other. Holds frames/, frames.json, actions.json, the ' +
-  'per-take cursor.json and narration.json, demo.recordly, the MP4 at each stage (raw, cut, final, ' +
+  'per-take cursor.json and narration.json, {take}.recordly, the MP4 at each stage (raw, cut, final, ' +
   'final-narrated, -tight, -carded) and the quality gate report with its stills. The hand-off ' +
   'between every stage.');
 const dTts = mk(pkgContainers, 'store', 'TTS clip cache', 'out/tts/ · mp3',
@@ -950,7 +950,7 @@ const zTrack = mk(pkgProject, 'component', 'Focus track builder', 'project.mjs',
   'Keeps every click position in a cluster, not only the last. A merged region can span clicks ' +
   'far apart on screen, and the compositor pans across them instead of framing the final one and ' +
   'leaving the earlier ones off screen.');
-const zWrite = mk(pkgProject, 'component', 'Project writer', 'demo.recordly · JSON',
+const zWrite = mk(pkgProject, 'component', 'Project writer', '{take}.recordly · JSON',
   'videoPath plus the regions, and it prints each region with its focus track so the framing can ' +
   'be reviewed before composing.');
 
@@ -969,7 +969,7 @@ const dL3project = diagram(pkgProject, 'c4-l3-zoom-projector',
   link(dL3project, pkgProject, vFlut, vReg, 'Merged clusters to');
   link(dL3project, pkgProject, vReg, vTrack, 'Each region to');
   link(dL3project, pkgProject, vTrack, vWrite, 'Regions with focus tracks to');
-  link(dL3project, pkgProject, vWrite, vWork, 'Writes demo.recordly');
+  link(dL3project, pkgProject, vWrite, vWork, 'Writes {take}.recordly');
 }
 
 // ========================================== L3 · 5 — components: compositor ==
@@ -980,7 +980,7 @@ const pkgCompose = pkg(
 );
 
 const xArgs = mk(pkgCompose, 'component', 'Project reader', 'compose.mjs',
-  'Reads demo.recordly and the take it names, so the composite is always of the video the project ' +
+  'Reads {take}.recordly and the take it names, so the composite is always of the video the project ' +
   'was built from.');
 const xLook = mk(pkgCompose, 'component', 'Look resolver', 'compose.mjs + brand.mjs',
   'padding, radius, shadow, background, ramp and pan timings, from the project frame block and ' +
@@ -1020,7 +1020,7 @@ const dL3compose = diagram(pkgCompose, 'c4-l3-compositor',
     { cols: 3 });
   const [vWork, vBrand, vFfmpeg] = column(dL3compose, [dWork, dBrand, ffmpeg]);
 
-  link(dL3compose, pkgCompose, vWork, vArgs, 'demo.recordly and the take to');
+  link(dL3compose, pkgCompose, vWork, vArgs, '{take}.recordly and the take to');
   link(dL3compose, pkgCompose, vLook, vBrand, 'Reads colours');
   link(dL3compose, pkgCompose, vArgs, vLook, 'Frame block to');
   link(dL3compose, pkgCompose, vArgs, vProbe, 'Take path to');
@@ -1046,7 +1046,7 @@ const pkgNarrator = pkg(
 );
 
 const nCues = mk(pkgNarrator, 'component', 'Cue file resolver', 'narrate.mjs',
-  'Reads videoPath out of demo.recordly to find the cue file belonging to the take that was ' +
+  'Reads videoPath out of {take}.recordly to find the cue file belonging to the take that was ' +
   'actually composed, falling back to newest-mtime. Using another take’s cues does not error — it ' +
   'silently narrates over the wrong footage — so the project file, not the timestamp, is the authority.');
 const nTts = mk(pkgNarrator, 'component', 'TTS gateway', 'tts.mjs · shared',
@@ -1099,7 +1099,7 @@ const dL3b = diagram(pkgNarrator, 'c4-l3-narrator', 'C4-L3 — Components · Nar
   const vWork = place(dL3b, dWork, 1020, 380, 220, 160);
   const vFfmpeg = place(dL3b, ffmpeg, 700, 540);
 
-  link(dL3b, pkgNarrator, vCues, vWork, 'Reads demo.recordly + the cue file');
+  link(dL3b, pkgNarrator, vCues, vWork, 'Reads {take}.recordly + the cue file');
   link(dL3b, pkgNarrator, vCues, vTts, 'One line at a time to');
   link(dL3b, pkgNarrator, vTts, vCache, 'Hits before spending');
   link(dL3b, pkgNarrator, vTts, vApi, 'Renders a miss', 'HTTPS');
@@ -1136,7 +1136,7 @@ const tIntersect = mk(pkgTighten, 'component', 'Dead-run intersector', 'tighten.
   'Dead means frozen AND silent. Either signal alone is wrong: a frozen screen under a narration ' +
   'line is the shot that line is playing over, and silence over a moving screen is a stretch that ' +
   'needs narrating, not cutting. Touching runs are merged so two detections do not become two seams.');
-const tZoomGuard = mk(pkgTighten, 'component', 'Zoom guard', 'tighten.mjs + demo.recordly',
+const tZoomGuard = mk(pkgTighten, 'component', 'Zoom guard', 'tighten.mjs + {take}.recordly',
   'Zoom windows are subtracted from the dead runs outright. A dead run butts right up against a ' +
   'zoom, because the zoom is triggered by a click and the screen goes still immediately after it, ' +
   'so a seam there dissolves the move and turns it into a snap.');
@@ -1167,7 +1167,7 @@ const dL3tighten = diagram(pkgTighten, 'c4-l3-tightener',
   link(dL3tighten, pkgTighten, vDet, vInt, 'Frozen and silent runs to');
   link(dL3tighten, pkgTighten, vOpts, vInt, 'Minimum run length to');
   link(dL3tighten, pkgTighten, vInt, vZoom, 'Dead runs to');
-  link(dL3tighten, pkgTighten, vWork, vZoom, 'demo.recordly zoom regions to');
+  link(dL3tighten, pkgTighten, vWork, vZoom, '{take}.recordly zoom regions to');
   link(dL3tighten, pkgTighten, vZoom, vPlan, 'Protected dead runs to');
   link(dL3tighten, pkgTighten, vOpts, vPlan, 'keep, speed and tail to');
   link(dL3tighten, pkgTighten, vPlan, vChk, 'Segment plan to');

@@ -36,7 +36,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadTarget } from './target.mjs';
 import { pickProvider, TTS_CACHE } from './tts.mjs';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath as projectFile } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
@@ -109,7 +109,7 @@ function cueFile() {
   if (opt.cues) return path.resolve(opt.cues);
   // same discovery as narrate.mjs: the take compose.mjs rendered from
   try {
-    const project = JSON.parse(fs.readFileSync(path.join(OUT, 'demo.recordly'), 'utf8').replace(/^\uFEFF/, ''));
+    const project = JSON.parse(fs.readFileSync(projectFile(), 'utf8').replace(/^\uFEFF/, ''));
     const p = path.join(OUT, `${path.basename(project.videoPath)}.narration.json`);
     if (fs.existsSync(p)) return p;
   } catch {
