@@ -69264,7 +69264,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: video state · video review · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done), last build with qa counts, the visual review and a history. Generates the Video status section of the page and sends changes to Zep and the video thread."
+              "documentation": "Technology: video state · video review · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done), last build with qa counts, the visual review and a history. Generates the Video status section of the page, sends the state to the app graph and posts the whole status to the video thread."
             },
             {
               "_type": "UMLClass",
@@ -69276,7 +69276,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: session end (SessionEnd) · session video\n\nPushes what the person typed and Claude answered from the transcript, tool output left out and emails and phone numbers masked, then a summary built from the record: prompts, files changed, commits, pull requests. Each new video starts a new thread, so a video is a session of its own."
+              "documentation": "Technology: session flush (Stop) · session end (SessionEnd) · session video\n\nAfter every Claude turn, and at the end, pushes what the person typed and Claude answered from the transcript, tool output left out and emails and phone numbers masked, then a summary built from the record: prompts, files changed, commits, pull requests. Each new video starts a new thread, so a video is a session of its own."
             },
             {
               "_type": "UMLClass",
@@ -71679,7 +71679,7 @@
                           "top": 715,
                           "width": 210,
                           "height": 13,
-                          "text": "«component: session end (SessionEnd) · session video»",
+                          "text": "«component: session flush (Stop) · session end (SessionEnd) · session video»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },

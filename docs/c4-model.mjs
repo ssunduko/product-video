@@ -1445,9 +1445,10 @@ const mUsers = mk(pkgMemory, 'component', 'Session attribution', 'MEMORY_USER ·
 const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video sync',
   'One state file per video next to its page: status (not built, build failed, qa failed, awaiting ' +
   'review, review failed, done), last build with qa counts, the visual review and a history. ' +
-  'Generates the Video status section of the page and sends changes to Zep and the video thread.');
-const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session end (SessionEnd) · session video',
-  'Pushes what the person typed and Claude answered from the transcript, tool output left out and ' +
+  'Generates the Video status section of the page, sends the state to the app graph and posts the whole ' +
+  'status to the video thread.');
+const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session flush (Stop) · session end (SessionEnd) · session video',
+  'After every Claude turn, and at the end, pushes what the person typed and Claude answered from the transcript, tool output left out and ' +
   'emails and phone numbers masked, then a summary built from the record: prompts, files changed, ' +
   'commits, pull requests. Each new video starts a new thread, so a video is a session of its own.');
 const mPush = mk(pkgMemory, 'component', 'Zep publisher', 'zep push',
