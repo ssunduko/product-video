@@ -426,6 +426,9 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   const vTts = place(dL1, ttsApi, 800, 460);
   const vExt = place(dL1, chromeExt, 800, 620);
   const vQaAgent = place(dL1, qaAgent, 440, 620);
+  const vMemoryAgent = place(dL1, memoryAgent, 1160, 240);
+  const vSources = place(dL1, featureSource, 1160, 460);
+  const vZep = place(dL1, zepCloud, 1160, 60);
 
   link(dL1, pkgContext, vAuthor, vSystem, 'Writes flows and runs the stages', 'CLI');
   link(dL1, pkgContext, vSystem, vExt, 'Resolves natural-language selectors before a take via');
@@ -436,6 +439,10 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   link(dL1, pkgContext, vSystem, vFfmpeg, 'Encodes, decodes and filters via', 'child process');
   link(dL1, pkgContext, vSystem, vTts, 'Renders speech via', 'HTTPS');
   link(dL1, pkgContext, vQaAgent, vSystem, 'Reviews every video built by');
+  link(dL1, pkgContext, vSystem, vZep, 'Stores feature catalogs, pages, traces and session threads in', 'HTTPS');
+  link(dL1, pkgContext, vMemoryAgent, vSources, 'Reads new and changed feature files from', 'MCP');
+  link(dL1, pkgContext, vMemoryAgent, vSystem, 'Merges features and syncs memory via', 'CLI');
+  link(dL1, pkgContext, vSystem, vMemoryAgent, 'Asks for a sync at session start when a source is stale');
 }
 
 // ======================================================= L2 — containers ==
@@ -1399,6 +1406,75 @@ const dL3build = diagram(pkgBuild, 'c4-l3-build',
   link(dL3build, pkgBuild, vRep, vWork, 'Writes build.json');
 }
 
+// ======================================== L3 · 11 — components: memory ==
+const pkgMemory = pkg(
+  '3.11 — Components · Memory',
+  'Inside memory.mjs. Bookkeeping for project memory: it never reads an online source itself ' +
+    '(only the memory agent can, through MCP tools), but it decides what changed, merges what the ' +
+    'agent found, and keeps Zep in step with the repo.',
+);
+
+const mSource = mk(pkgMemory, 'component', 'Source resolver', 'sources.json + .env · source',
+  'Finds the apps (one folder per app under memory/features), the catalog of each, and its online ' +
+  'source from FEATURE_SOURCE_{APP} in .env; recognises the kind of source and names the tools to ' +
+  'list and read it.');
+const mDiff = mk(pkgMemory, 'component', 'Change detector', 'diff · baseline',
+  'Compares a source listing with the sync lock: new, changed, removed, unchanged. Files dated on ' +
+  'or before the catalog generated date are its baseline, recorded without being read.');
+const mCatalog = mk(pkgMemory, 'component', 'Catalog merger', 'upsert',
+  'Merges the features the agent found into data/features.json: matched by name, a new one gets ' +
+  'the next feature id; totals and the updated date follow.');
+const mLock = mk(pkgMemory, 'component', 'Sync lock', 'mark · synced',
+  'data/sources.lock.json next to each catalog: every source file seen, its kind and the features ' +
+  'it fed, and when the app was last synced. Private with its app.');
+const mStale = mk(pkgMemory, 'component', 'Staleness check', 'staleSources() · MEMORY_MAX_AGE_H',
+  'Apps whose source was last synced longer ago than the limit. Read by the session hook and by ' +
+  'build.mjs.');
+const mHook = mk(pkgMemory, 'component', 'Session hook', 'hook · SessionStart',
+  'Runs when a Claude Code session starts: attributes the session to its user, opens its Zep ' +
+  'thread, and asks Claude to launch the memory agent when a source is stale.');
+const mUsers = mk(pkgMemory, 'component', 'Session attribution', 'MEMORY_USER · Zep users and threads',
+  'One Zep user per person (MEMORY_USER, else git user.email) and one thread per Claude session; ' +
+  'zep session adds notes to it.');
+const mPush = mk(pkgMemory, 'component', 'Zep publisher', 'zep push',
+  'Turns catalogs (one document per feature), video pages, rules, pipeline lessons, traces and ' +
+  'manifests into Zep documents in the graph of their app. Sends only what changed; a full push ' +
+  'removes documents whose file is gone.');
+const mSearch = mk(pkgMemory, 'component', 'Zep search', 'zep search',
+  'Facts from the graph of one app, or of all of them.');
+
+const dL3memory = diagram(pkgMemory, 'c4-l3-memory',
+  'C4-L3 — Components · Memory (memory.mjs)',
+  'Level 3, container "Memory".',
+  { macro: 'Container_Boundary', name: 'Memory' });
+{
+  const vAgent = place(dL3memory, memoryAgent, 60, 40);
+  const [vSrc, vDiff, vCat, vLock, vStale, vHook, vUsers, vPush, vSearch] = grid(dL3memory,
+    [mSource, mDiff, mCatalog, mLock, mStale, mHook, mUsers, mPush, mSearch], { y: 200, cols: 3 });
+  const [vStore, vTraces, vManifests, vBuild, vZep] =
+    column(dL3memory, [dMemory, dTraces, dManifests, cBuild, zepCloud], { dy: 150 });
+
+  link(dL3memory, pkgMemory, vAgent, vSrc, 'Asks where the source is', 'CLI');
+  link(dL3memory, pkgMemory, vAgent, vDiff, 'Hands the source listing to', 'CLI');
+  link(dL3memory, pkgMemory, vAgent, vCat, 'Hands the features it read to', 'CLI');
+  link(dL3memory, pkgMemory, vAgent, vPush, 'Runs', 'CLI');
+  link(dL3memory, pkgMemory, vSrc, vStore, 'Reads sources.json and the catalogs');
+  link(dL3memory, pkgMemory, vDiff, vLock, 'Compares with');
+  link(dL3memory, pkgMemory, vCat, vStore, 'Writes data/features.json');
+  link(dL3memory, pkgMemory, vCat, vLock, 'Then records the file in');
+  link(dL3memory, pkgMemory, vLock, vStore, 'Writes data/sources.lock.json');
+  link(dL3memory, pkgMemory, vStale, vLock, 'Reads the last sync from');
+  link(dL3memory, pkgMemory, vBuild, vStale, 'Warns on stale sources', 'import');
+  link(dL3memory, pkgMemory, vHook, vStale, 'Checks');
+  link(dL3memory, pkgMemory, vHook, vUsers, 'Opens the session thread via');
+  link(dL3memory, pkgMemory, vUsers, vZep, 'Users, threads, messages', 'HTTPS');
+  link(dL3memory, pkgMemory, vPush, vStore, 'Reads catalogs, pages, rules');
+  link(dL3memory, pkgMemory, vPush, vTraces, 'Reads');
+  link(dL3memory, pkgMemory, vPush, vManifests, 'Reads');
+  link(dL3memory, pkgMemory, vPush, vZep, 'Adds and deletes episodes', 'HTTPS');
+  link(dL3memory, pkgMemory, vSearch, vZep, 'Searches facts', 'HTTPS');
+}
+
 // --------------------------------------------------------------- validate
 const byId = new Map();
 (function index(o, at = '$') {
@@ -1455,6 +1531,45 @@ for (const d of diagrams) {
       problems.push(`relationship "${l.label}" has a quote or angle bracket`);
     }
   }
+}
+
+// Coverage: mentioning a stage somewhere in the model is not enough, it has to
+// be drawn at every level it belongs to. These rules caught nothing before they
+// existed, which is how memory.mjs and Zep reached main on L2 only.
+const isL1 = (d) => d.slug === 'c4-l1-context';
+const isL3 = (d) => d.slug.startsWith('c4-l3-');
+const placed = (pred) => new Set(diagrams.filter(pred).flatMap((d) => d.nodes));
+const allEls = [...byId.values()].filter((e) => e._type === 'UMLClass');
+
+// 1. every container has its own L3 diagram (its boundary carries the container's name)
+const l3Boundaries = new Set(diagrams.filter(isL3).map((d) => d.boundary?.name));
+for (const c of allEls.filter((e) => e.__kind === 'container')) {
+  if (!l3Boundaries.has(c.name)) problems.push(`container "${c.name}" has no L3 diagram (diagram(..., { macro: 'Container_Boundary', name: '${c.name}' }))`);
+}
+
+// 2. every person and external system drawn anywhere is on the L1 context diagram
+const onL1 = placed(isL1);
+for (const el of placed(() => true)) {
+  if ((el.__kind === 'external' || el.__kind === 'person') && !onL1.has(el)) {
+    problems.push(`${el.__kind} "${el.name}" is drawn on a diagram but not on L1 context`);
+  }
+}
+
+// 3. every pipeline file is named by an L3 diagram: its title or one of its components
+const l3Text = diagrams.filter(isL3)
+  .map((d) => [d.name, ...d.nodes.filter((n) => n.__kind === 'component').map((n) => `${n.name} ${n.__tech} ${n.__doc}`)].join(' '))
+  .join(' ');
+const PIPELINE = path.join(HERE, '..', 'pipeline');
+for (const f of fs.readdirSync(PIPELINE).filter((x) => x.endsWith('.mjs'))) {
+  if (!l3Text.includes(f)) problems.push(`pipeline/${f} is not named by any L3 diagram title or component`);
+}
+
+// 4. every runtime dependency is named in the model, so a new outside service
+//    (a client library) cannot arrive without being drawn
+const modelText = allEls.map((e) => `${e.name} ${e.__tech} ${e.__doc}`).join(' ');
+const deps = Object.keys(JSON.parse(fs.readFileSync(path.join(PIPELINE, 'package.json'), 'utf8')).dependencies ?? {});
+for (const dep of deps) {
+  if (!modelText.includes(dep)) problems.push(`dependency ${dep} (pipeline/package.json) is not named by any element`);
 }
 
 if (problems.length) {

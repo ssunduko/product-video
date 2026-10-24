@@ -13,6 +13,9 @@ Docs change in the same commit as the code they describe.
   env var, npm script, target option or script command that `README.md` or the
   C4 model does not cover. A PostToolUse hook (`.claude/settings.json`) runs it
   after every edit and tells you what is missing — act on it before finishing.
+- A new stage, outside service or dependency is drawn at every level it belongs
+  to: its own L3 diagram, and L1 for anything outside the pipeline. The model's
+  coverage rules fail the check otherwise.
 - The check only catches what is *missing*. When a change alters what a stage
   *does*, update its description in `docs/c4-model.mjs` and its README section
   too, then rerun the check.

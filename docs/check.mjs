@@ -20,6 +20,10 @@
 //    reads, the npm scripts, the target options, the script commands — and fail
 //    with the exact list of what is missing, so the fix is obvious.
 //
+// 3. Structure. Regenerating also runs the model's own coverage rules: every
+//    container has an L3 diagram, every outside party is on L1, every pipeline
+//    file is named by an L3, every dependency is drawn. A gap fails generation.
+//
 // Exit 1 on any gap (or, with --ci, on stale generated files). No dependencies.
 
 import fs from 'node:fs';
