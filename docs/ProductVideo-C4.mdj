@@ -3412,7 +3412,7 @@
               "stereotype": {
                 "$ref": "c4-st-0008"
               },
-              "documentation": "Technology: memory/ · committed\n\nrules.md, pipeline.md, features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (generic: kinds of source; locations are in .env). A private app folder is gitignored."
+              "documentation": "Technology: memory/ · committed\n\nrules.md (imported by CLAUDE.md), features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (generic: kinds of source; locations are in .env). A private app folder is gitignored."
             },
             {
               "_type": "UMLClass",

@@ -31,14 +31,18 @@ and CI) fails while they disagree. Define each selector once in the trace's
 
 ## Memory
 
-`memory/` is what the project has learned, kept in the repo:
-`memory/rules.md` (standing rules that override defaults),
-`memory/pipeline.md` (timing, qa and zoom lessons) and
-`memory/features/<app>/<feature>.md` (one page per app feature, with the
-videos that cover it).
+Standing rules, loaded into every session (they override defaults):
 
-- Read the rules, the pipeline page and the feature's page before authoring a
-  trace or recording.
+@memory/rules.md
+
+`memory/` also holds `memory/features/<app>/`: each app's feature catalog
+(`data/features.json`), its own rules (`README.md`) and one page per filmed
+feature, naming its videos. How the pipeline behaves in practice (timing, qa,
+zoom) is in `docs/pipeline-lessons.md`.
+
+- Read `docs/pipeline-lessons.md`, the app's `README.md` and the feature's page
+  before authoring a trace or recording.
+- Add to `docs/pipeline-lessons.md` anything that would have saved a re-take.
 - After each take or review, update the feature page's status and quirks.
 - When the user sets a standing rule, add it to `memory/rules.md` with why and
   the date.

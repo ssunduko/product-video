@@ -62,7 +62,7 @@ cursor, and a styled window frame.
   docs/             C4 architecture model and its renderings
   sample-app/       a small Express app to record against (npm install && npm start)
   sample/           model videos new ones should match: cards, outro, pacing
-  memory/           what the project has learned: rules.md, pipeline.md, and
+  memory/           what the project has learned: rules.md (imported by CLAUDE.md), and
                     features/<app>/<feature>.md linking each feature to its videos
   .env.example      template for .env — copy and fill in
   .env              optional, gitignored: KEY=VALUE for env: references in targets
@@ -1034,9 +1034,13 @@ until clean.
 
 ## Project memory
 
+How the pipeline behaves in practice (timing, qa, zoom, loading) is in
+[docs/pipeline-lessons.md](docs/pipeline-lessons.md).
+
+
 `memory/` holds what the project knows:
-- `rules.md`: standing rules.
-- `pipeline.md`: timing and qa lessons.
+- `rules.md`: standing rules. `CLAUDE.md` imports it (`@memory/rules.md`), so
+  Claude Code loads it in every session.
 - `features/<app>/`: one folder per application.
   - `data/features.json` is the app's **feature catalog**, the initial feature
     set: one document per feature, with category, description and source. Its
@@ -1075,7 +1079,8 @@ Zep Cloud (`@getzep/zep-cloud`, key in `ZEP_API_KEY`) is the searchable store:
 - `productvideo-project` holds the rules and pipeline notes;
 - each working session is its own thread.
 
-A changed document replaces its old episodes. `memory/.zep-state.json` keeps
+A changed document replaces its old episodes, and a full push (no file
+arguments) removes documents whose file is gone. `memory/.zep-state.json` keeps
 this machine's Zep ids and is gitignored.
 
 **Sessions are attributed to a person.** Each person is one Zep user, keyed by

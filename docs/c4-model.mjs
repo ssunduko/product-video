@@ -541,7 +541,7 @@ const cMemory = mk(pkgContainers, 'container', 'Memory', 'memory.mjs · Node.js 
   'the catalog, reports stale sources (SessionStart hook and build.mjs), and pushes changed catalog ' +
   'features, pages, traces and manifests to Zep.');
 const dMemory = mk(pkgContainers, 'store', 'Project memory', 'memory/ · committed',
-  'rules.md, pipeline.md, features/{app}/data/features.json (the feature catalog, the initial set), ' +
+  'rules.md (imported by CLAUDE.md), features/{app}/data/features.json (the feature catalog, the initial set), ' +
   'features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (generic: kinds ' +
   'of source; locations are in .env). A private app folder is gitignored.');
 const dProfiles = mk(pkgContainers, 'store', 'Browser profiles', 'profile/, profile-*/ · gitignored',
