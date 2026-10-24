@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normaliseFake } from './fake.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const TARGETS_DIR = path.join(HERE, '..', 'targets');
@@ -34,6 +35,7 @@ const KNOWN_KEYS = new Set([
   'pageUrlMatch',
   'blockUrls',
   'hideSelectors',
+  'fake',
   'profile',
   'auth',
   'secrets',
@@ -243,6 +245,7 @@ export function loadTarget(ref) {
     pageUrlMatch: cfg.pageUrlMatch ?? null,
     blockUrls: cfg.blockUrls ?? [],
     hideSelectors: cfg.hideSelectors ?? [],
+    fake: normaliseFake(cfg.fake),
     profile: cfg.profile ?? null,
     secrets: cfg.secrets ?? {},
     auth,

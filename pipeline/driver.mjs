@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadTarget, describeTarget, requireCredentials } from './target.mjs';
 import { compileScript } from './script.mjs';
 import { OUT } from './paths.mjs';
+import { installFake } from './fake.mjs';
 
 // usage: node driver.mjs <scenario.mjs|flow.demo> [--target <name|path>]
 //
@@ -296,6 +297,17 @@ if (target?.hideSelectors?.length) {
   await page.evaluateOnNewDocument(inject, css);
   await page.evaluate(inject, css);
   console.log(`hiding: ${target.hideSelectors.join(', ')}`);
+}
+
+// Personal data on a live account (contact names, phones, emails, messages,
+// tags) is shown as fake values, swapped in the page before each paint; see
+// fake.mjs. Display only: nothing is typed or saved.
+if (target?.fake) {
+  await page.evaluateOnNewDocument(installFake, target.fake);
+  await page.evaluate(installFake, target.fake);
+  const f = target.fake;
+  const parts = [...f.text.map((t) => `text:${t}`), ...['names', 'initials', 'messages', 'tags'].filter((k) => f[k].length), ...(Object.keys(f.inputs).length ? ['inputs'] : [])];
+  console.log(`faking: ${parts.join(', ')}`);
 }
 
 // size window so the viewport is exactly VIEWPORT
@@ -807,6 +819,12 @@ try {
   console.log(
     `take done: ${frames.length} frames, ${samples.length} samples, ${Date.now() - t0wall}ms`,
   );
+  // what the fake-data layer swapped on the last page: a zero where the target
+  // expects data means its selectors no longer match the app
+  if (target?.fake) {
+    const swapped = await page.evaluate(() => window.__demoFake).catch(() => null);
+    if (swapped) console.log(`faked: ${Object.entries(swapped).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+  }
 
   fs.writeFileSync(
     path.join(OUT, 'frames.json'),

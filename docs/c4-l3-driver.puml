@@ -27,6 +27,7 @@ Container_Boundary(driver_2, "2 · Driver") {
   Component(teardown, "Teardown", "driver.mjs", "Stops the screencast, writes frames.json and actions.json, and closes Chrome by its window rather than killing it, so unflushed session state is not lost.")
   Component(page_conditioner, "Page conditioner", "CDP Network.setBlockedURLs + injected CSS", "Applies the target to the page before the take: blockUrls keeps third-party widgets such as a chat bubble from loading, and hideSelectors hides app banners on this page and every page loaded after it.")
   Component(wait_logger, "Wait logger", "driver.mjs · timed()", "Times every open, wait and wait-gone the flow makes, keeping { start, end, kind, spec }. Written to actions.json for the assembler to fast-forward the long ones.")
+  Component(fake_data, "Fake data", "fake.mjs · in-page MutationObserver", "Shows realistic fake values in place of personal data: the elements the target's fake option names (names, initials, messages, tags, inputs) and any email or phone by pattern.")
 }
 
 Rel(demo_author, input_resolver, "Runs", "CLI")
@@ -49,8 +50,10 @@ Rel(teardown, narration_cue_collector, "Serialises")
 Rel(teardown, work_directory, "Writes actions.json + frames.json")
 Rel(chrome_launcher, browser_profiles, "Runs Chrome on the target's")
 Rel(chrome_launcher, page_conditioner, "Conditions the page via")
-Rel(page_conditioner, target_loader, "Reads blockUrls and hideSelectors from")
+Rel(page_conditioner, target_loader, "Reads blockUrls, hideSelectors and fake from")
 Rel(page_conditioner, google_chrome, "Blocks URLs and injects CSS", "CDP")
+Rel(page_conditioner, fake_data, "Installs the fake option via")
+Rel(fake_data, google_chrome, "Swaps personal data before each paint", "CDP")
 Rel(flow_primitives, wait_logger, "Every open and wait is timed by")
 Rel(teardown, wait_logger, "Serialises")
 
