@@ -695,7 +695,7 @@ node project.mjs
 ```
 
 Writes `out/<take>.recordly`, named after the script the take ran
-(`scripts/click-tracking.demo` -> `click-tracking.recordly`; `driver.mjs` stores
+(`scripts/acme-tour.demo` -> `acme-tour.recordly`; `driver.mjs` stores
 the name in `actions.json`, and a take recorded before that falls back to
 `demo.recordly`) — one zoom region per click cluster (clicks under
 2.5s apart merge), derived from the cut telemetry. Review the printed regions
@@ -1139,10 +1139,10 @@ node memory.mjs upsert acme found.json --source "Surveys Rollout One-Pager.pdf"
 node memory.mjs mark acme <fileId> --title "<t>" --modified <iso> --kind feature --features feature-262
 node memory.mjs synced acme
 node memory.mjs zep push                     # changed catalog features, pages, traces, manifests
-node memory.mjs session video sherpa-ai --session <id>   # a new video: a new session in Zep
+node memory.mjs session video acme-tour --session <id>   # a new video: a new session in Zep
 node memory.mjs session end --dry-run --transcript <jsonl>   # what the SessionEnd hook would push
-node memory.mjs zep session --session <id> --title "2026-10-23 click tracking" --file notes.md
-node memory.mjs zep search "where is click tracking" --app acme
+node memory.mjs zep session --session <id> --title "2026-10-23 acme tour" --file notes.md
+node memory.mjs zep search "where is the reports page" --app acme
 npm run memory -- status                     # the same, via npm
 ```
 

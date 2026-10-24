@@ -22,7 +22,7 @@ ends with its conversation and a summary pushed to Zep (SessionEnd hook).
 
 ### A video is done only after both gates
 `qa.mjs` PASS and a video-qa visual review with no FAIL. A qa.mjs PASS alone is
-not done: the click-tracking take passed qa.mjs and still showed loading
+not done: an earlier take passed qa.mjs and still showed loading
 spinners and personal data.
 
 ## Content
@@ -32,7 +32,7 @@ Blur any contact's full name, phone number, email address and tags wherever
 they appear on screen (contact tabs, contact rows, names next to avatars,
 conversation headers). Blur, don't hide or drop the step. An unblurred one
 blocks publishing.
-*Why:* the click-tracking take showed a real contact on the Contacts tab
+*Why:* an earlier take showed a real contact on a contacts tab
 (2026-10-23).
 *Status:* the pipeline only hides elements (`hideSelectors`, display:none) and has
 no blur option yet. One is needed before this rule can be met.
