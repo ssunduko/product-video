@@ -16,7 +16,7 @@ export const DEFAULT_OUT = path.join(HERE, '..', 'out');
 export const OUT = process.env.DEMO_OUT ? path.resolve(process.env.DEMO_OUT) : DEFAULT_OUT;
 
 // The take's zoom project, named after the take: driver.mjs writes the script's
-// file name into actions.json, so scripts/click-tracking.demo -> click-tracking.recordly.
+// file name into actions.json, so scripts/acme-tour.demo -> acme-tour.recordly.
 // A take recorded before the name was written falls back to demo.recordly.
 export function projectPath() {
   let name = 'demo';

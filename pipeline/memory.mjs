@@ -26,6 +26,13 @@
 //   node memory.mjs synced <app>               stamp the app's last full sync
 //   node memory.mjs zep push [files...]        catalogs, video pages, rules, pipeline notes, traces, manifests
 //                                              -> Zep (no files: everything; unchanged ones are skipped)
+//   node memory.mjs session video <name> [--session <id>]   a new video: a new Zep session (thread) from here on
+//   node memory.mjs session end [--session <id>] [--transcript <jsonl>]
+//                                              SessionEnd hook: push the conversation and a summary per thread
+//   node memory.mjs video state <name> [--json]  a video's status, last build, review, history
+//   node memory.mjs video review <name> PASS|FAIL [--findings <file|->] [--note <t>]
+//                                              record the visual review (video-qa)
+//   node memory.mjs video sync <name>          the state to Zep (build.mjs runs it after every build)
 //   node memory.mjs zep session [--session <id>] --title <t> --file <md|->
 //                                              notes -> the Claude session's Zep thread (or a new one)
 //   node memory.mjs zep search <query> [--app <app>]       facts from Zep
@@ -38,7 +45,10 @@
 //
 // Sessions are attributed: every Claude session belongs to a user (MEMORY_USER,
 // else git's user.email), one Zep user per person. The SessionStart hook opens the
-// session's thread under that user, so notes saved with --session <id> land there.
+// session's thread under that user; the SessionEnd hook pushes what was typed and
+// answered (tool output left out, emails and phone numbers masked) and a summary.
+// A new video starts a new thread (`session video <name>`), so each video is a
+// session of its own.
 //
 // MEMORY_MAX_AGE_H (default 24): a source synced longer ago than this is stale,
 // which the hook and build.mjs report.
@@ -309,8 +319,12 @@ async function hook() {
   const lines = [`Project memory: this Claude session${session ? ` (${session})` : ''} is attributed to ${user.id}.`];
   if (process.env.ZEP_API_KEY && session) {
     try {
-      const thread = await sessionThread(session, user, payload.source ?? 'startup');
-      lines.push(`It is Zep thread ${thread}. To save notes: node pipeline/memory.mjs zep session --session ${session} --title "<topic>" --file <notes.md>`);
+      const thread = await sessionThread(session, user, payload.source ?? 'startup', payload.transcript_path ?? null);
+      lines.push(
+        `It is Zep thread ${thread}. The conversation and a summary go there when the session ends (SessionEnd hook).`,
+        `Starting work on a new video (a new flow, trace or manifest)? First run: node pipeline/memory.mjs session video <name> --session ${session} - the video becomes a new session in Zep.`,
+        `Notes by hand: node pipeline/memory.mjs zep session --session ${session} --title "<topic>" --file <notes.md>`,
+      );
     } catch (e) {
       lines.push(`Could not open its Zep thread: ${e.message}`);
     }
@@ -365,7 +379,7 @@ function defaultFiles() {
     .flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
   const list = (d, re) => (fs.existsSync(path.join(ROOT, d)) ? fs.readdirSync(path.join(ROOT, d)).filter((f) => re.test(f)).map((f) => path.join(ROOT, d, f)) : []);
   return [
-    ...walk(MEMORY).filter((f) => f.endsWith('.md')),
+    ...walk(MEMORY).filter((f) => f.endsWith('.md') || f.endsWith('.state.json')),
     path.join(ROOT, 'docs', 'pipeline-lessons.md'),
     ...apps().map((app) => appInfo(app).featuresPath).filter((f) => fs.existsSync(f)),
     ...list('scenarios', /\.trace\.json$/),
@@ -405,7 +419,7 @@ function documentsOf(file) {
       episodes: [{ type: 'json', data: JSON.stringify({ product: cat.product, id: d.id, feature: d.feature, category: d.category, subcategory: d.subcategory, description: d.description, is_new: d.is_new, source: d.metadata?.source }) }],
     }));
   }
-  const kind = r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') || r.startsWith('docs/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : 'video manifest';
+  const kind = r.endsWith('.state.json') ? 'video state' : r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') || r.startsWith('docs/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : 'video manifest';
   if (r.endsWith('.json')) {
     const compact = JSON.stringify(JSON.parse(text));
     const episodes = compact.length <= EPISODE_CHARS ? [{ type: 'json', data: compact }] : chunks(text).map((data) => ({ type: 'text', data }));
@@ -485,25 +499,237 @@ async function zepUser(client, st, user) {
   return (st.users[user.id] = u.uuid);
 }
 
-// the Zep thread of a Claude session, opened under its user on first use
-async function sessionThread(session, user, how = 'startup') {
+// A Claude session's record: the transcript it writes, how far that has been
+// pushed to Zep, and its segments. Each segment is one Zep thread: the session
+// starts in one, and every new video (`session video <name>`) starts another,
+// so a video's work is a session of its own in Zep.
+function sessionRecord(st, session) {
+  const s = st.sessions[session];
+  if (s && !s.segments) {
+    // a record from before segments: its one thread is the first segment
+    s.segments = [{ thread: s.thread, video: null, fromLine: 0, summarizedLine: 0 }];
+    s.pushedLine ??= 0;
+  }
+  return s;
+}
+
+// the current Zep thread of a Claude session, opened under its user on first use
+async function sessionThread(session, user, how = 'startup', transcript = null) {
   const client = await zepClient();
   const st = zepState();
-  if (st.sessions[session]) {
+  const meta = { claudeSessionId: session, user: user.id };
+  const s = sessionRecord(st, session);
+  if (s) {
+    if (transcript) s.transcript = transcript;
+    const current = s.segments.at(-1).thread;
     if (how !== 'startup') {
-      await client.thread.addMessages(st.sessions[session].thread, {
-        messages: [{ role: 'system', name: 'productvideo', content: `Session ${how} by ${user.name} (${user.id}).`, metadata: { claudeSessionId: session, user: user.id } }],
+      await client.thread.addMessages(current, {
+        messages: [{ role: 'system', name: 'productvideo', content: `Session ${how} by ${user.name} (${user.id}).`, metadata: meta }],
       });
     }
-    return st.sessions[session].thread;
+    writeJson(ZEP_STATE, st);
+    return current;
   }
   const thread = await client.thread.create({ userUuid: await zepUser(client, st, user) });
   await client.thread.addMessages(thread.uuid, {
-    messages: [{ role: 'system', name: 'productvideo', content: `Claude Code session ${session} started by ${user.name} (${user.id}).`, metadata: { claudeSessionId: session, user: user.id } }],
+    messages: [{ role: 'system', name: 'productvideo', content: `Claude Code session ${session} started by ${user.name} (${user.id}).`, metadata: meta }],
   });
-  st.sessions[session] = { thread: thread.uuid, user: user.id, startedAt: new Date().toISOString() };
+  st.sessions[session] = {
+    thread: thread.uuid,
+    user: user.id,
+    startedAt: new Date().toISOString(),
+    transcript,
+    pushedLine: 0,
+    segments: [{ thread: thread.uuid, video: null, fromLine: 0, summarizedLine: 0 }],
+  };
   writeJson(ZEP_STATE, st);
   return thread.uuid;
+}
+
+// the session to act on: --session <id>, else the one started most recently on this machine
+function pickSession(st, o) {
+  if (o.session && o.session !== true) return o.session;
+  const latest = Object.entries(st.sessions).sort(([, a], [, b]) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0];
+  if (!latest) fail('no Claude session recorded yet: pass --session <id> (the SessionStart context names it)');
+  return latest[0];
+}
+
+// ---- the transcript: what the person typed and what Claude answered, nothing else
+
+// emails and phone numbers never leave the machine
+const redact = (t) => t
+  .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]')
+  .replace(/\+\d{10,15}\b/g, '[phone]')
+  .replace(/\(?\b\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g, '[phone]');
+
+const MESSAGE_CHARS = 2400; // Zep messages are kept well under its content cap
+
+function readTranscript(file) {
+  if (!file || !fs.existsSync(file)) return { lines: 0, turns: [], tools: [], prs: [] };
+  const raw = fs.readFileSync(file, 'utf8').split('\n');
+  const turns = [];
+  const tools = [];
+  const prs = [];
+  raw.forEach((line, i) => {
+    if (!line.trim()) return;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (e.isSidechain) return; // subagents' own work
+    const content = e.message?.content;
+    if (e.type === 'user' && e.origin?.kind === 'human' && typeof content === 'string') {
+      turns.push({ line: i, role: 'user', text: content.trim(), at: e.timestamp });
+    } else if (e.type === 'assistant' && Array.isArray(content)) {
+      const text = content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+      if (text) turns.push({ line: i, role: 'assistant', text, at: e.timestamp });
+      for (const b of content.filter((b) => b.type === 'tool_use')) tools.push({ line: i, name: b.name, input: b.input ?? {} });
+    } else if (e.type === 'user' && Array.isArray(content)) {
+      // tool results are never pushed; only the pull requests they mention are kept
+      const text = JSON.stringify(content);
+      for (const m of text.matchAll(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g)) prs.push({ line: i, url: m[0] });
+    }
+  });
+  return { lines: raw.length, turns, tools, prs };
+}
+
+// the segment (Zep thread) a transcript line belongs to
+const segmentAt = (s, line) => [...s.segments].reverse().find((g) => g.fromLine <= line) ?? s.segments[0];
+
+// push the turns not yet in Zep, each into the thread of its segment
+async function flushTranscript(client, s, session, user) {
+  const t = readTranscript(s.transcript);
+  const fresh = t.turns.filter((x) => x.line >= (s.pushedLine ?? 0));
+  const byThread = new Map();
+  for (const x of fresh) {
+    const g = segmentAt(s, x.line);
+    const parts = [];
+    for (let at = 0; at < x.text.length; at += MESSAGE_CHARS) parts.push(redact(x.text.slice(at, at + MESSAGE_CHARS)));
+    for (const content of parts) {
+      if (!byThread.has(g.thread)) byThread.set(g.thread, []);
+      byThread.get(g.thread).push({
+        role: x.role,
+        name: x.role === 'user' ? user.name : 'claude',
+        content,
+        metadata: { claudeSessionId: session, user: user.id, video: g.video ?? undefined, at: x.at },
+      });
+    }
+  }
+  for (const [thread, messages] of byThread) {
+    for (let i = 0; i < messages.length; i += 30) await client.thread.addMessages(thread, { messages: messages.slice(i, i + 30) });
+  }
+  s.pushedLine = t.lines;
+  return { t, pushed: fresh.length };
+}
+
+// what a stretch of the transcript did, from the record itself (no model involved)
+function summarize(t, from, to, session, user, video) {
+  const inRange = (x) => x.line >= from && x.line < to;
+  const turns = t.turns.filter(inRange);
+  if (!turns.length) return null;
+  const prompts = turns.filter((x) => x.role === 'user');
+  const last = turns.filter((x) => x.role === 'assistant').at(-1);
+  const files = [...new Set(t.tools.filter(inRange)
+    .filter((x) => ['Edit', 'Write', 'NotebookEdit'].includes(x.name) && x.input.file_path)
+    .map((x) => { const p = path.resolve(x.input.file_path); return p.startsWith(ROOT) ? rel(p) : path.basename(p); }))];
+  const commits = t.tools.filter(inRange)
+    .filter((x) => x.name === 'Bash' && /git commit/.test(x.input.command ?? ''))
+    .map((x) => (/-m\s+"([^"\n]+)/.exec(x.input.command)?.[1] ?? /<<'?EOF'?\n([^\n]+)/.exec(x.input.command)?.[1] ?? 'commit'));
+  const prs = [...new Set(t.prs.filter(inRange).map((x) => x.url))];
+  const lines = [
+    `Session summary${video ? ` - video ${video}` : ''}`,
+    `Claude Code session ${session}, ${user.name} (${user.id}), ${turns[0].at ?? '?'} to ${turns.at(-1).at ?? '?'}.`,
+    '',
+    `Asked (${prompts.length}):`,
+    ...prompts.slice(0, 40).map((x) => `- ${x.text.replace(/\s+/g, ' ').slice(0, 200)}`),
+    ...(prompts.length > 40 ? [`- ... and ${prompts.length - 40} more`] : []),
+  ];
+  if (files.length) lines.push('', `Files changed (${files.length}):`, ...files.slice(0, 60).map((f) => `- ${f}`));
+  if (commits.length) lines.push('', 'Commits:', ...commits.map((c) => `- ${c}`));
+  if (prs.length) lines.push('', 'Pull requests:', ...prs.map((u) => `- ${u}`));
+  if (last) lines.push('', 'Where it ended:', last.text.slice(0, 1500));
+  return redact(lines.join('\n'));
+}
+
+// summaries for every segment that has turns not summarized yet
+async function summarizeSegments(client, s, t, session, user) {
+  let n = 0;
+  for (const [i, g] of s.segments.entries()) {
+    const to = s.segments[i + 1]?.fromLine ?? t.lines;
+    const from = Math.max(g.fromLine, g.summarizedLine ?? 0);
+    if (from >= to) continue;
+    const text = summarize(t, g.fromLine, to, session, user, g.video);
+    if (!text || !t.turns.some((x) => x.line >= from && x.line < to)) continue;
+    const parts = [];
+    for (let at = 0; at < text.length; at += MESSAGE_CHARS) parts.push(text.slice(at, at + MESSAGE_CHARS));
+    await client.thread.addMessages(g.thread, {
+      messages: parts.map((content) => ({ role: 'system', name: 'productvideo', content, metadata: { claudeSessionId: session, user: user.id, video: g.video ?? undefined, kind: 'summary' } })),
+    });
+    g.summarizedLine = to;
+    n++;
+  }
+  return n;
+}
+
+// `session video <name>`: the work from here on is a new session in Zep, named for the video
+async function sessionVideo(name, o) {
+  if (!name) fail('session video needs the video name (the videos/<name>.json it builds)');
+  const client = await zepClient();
+  const st = zepState();
+  const session = pickSession(st, o);
+  const user = currentUser();
+  if (!sessionRecord(st, session)) await sessionThread(session, user, 'startup', o.transcript ?? null);
+  const fresh = zepState();
+  const s = sessionRecord(fresh, session);
+  if (o.transcript && o.transcript !== true) s.transcript = o.transcript;
+  // close out what came before: push it and summarize it in its own thread
+  const { t } = await flushTranscript(client, s, session, user);
+  await summarizeSegments(client, s, t, session, user);
+  const thread = await client.thread.create({ userUuid: await zepUser(client, fresh, user) });
+  await client.thread.addMessages(thread.uuid, {
+    messages: [{ role: 'system', name: 'productvideo', content: `Video ${name}: new session, started by ${user.name} (${user.id}) in Claude Code session ${session}.`, metadata: { claudeSessionId: session, user: user.id, video: name } }],
+  });
+  s.segments.push({ thread: thread.uuid, video: name, fromLine: t.lines, summarizedLine: t.lines });
+  s.thread = thread.uuid;
+  writeJson(ZEP_STATE, fresh);
+  console.log(`zep: video ${name} -> new thread ${thread.uuid} for ${user.id} (Claude session ${session})`);
+}
+
+// SessionEnd hook (or by hand): push the rest of the transcript and summarize each segment
+async function sessionEnd(o) {
+  let payload = {};
+  if (!process.stdin.isTTY && !o.session) {
+    try {
+      payload = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
+    } catch {}
+  }
+  if (o['dry-run']) {
+    // what would be pushed, without Zep: the turns (masked) and the summary
+    const t = readTranscript(o.transcript);
+    const user = currentUser();
+    const masked = t.turns.filter((x) => redact(x.text) !== x.text).length;
+    console.log(`${t.turns.length} turn(s) (${t.turns.filter((x) => x.role === 'user').length} typed), ${masked} with an email or phone masked, ${t.prs.length} PR link(s)\n`);
+    console.log(summarize(t, 0, t.lines, o.session ?? '?', user, null));
+    return;
+  }
+  if (!process.env.ZEP_API_KEY) return;
+  const st = zepState();
+  const session = payload.session_id ?? pickSession(st, o);
+  const user = currentUser();
+  const transcript = payload.transcript_path ?? (o.transcript !== true ? o.transcript : null) ?? st.sessions[session]?.transcript ?? null;
+  if (!sessionRecord(st, session)) await sessionThread(session, user, 'startup', transcript);
+  const fresh = zepState();
+  const s = sessionRecord(fresh, session);
+  if (transcript) s.transcript = transcript;
+  if (!s.transcript) fail(`no transcript known for session ${session}: pass --transcript <path to its .jsonl>`);
+  const client = await zepClient();
+  const { t, pushed } = await flushTranscript(client, s, session, user);
+  const summaries = await summarizeSegments(client, s, t, session, user);
+  s.endedAt = new Date().toISOString();
+  writeJson(ZEP_STATE, fresh);
+  console.log(`zep: session ${session} - ${pushed} turn(s) pushed, ${summaries} summary(ies) across ${s.segments.length} thread(s)${payload.reason ? ` (${payload.reason})` : ''}`);
 }
 
 async function zepSession(o) {
@@ -539,6 +765,159 @@ async function zepSearch(query, o) {
   writeJson(ZEP_STATE, st);
 }
 
+// ---------------------------------------------------------------- video state
+//
+// One record per video, memory/features/<app>/<name>.state.json, next to the
+// page that names videos/<name>.json (private with its app). build.mjs records
+// every build (built, failed the quality gate, or failed outright) and the
+// visual review is recorded with `video review`. The status is derived from
+// the record, the page's "Video status" section is generated from it, and each
+// change goes to the video's Zep thread.
+
+// the app and page of a video: the page that names its manifest
+export function videoHome(name) {
+  for (const app of apps()) {
+    const dir = path.join(FEATURES, app);
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.md') && x !== 'README.md')) {
+      if (fs.readFileSync(path.join(dir, f), 'utf8').includes(`videos/${name}.json`)) {
+        return { app, page: path.join(dir, f), state: path.join(dir, `${name}.state.json`) };
+      }
+    }
+  }
+  return null;
+}
+
+const STATUS_TEXT = {
+  'not built': 'Not built yet.',
+  'build failed': 'The last build failed before the quality gate.',
+  'qa failed': 'The last build failed the quality gate (qa.mjs).',
+  'awaiting review': 'Built and through the quality gate; the visual review (video-qa) has not been recorded.',
+  'review failed': 'Through the quality gate, but the visual review failed: see the findings.',
+  done: 'Done: through the quality gate and the visual review.',
+};
+
+function deriveStatus(v) {
+  const b = v.build;
+  if (!b) return 'not built';
+  if (b.outcome === 'failed') return 'build failed';
+  if (b.outcome === 'qa-fail') return 'qa failed';
+  if (v.review && v.review.at >= b.at) return v.review.verdict === 'PASS' ? 'done' : 'review failed';
+  return 'awaiting review';
+}
+
+function renderStatus(name, v) {
+  const out = [`<!-- video-state:${name} (generated from ${name}.state.json by memory.mjs; do not edit) -->`];
+  out.push(`**${name}: ${v.status}.** ${STATUS_TEXT[v.status]} Updated ${v.updatedAt}.`, '');
+  if (v.build) {
+    const b = v.build;
+    out.push(`Last build ${b.at}${b.scope ? ` (${b.scope})` : ''}: ${b.outcome}${b.message ? ` - ${b.message}` : ''}.`);
+    if (b.output) out.push(`Output: \`${b.output}\`${b.durationS ? ` (${b.durationS.toFixed(1)}s)` : ''}.`);
+    if (b.parts?.length) {
+      out.push('', '| Part | qa | Fail | Warn | Checked |', '|---|---|---|---|---|');
+      for (const p of b.parts) out.push(`| ${p.part} | ${p.qa} | ${p.fail ?? ''} | ${p.warn ?? ''} | ${p.at ?? ''} |`);
+      if (b.joinedQa) out.push(`| joined | ${b.joinedQa} | ${b.joined?.fail ?? ''} | ${b.joined?.warn ?? ''} | ${b.at} |`);
+    }
+  }
+  if (v.review) {
+    const r = v.review;
+    out.push('', `Visual review ${r.at}: **${r.verdict}**${r.note ? ` - ${r.note}` : ''}.`);
+    if (r.findings?.length) out.push(...r.findings.map((f, i) => `${i + 1}. ${f}`));
+  }
+  if (v.history?.length > 1) {
+    out.push('', 'History (newest first):', ...v.history.slice(-8).reverse().map((h) => `- ${h.at}: ${h.event}`));
+  }
+  out.push(`<!-- /video-state:${name} -->`);
+  return out.join('\n');
+}
+
+// put the generated block in the page: replace it if present, else make it the
+// body of "## Video status" (added at the end when the page has none)
+function writeStatusSection(page, name, block) {
+  let s = fs.readFileSync(page, 'utf8');
+  const marked = new RegExp(`<!-- video-state:${name}[^>]*-->[\\s\\S]*?<!-- /video-state:${name} -->`);
+  if (marked.test(s)) s = s.replace(marked, block);
+  else {
+    const h = /^## Video status.*$/m.exec(s);
+    if (h) {
+      const rest = s.slice(h.index + h[0].length);
+      const next = /^## /m.exec(rest);
+      s = s.slice(0, h.index) + `## Video status\n\n${block}\n` + (next ? `\n${rest.slice(next.index)}` : '');
+    } else s = `${s.trimEnd()}\n\n## Video status\n\n${block}\n`;
+  }
+  fs.writeFileSync(page, s);
+}
+
+// record one event (synchronous, so build.mjs can call it on its way out)
+export function recordVideo(name, event) {
+  const home = videoHome(name);
+  if (!home) throw new Error(`no video page names videos/${name}.json`);
+  const v = readJson(home.state, { name, app: home.app, manifest: `videos/${name}.json`, page: rel(home.page), history: [] });
+  // an event can carry its own time (recording one after the fact); otherwise now
+  const at = event.at ?? new Date().toISOString();
+  if (event.type === 'build') v.build = { ...event, at, type: undefined };
+  if (event.type === 'review') v.review = { at, verdict: event.verdict, note: event.note, findings: event.findings ?? [] };
+  const summary = event.type === 'build'
+    ? `build ${event.outcome}${event.scope ? ` (${event.scope})` : ''}${event.joinedQa ? `, joined qa ${event.joinedQa}` : ''}${event.message ? `: ${event.message}` : ''}`
+    : `visual review ${event.verdict}${event.findings?.length ? ` (${event.findings.length} finding(s))` : ''}`;
+  v.history = [...(v.history ?? []), { at, event: summary }].slice(-30);
+  v.status = deriveStatus(v);
+  v.updatedAt = at;
+  writeJson(home.state, v);
+  writeStatusSection(home.page, name, renderStatus(name, v));
+  return { home, v, summary };
+}
+
+// a part's quality-gate counts, from its qa.json
+export function qaCounts(file) {
+  const q = readJson(file, null);
+  if (!q) return null;
+  return { qa: q.verdict, fail: q.counts?.fail ?? 0, warn: q.counts?.warn ?? 0, at: fs.statSync(file).mtime.toISOString() };
+}
+
+function videoState(name, o) {
+  const home = videoHome(name) ?? fail(`no video page names videos/${name}.json`);
+  const v = readJson(home.state, null);
+  if (!v) return console.log(`${name}: not built (no ${rel(home.state)} yet)`);
+  if (o.json) return console.log(JSON.stringify(v, null, 2));
+  console.log(renderStatus(name, v).split('\n').filter((l) => !l.startsWith('<!--')).join('\n'));
+}
+
+function videoReview(name, verdict, o) {
+  if (!['PASS', 'FAIL'].includes(String(verdict).toUpperCase())) fail('video review needs PASS or FAIL');
+  let findings = [];
+  if (o.findings && o.findings !== true) {
+    const text = o.findings === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(o.findings, 'utf8');
+    try {
+      findings = JSON.parse(text);
+    } catch {
+      findings = text.split(/\r?\n/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, '').trim()).filter(Boolean);
+    }
+  }
+  const { summary } = recordVideo(name, { type: 'review', verdict: String(verdict).toUpperCase(), note: o.note !== true ? o.note : undefined, findings: findings.map((f) => redact(String(f))) });
+  console.log(`${name}: ${summary}`);
+}
+
+// `video sync <name>`: the state record and page to the app graph, the latest event to the video's thread(s)
+async function videoSync(name) {
+  const home = videoHome(name) ?? fail(`no video page names videos/${name}.json`);
+  const v = readJson(home.state, null);
+  if (!v) return console.log(`${name}: no state yet`);
+  if (!process.env.ZEP_API_KEY) return console.log('zep: ZEP_API_KEY not set, state kept locally');
+  await zepPush([home.state, home.page]);
+  const client = await zepClient();
+  const st = zepState();
+  const threads = Object.entries(st.sessions).flatMap(([session, s]) => (sessionRecord(st, session).segments ?? [])
+    .filter((g) => g.video === name).map((g) => ({ session, thread: g.thread })));
+  const last = v.history.at(-1);
+  for (const { session, thread } of threads.slice(-1)) {
+    await client.thread.addMessages(thread, {
+      messages: [{ role: 'system', name: 'productvideo', content: `Video ${name} is now "${v.status}": ${last?.event ?? ''}`, metadata: { claudeSessionId: session, video: name, kind: 'video-state' } }],
+    });
+  }
+  writeJson(ZEP_STATE, st);
+  console.log(`zep: ${name} state "${v.status}" pushed${threads.length ? ' and posted to its video thread' : ''}`);
+}
+
 // ---------------------------------------------------------------- CLI
 
 function fail(msg) {
@@ -563,6 +942,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const o = opts(rest);
   if (cmd === 'status') status(o.json);
   else if (cmd === 'hook') await hook();
+  else if (cmd === 'session' && o._[0] === 'video') await sessionVideo(o._[1], o);
+  else if (cmd === 'session' && o._[0] === 'end') await sessionEnd(o);
+  else if (cmd === 'video' && o._[0] === 'state') videoState(o._[1], o);
+  else if (cmd === 'video' && o._[0] === 'review') videoReview(o._[1], o._[2], o);
+  else if (cmd === 'video' && o._[0] === 'sync') await videoSync(o._[1]);
   else if (cmd === 'source') source(o._[0]);
   else if (cmd === 'diff') diff(o._[0], o._[1]);
   else if (cmd === 'baseline') baseline(o._[0], o._[1]);
@@ -572,5 +956,5 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   else if (cmd === 'zep' && o._[0] === 'push') await zepPush(o._.slice(1));
   else if (cmd === 'zep' && o._[0] === 'session') await zepSession(o);
   else if (cmd === 'zep' && o._[0] === 'search') await zepSearch(o._.slice(1).join(' '), o);
-  else fail('usage: node memory.mjs status|hook|source|diff|baseline|upsert|mark|synced|zep push|zep session|zep search (see the header of this file)');
+  else fail('usage: node memory.mjs status|hook|source|diff|baseline|upsert|mark|synced|session video|session end|video state|video review|video sync|zep push|zep session|zep search (see the header of this file)');
 }

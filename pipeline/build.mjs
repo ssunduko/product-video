@@ -34,7 +34,7 @@ import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_OUT } from './paths.mjs';
-import { staleSources } from './memory.mjs';
+import { staleSources, recordVideo, qaCounts } from './memory.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -48,6 +48,7 @@ const FFPROBE =
 // ---- args ----
 const argv = process.argv.slice(2);
 const opt = { record: true, gate: true, joinOnly: false, only: null };
+let building = false; // set once parts start: from then on fail() records the video's state
 let manifestArg = null;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -72,9 +73,25 @@ const XF = M.crossfadeS ?? 0.75;
 const LEAD = M.leadS ?? 0.6;
 const TAIL = M.tailS ?? 1.6;
 
-function fail(msg) {
+function fail(msg, outcome = 'failed') {
   console.error(`build: ${msg}`);
+  if (building) recordState({ outcome, message: msg });
   process.exit(1);
+}
+
+// ---- video state: every way a build ends is recorded in memory/ and Zep ----
+// (memory/features/<app>/<name>.state.json; the video page's status is generated from it)
+function partCounts() {
+  return M.parts.map((p) => ({ part: p.name, ...(qaCounts(path.join(BUILD, p.name, 'qa', 'qa.json')) ?? { qa: 'not run' }) }));
+}
+function recordState(event) {
+  try {
+    const scope = opt.only ? `part ${opt.only}${opt.record ? '' : ', no record'}` : opt.joinOnly ? 'join only' : opt.record ? undefined : 'no record';
+    recordVideo(M.name, { type: 'build', scope, parts: partCounts(), ...event });
+    spawnSync(process.execPath, ['memory.mjs', 'video', 'sync', M.name], { cwd: HERE, stdio: 'inherit', timeout: 120000 });
+  } catch (e) {
+    console.warn(`memory: video state not recorded: ${e.message}`);
+  }
 }
 
 function run(label, args, env) {
@@ -111,6 +128,7 @@ for (const s of staleSources()) {
 }
 
 // ---- parts ----
+building = true;
 const results = [];
 for (const [i, part] of M.parts.entries()) {
   const dir = path.join(BUILD, part.name);
@@ -142,7 +160,7 @@ for (const [i, part] of M.parts.entries()) {
     const qa = run(`${part.name} qa`, ['qa.mjs', '--frames', path.join(dir, 'qa')], env);
     if (qa !== 0 && opt.gate) {
       fail(`part "${part.name}" failed the quality gate. Report: ${path.relative(ROOT, path.join(dir, 'qa', 'qa.json'))}. ` +
-        'Fix the trace, regenerate the script, and rerun with --only ' + part.name);
+        'Fix the trace, regenerate the script, and rerun with --only ' + part.name, 'qa-fail');
     }
   }
 
@@ -205,6 +223,15 @@ const report = {
 };
 fs.writeFileSync(path.join(BUILD, 'build.json'), JSON.stringify(report, null, 2) + '\n');
 
-console.log(`\n${report.joinedQa === 'PASS' ? 'BUILT' : 'BUILT, BUT FAILED QA'}: ${path.relative(ROOT, OUTPUT)}  (${probeS(OUTPUT).toFixed(1)}s)`);
+const durationS = probeS(OUTPUT);
+recordState({
+  outcome: q === 0 ? 'built' : 'qa-fail',
+  output: path.relative(ROOT, OUTPUT).split(path.sep).join('/'),
+  durationS,
+  joinedQa: report.joinedQa,
+  joined: qaCounts(path.join(joinedQa, 'qa.json')),
+  message: q === 0 ? undefined : 'the joined video failed the quality gate',
+});
+console.log(`\n${report.joinedQa === 'PASS' ? 'BUILT' : 'BUILT, BUT FAILED QA'}: ${path.relative(ROOT, OUTPUT)}  (${durationS.toFixed(1)}s)`);
 console.log('Next: the video-qa agent for the visual review of each part and the join.');
 process.exit(q === 0 || !opt.gate ? 0 : 1);

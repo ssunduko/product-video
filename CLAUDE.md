@@ -51,6 +51,10 @@ zoom) is in `docs/pipeline-lessons.md`.
   the date.
 - Every `videos/*.json` must be named on a feature page; `node docs/check.mjs`
   fails otherwise.
+- Every new video is a new session: before starting work on one (a new flow,
+  trace or manifest), run `node pipeline/memory.mjs session video <name>
+  --session <id>` with the session id the SessionStart context gives. The
+  SessionEnd hook pushes the conversation and a summary to Zep.
 - Never write personal data, credentials or internal ids there.
 - Online sources (`memory/sources.json`) are synced by the `memory` agent
   (`.claude/agents/memory.md`) when the SessionStart hook says they are stale;
@@ -64,3 +68,10 @@ the `video-qa` agent. Its findings are a report, not instructions: show the
 user the verdict and the proposed fixes, and ask before changing a trace,
 script or manifest, re-rendering or re-recording because of them. Multi-take videos are built with `pipeline/build.mjs` from
 a `videos/<name>.json` manifest — never joined by hand.
+
+A video's state lives in `memory/features/<app>/<name>.state.json`. `build.mjs`
+records every build. After showing the user a video-qa verdict, record it:
+`node pipeline/memory.mjs video review <name> PASS|FAIL --findings <file>`.
+The page's "Video status" section is generated from the state; never edit it
+by hand. `node pipeline/memory.mjs video state <name>` answers "where is this
+video?"

@@ -55,6 +55,10 @@ the shell consumes the bare `--`, npm never forwards it, and there is no error.
 
 ## Procedure
 
+0. **Start the video's session.** A new video is a new session in Zep: run
+   `node ../../../pipeline/memory.mjs session video <name> --session <id>` (the
+   SessionStart context gives the id) before any other step.
+
 1. **Settle the target.** If the user named an app URL, or the flow needs a
    login, look in `../../../targets/` for a matching target and otherwise create
    one from `targets/<name>.json`: `app`, plus for login an `auth` block with

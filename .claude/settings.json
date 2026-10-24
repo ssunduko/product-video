@@ -24,6 +24,17 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/pipeline/memory.mjs\" session end",
+            "timeout": 120
+          }
+        ]
+      }
     ]
   }
 }

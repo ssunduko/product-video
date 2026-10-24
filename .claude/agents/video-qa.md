@@ -119,3 +119,7 @@ Your fixes are proposals. The caller presents your verdict and fixes to the user
 and asks before applying any of them — no trace, script or manifest edit, no
 re-render, no re-record on the strength of this report alone. End the report
 with that reminder: "Fixes above are proposals — ask the user before applying."
+Also end it with a findings list the caller can record as the video's state:
+one finding per line, under the heading "Findings for the state record". The
+caller runs `node pipeline/memory.mjs video review <name> PASS|FAIL --findings <file>`.
+You don't run it yourself.
