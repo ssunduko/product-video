@@ -30,6 +30,10 @@ problem. The README says what the stages are; this page says how to get a pass.
   adding narration.
 - **"Frozen" WARN with narration over 70–100%** is a narrated hold on finished
   content. It's fine if the page isn't loading.
+- **A part with no outro card ends on its last hold.** That freeze runs to the
+  end of the file. Until 2026-10-24 qa failed it whatever its narration (a
+  first part, twice); now it's scored by narration like any other. Still, end such a part on its last line: a closing line on a
+  static page adds a long still tail.
 - **A "deadair" WARN** is a silent gap over about 5s, usually a slow load
   between two lines.
 - **The joined qa** (`--cues none`) can segment frozen runs differently from
