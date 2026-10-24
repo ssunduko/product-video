@@ -34,6 +34,7 @@ import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_OUT } from './paths.mjs';
+import { staleSources } from './memory.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -102,6 +103,11 @@ function speech(file) {
   const first = firstQuiet && firstQuiet[0] <= 0.05 ? firstQuiet[1] : 0;
   const last = lastQuiet && lastQuiet[1] >= total - 0.05 ? lastQuiet[0] : total;
   return { first, last, total };
+}
+
+// ---- memory: warn when an app's online feature source has not been synced lately ----
+for (const s of staleSources()) {
+  console.warn(`memory: ${s.app} features ${s.lastSyncAt ? `last synced ${s.lastSyncAt}` : 'never synced'} - run the memory agent to pick up changes`);
 }
 
 // ---- parts ----

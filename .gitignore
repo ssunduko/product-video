@@ -12,6 +12,8 @@ node_modules/
 .env.*
 !.env.example
 *.local.json
+# Zep graph/episode ids for this machine (memory.mjs)
+memory/.zep-state.json
 
 # renders, frames, narration and TTS cache: regenerable, and they show live
 # account data (claude.ai sidebar, Salesmessage analytics). The folder itself
@@ -34,3 +36,18 @@ brand/*.png
 Thumbs.db
 npm-debug.log*
 *.log
+
+# Salesmessage assets: never in this public repo. They stay on disk for local
+# builds. A trace, script or manifest whose target is gitignored is itself
+# private: list it here too (docs/check.mjs fails if one is committed).
+targets/salesmessage*.json
+input/click-tracking.flow
+scenarios/click-tracking.trace.json
+scripts/click-tracking.demo
+scripts/click-tracking.selectors.json
+videos/click-tracking.json
+memory/features/salesmessage/
+brand/StyleGuide.txt
+# model videos are Salesmessage videos; only the folder is kept
+sample/*
+!sample/.gitkeep

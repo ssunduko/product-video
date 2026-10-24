@@ -134,6 +134,50 @@ const quoted = (c) => new RegExp('`' + c + '(:|\\s|`)');
 rule('script command(s)', commands, (c) => usedAt(c).test(grammar) || usedAt(c).test(readme) || quoted(c).test(readme),
   'README.md or scripts/grammar-tour.demo (as `command ...` or a script line starting with it)');
 
+// every video manifest is named on a feature page in memory/, so what each video covers is on record
+const walk = (d) => (fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }) : [])
+  .flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+const featurePages = walk(path.join(ROOT, 'memory/features')).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(f, 'utf8'));
+const videos = fs.existsSync(path.join(ROOT, 'videos'))
+  ? fs.readdirSync(path.join(ROOT, 'videos')).filter((f) => f.endsWith('.json')).map((f) => `videos/${f}`).sort()
+  : [];
+rule('video manifest(s)', videos, (v) => featurePages.some((p) => p.includes(v)), 'memory/features/ (name it on the page of the feature it covers)');
+
+// .env.example lists the same keys as .env, in the same order (local only: CI has no .env)
+const envKeys = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8').split(/\r?\n/)
+  .map((l) => /^#?\s?([A-Z][A-Z0-9_]*)=/.exec(l)?.[1]).filter(Boolean);
+if (fs.existsSync(path.join(ROOT, '.env')) && fs.existsSync(path.join(ROOT, '.env.example'))) {
+  const [local, example] = [envKeys('.env'), envKeys('.env.example')];
+  const onlyLocal = local.filter((k) => !example.includes(k));
+  const onlyExample = example.filter((k) => !local.includes(k));
+  if (onlyLocal.length) problems.push(`.env.example is missing key(s) that .env has: ${onlyLocal.join(', ')}`);
+  if (onlyExample.length) problems.push(`.env is missing key(s) that .env.example lists (add them, empty or commented): ${onlyExample.join(', ')}`);
+}
+
+// nothing committed depends on a private target: a trace, script or manifest whose
+// target file is gitignored (Salesmessage) is private too and must be gitignored
+const git = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' });
+if (git.status === 0) {
+  const tracked = new Set(git.stdout.split(/\r?\n/).filter(Boolean));
+  const privateTarget = (t) => t && fs.existsSync(path.join(ROOT, 'targets', `${t}.json`)) && !tracked.has(`targets/${t}.json`);
+  const targetOf = (f) => {
+    const abs = path.join(ROOT, f);
+    if (!fs.existsSync(abs)) return null;
+    const text = fs.readFileSync(abs, 'utf8');
+    if (f.endsWith('.demo')) return /^target:\s*(\S+)/m.exec(text)?.[1] ?? null;
+    try {
+      const j = JSON.parse(text);
+      if (j.target) return j.target;
+      const script = j.parts?.[0]?.script;
+      return script ? targetOf(`scenarios/${path.basename(script).replace(/\.demo$/, '.trace.json')}`) : null;
+    } catch {
+      return null;
+    }
+  };
+  const leaks = [...tracked].filter((f) => /^(scenarios\/.*\.trace\.json|scripts\/.*\.demo|videos\/.*\.json)$/.test(f) && privateTarget(targetOf(f)));
+  if (leaks.length) problems.push(`committed file(s) use a gitignored target, so they are private too: ${leaks.join(', ')} - add them to .gitignore and git rm --cached them`);
+}
+
 // ---------------------------------------------------------------- report
 const staleInCi = MODE === 'ci' && regenerated.length;
 if (staleInCi) {
@@ -164,4 +208,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`docs check passed: ${pipelineFiles.length} pipeline files, ${envVars.length} env vars, ${scripts.length} npm scripts, ` +
-  `${targetKeys.length} target options, ${commands.length} script commands documented; diagrams ${regenerated.length ? 'regenerated' : 'up to date'}.`);
+  `${targetKeys.length} target options, ${commands.length} script commands, ${videos.length} videos documented; diagrams ${regenerated.length ? 'regenerated' : 'up to date'}.`);

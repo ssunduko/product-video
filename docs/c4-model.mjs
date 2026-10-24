@@ -395,13 +395,24 @@ const chromeExt = mk(pkgContext, 'external', 'Claude in Chrome extension', 'Brow
   'take itself stays with the CDP driver.');
 const ttsApi = mk(pkgContext, 'external', 'Text-to-speech API', 'ElevenLabs or OpenAI',
   'Chosen by DEMO_TTS, or by whichever key is set. Anthropic has no TTS API, so this is a third ' +
-  'party. Keys come from the shell or .env, never a committed file. The only network ' +
-  'dependency other than the app under demo.');
+  'party. Keys come from the shell or .env, never a committed file. With Zep, the only network ' +
+  'dependencies other than the app under demo.');
 
 const qaAgent = mk(pkgContext, 'external', 'video-qa agent', 'Claude Code subagent',
   'Reviews a finished video: runs the quality gate, then checks every narration line against a ' +
   'still of the screen — is the thing being described on screen while it is said? — and returns ' +
   'PASS or FAIL with the fix for each defect. Read-only. Defined in .claude/agents/video-qa.md.');
+
+const memoryAgent = mk(pkgContext, 'external', 'memory agent', 'Claude Code subagent',
+  'Runs at session start when a feature source is stale: lists each online source of an app with its ' +
+  'MCP tool, reads what changed, merges its features into the catalog and pushes them to Zep. Read-only on ' +
+  'the sources. Defined in .claude/agents/memory.md.');
+const featureSource = mk(pkgContext, 'external', 'Online feature sources', 'e.g. a Google Drive folder per app',
+  'Where the features of each app are published, located by FEATURE_SOURCE_{APP} in .env. Reachable only ' +
+  'as Claude tools (MCP), so the memory agent reads them, never the pipeline.');
+const zepCloud = mk(pkgContext, 'external', 'Zep Cloud', '@getzep/zep-cloud · HTTPS',
+  'Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and ' +
+  'pipeline notes, and a thread per working session. Key in ZEP_API_KEY (.env).');
 
 const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   'Level 1. The pipeline as one box, with the people who use it and the systems it depends on.');
@@ -524,6 +535,15 @@ const cBuild = mk(pkgContainers, 'container', 'Build Orchestrator', 'build.mjs �
 const dManifests = mk(pkgContainers, 'store', 'Video manifests', 'videos/*.json',
   'One per finished video: its parts in recording order with what must be true before each take, ' +
   'the settings every stage runs with, and how the parts join. Committed.');
+const cMemory = mk(pkgContainers, 'container', 'Memory', 'memory.mjs · Node.js + @getzep/zep-cloud',
+  'Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against ' +
+  'the sync lock next to the catalog (files older than the catalog are its baseline), merges new features into ' +
+  'the catalog, reports stale sources (SessionStart hook and build.mjs), and pushes changed catalog ' +
+  'features, pages, traces and manifests to Zep.');
+const dMemory = mk(pkgContainers, 'store', 'Project memory', 'memory/ · committed',
+  'rules.md, pipeline.md, features/{app}/data/features.json (the feature catalog, the initial set), ' +
+  'features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (generic: kinds ' +
+  'of source; locations are in .env). A private app folder is gitignored.');
 const dProfiles = mk(pkgContainers, 'store', 'Browser profiles', 'profile/, profile-*/ · gitignored',
   'Chrome user-data directories holding signed-in sessions, one per target that needs its own ' +
   'user. Signed in by hand once; a take never signs out. Sensitive: whoever has the folder has ' +
@@ -564,6 +584,11 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   const vManifests = place(dL2, dManifests, 1560, 560);
   const vProfiles = place(dL2, dProfiles, 1560, 720);
   const vQaAgent = place(dL2, qaAgent, 60, 860);
+  const vMemory = place(dL2, cMemory, 340, 860);
+  const vMemoryStore = place(dL2, dMemory, 620, 860);
+  const vMemoryAgent = place(dL2, memoryAgent, 1000, 860);
+  const vFeatureSource = place(dL2, featureSource, 1280, 860);
+  const vZep = place(dL2, zepCloud, 1560, 860);
 
   link(dL2, pkgContainers, vAuthor, vFlows, 'Writes the flow');
   link(dL2, pkgContainers, vAuthor, vTargets, 'Sets the deployment and credentials');
@@ -620,6 +645,15 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   }
   link(dL2, pkgContainers, vBuild, vWork, 'Gives each part its own folder; writes the joined MP4');
   link(dL2, pkgContainers, vBuild, vFfmpeg, 'Measures and joins via', 'child process');
+
+  link(dL2, pkgContainers, vMemoryAgent, vFeatureSource, 'Lists and reads', 'MCP');
+  link(dL2, pkgContainers, vMemoryAgent, vMemoryStore, 'Writes the feature pages');
+  link(dL2, pkgContainers, vMemoryAgent, vMemory, 'Runs diff, mark, synced, zep push', 'CLI');
+  link(dL2, pkgContainers, vMemory, vMemoryStore, 'Reads sources; writes the lock');
+  link(dL2, pkgContainers, vMemory, vZep, 'Pushes documents, sessions; searches', 'HTTPS');
+  link(dL2, pkgContainers, vMemory, vTraces, 'Pushes traces');
+  link(dL2, pkgContainers, vMemory, vManifests, 'Pushes manifests');
+  link(dL2, pkgContainers, vBuild, vMemory, 'Warns on stale sources', 'import');
 }
 
 // ========================================== L3 · 0 — components: author ==

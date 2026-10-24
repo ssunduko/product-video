@@ -1,0 +1,25 @@
+{
+  "//": [
+    "Generic: no app or location is named here. An app is a folder memory/features/<app>/.",
+    "Its feature catalog is <features>, and its online source is the .env variable <env>",
+    "(<APP> = the folder name upper-cased, dashes as underscores), e.g.",
+    "  FEATURE_SOURCE_SALESMESSAGE=https://drive.google.com/drive/folders/<id>",
+    "The kind of source is recognised from that value by each kind's `match`. The memory agent",
+    "(.claude/agents/memory.md) lists and reads it with the tools named for its kind, diffs it with",
+    "`node pipeline/memory.mjs diff <app> <listing.json>`, and merges what changed into the catalog",
+    "with `node pipeline/memory.mjs upsert`.",
+    "Remote files modified on or before the catalog's `generated` date are its baseline: already in",
+    "the catalog, so they are recorded, not read.",
+    "indexOnly: titles that are tracked but never read into features (digests covering many at once)."
+  ],
+  "env": "FEATURE_SOURCE_<APP>",
+  "features": "memory/features/<app>/data/features.json",
+  "indexOnly": ["newsletter"],
+  "kinds": {
+    "google-drive-folder": {
+      "match": "drive\\.google\\.com/drive/folders/([A-Za-z0-9_-]+)",
+      "list": "mcp__claude_ai_Google_Drive__search_files with query parentId = '<id>' and excludeContentSnippets true; follow every nextPageToken",
+      "read": "mcp__claude_ai_Google_Drive__read_file_content with the file id"
+    }
+  }
+}

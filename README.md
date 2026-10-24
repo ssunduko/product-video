@@ -28,6 +28,8 @@ cursor, and a styled window frame.
     qa.mjs          quality gate: overlap, sync, dead air, frozen/loading, lineage
     build.mjs       one command per video: record + render + gate each part, join
     paths.mjs       where stages read/write (DEMO_OUT, default out/)
+    memory.mjs      project memory: feature catalogs, source diffs, sync lock, Zep
+                    (see "Project memory")
   targets/
     signed-in.json          template for an app that needs sign-in
     local-app.json          the Express app in sample-app/
@@ -60,6 +62,8 @@ cursor, and a styled window frame.
   docs/             C4 architecture model and its renderings
   sample-app/       a small Express app to record against (npm install && npm start)
   sample/           model videos new ones should match: cards, outro, pacing
+  memory/           what the project has learned: rules.md, pipeline.md, and
+                    features/<app>/<feature>.md linking each feature to its videos
   .env.example      template for .env — copy and fill in
   .env              optional, gitignored: KEY=VALUE for env: references in targets
   out/              generated: frames/, frames.json, actions.json, *.mp4, <take>.recordly
@@ -1027,6 +1031,83 @@ Take one at each click + 0.6s and one wide per page. Confirm the zoom lands on
 every click, the cursor is visible where it should be, beats are in order, and
 content actually loaded — not skeletons or spinners. Iterate cuts and zooms
 until clean.
+
+## Project memory
+
+`memory/` holds what the project knows:
+- `rules.md`: standing rules.
+- `pipeline.md`: timing and qa lessons.
+- `features/<app>/`: one folder per application.
+  - `data/features.json` is the app's **feature catalog**, the initial feature
+    set: one document per feature, with category, description and source. Its
+    `generated` date says what it covers.
+  - The `.md` pages next to it are **video pages**, one per filmed feature,
+    naming the videos that cover it.
+
+Each app can have an online source. `memory/sources.json` is generic: it names
+no app or location, only how to recognise and read each kind of source (a
+Google Drive folder, for now). The location comes from `.env` as
+`FEATURE_SOURCE_<APP>`, for example `FEATURE_SOURCE_SALESMESSAGE=<Drive folder URL>`.
+
+Those sources are reachable only as Claude tools (MCP), so a Claude Code agent
+does the sync, `.claude/agents/memory.md`:
+
+1. **At session start**, a SessionStart hook (`.claude/settings.json`) runs
+   `node pipeline/memory.mjs hook`. When a source hasn't been synced within
+   `MEMORY_MAX_AGE_H` hours (default 24), it asks Claude to launch the memory
+   agent.
+2. **The agent finds the deltas.** It lists the source, then
+   `memory.mjs diff` compares the listing with the app's `data/sources.lock.json`.
+   Files from on or before the catalog's `generated` date count as covered;
+   `memory.mjs baseline` records them without reading them.
+3. **It merges what changed.** It reads only the new or changed files and
+   writes the features they describe into the catalog with `memory.mjs upsert`.
+   A feature is matched by name; a new one gets the next `feature-NNN` id.
+4. **It records each file** with `memory.mjs mark`.
+5. **It pushes to Zep** with `memory.mjs zep push`.
+6. **`build.mjs` warns too,** at the start of a build, when a source is stale.
+
+Zep Cloud (`@getzep/zep-cloud`, key in `ZEP_API_KEY`) is the searchable store:
+- one graph per app (`productvideo-<app>`) holds:
+  - its catalog, one Zep document per feature;
+  - its video pages;
+  - the traces and manifests those pages name;
+- `productvideo-project` holds the rules and pipeline notes;
+- each working session is its own thread.
+
+A changed document replaces its old episodes. `memory/.zep-state.json` keeps
+this machine's Zep ids and is gitignored.
+
+**Sessions are attributed to a person.** Each person is one Zep user, keyed by
+`MEMORY_USER` (default: `git config user.email`). At session start the hook
+opens a Zep thread for the Claude session under that user and tells Claude
+the session id. Notes saved with `zep session --session <id>` go to that
+thread, so each session can be traced to who ran it.
+
+**Private apps stay out of the repo.** An app's target, flows, traces,
+scripts, manifests, catalog and brand files can be gitignored; Salesmessage's
+are. They stay on disk for local builds. The sync record
+(`data/sources.lock.json`) sits next to each catalog, so it's private with it.
+`node docs/check.mjs` fails if a committed trace, script or manifest uses a
+gitignored target. It also fails if `.env` and `.env.example` list different
+keys.
+
+```bash
+cd pipeline
+node memory.mjs status                       # apps, catalogs, sources, last sync, Zep configured?
+node memory.mjs source salesmessage          # the source's kind, id, and the tools to list/read it
+node memory.mjs diff salesmessage list.json  # remote listing vs the lock
+node memory.mjs baseline salesmessage list.json
+node memory.mjs upsert salesmessage found.json --source "Surveys Rollout One-Pager.pdf"
+node memory.mjs mark salesmessage <fileId> --title "<t>" --modified <iso> --kind feature --features feature-262
+node memory.mjs synced salesmessage
+node memory.mjs zep push                     # changed catalog features, pages, traces, manifests
+node memory.mjs zep session --session <id> --title "2026-10-23 click tracking" --file notes.md
+node memory.mjs zep search "where is click tracking" --app salesmessage
+npm run memory -- status                     # the same, via npm
+```
+
+`node docs/check.mjs` fails if a `videos/*.json` isn't named on a video page.
 
 ## Documentation as code
 
