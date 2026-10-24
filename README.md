@@ -1027,7 +1027,7 @@ node qa.mjs        # checks out/final-narrated-tight-carded.mp4 (or the newest s
 | `overlap` | a narration line is still speaking when the next starts — two voices at once |
 | `sync` | a line's speech starts more than 250ms off its cue in `final-narrated.mp4` |
 | `deadair` | 6s+ with no narration (4s+ warns) outside the title cards |
-| `frozen` | the picture barely changes for 5s+ (2.5s+ warns) — usually loading |
+| `frozen` | the picture barely changes for 5s+ (2.5s+ warns) — usually loading. Narration over 60% of it makes it a WARN (a hold on finished content), including a hold that runs to the end of the file |
 | `black`, `streams` | black frames; audio and video of different length or offset |
 | `loudness` | integrated loudness outside -19..-13 LUFS, true peak above -1 dBFS (warns) |
 

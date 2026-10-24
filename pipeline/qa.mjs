@@ -343,11 +343,19 @@ const NARRATED_HOLD_SHARE = 0.6;
       start = null;
     }
   }
+  // A freeze that runs to the end of the file is judged like any other: a part
+  // without an outro card ends on its last narrated hold, which is not a wait.
   if (start != null) {
     const [s0, e0] = outsideCards(start, totalS);
-    if (e0 - s0 >= FREEZE_WARN_S) {
-      add('frozen', e0 - s0 >= FREEZE_FAIL_S ? 'FAIL' : 'WARN', s0,
-        `picture barely changes from ${fmt(s0)} to ${fmt(e0)}`, { endS: e0 });
+    const dur = e0 - s0;
+    if (dur >= FREEZE_WARN_S) {
+      const spoken = spokenShare(s0, e0);
+      const held = spoken >= NARRATED_HOLD_SHARE;
+      add('frozen', dur >= FREEZE_FAIL_S && !held ? 'FAIL' : 'WARN', s0,
+        held
+          ? `picture holds from ${fmt(s0)} to the end (${fmt(e0)}) with narration over ${Math.round(spoken * 100)}% of it — check it is finished content, not loading`
+          : `picture barely changes from ${fmt(s0)} to ${fmt(e0)}`,
+        { endS: e0, spokenShare: Math.round(spoken * 100) / 100 });
     }
   }
 }
