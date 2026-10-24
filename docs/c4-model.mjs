@@ -410,6 +410,12 @@ const memoryAgent = mk(pkgContext, 'external', 'memory agent', 'Claude Code suba
 const featureSource = mk(pkgContext, 'external', 'Online feature sources', 'e.g. a Google Drive folder per app',
   'Where the features of each app are published, located by FEATURE_SOURCE_{APP} in .env. Reachable only ' +
   'as Claude tools (MCP), so the memory agent reads them, never the pipeline.');
+const videoDest = mk(pkgContext, 'external', 'Video destination', 'Google Drive API v3 · HTTPS',
+  'Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} ' +
+  'in .env. Uploads run as the signed-in user (OAuth refresh token in .env).');
+const jiraTickets = mk(pkgContext, 'external', 'Jira', 'Atlassian MCP',
+  'The ticket each video is for (the manifest names it). Claude posts the published link there as a ' +
+  'comment through the Atlassian MCP tool; the pipeline only records that it was posted.');
 const zepCloud = mk(pkgContext, 'external', 'Zep Cloud', '@getzep/zep-cloud · HTTPS',
   'Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and ' +
   'pipeline notes, and a thread per working session. Key in ZEP_API_KEY (.env).');
@@ -429,6 +435,8 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   const vMemoryAgent = place(dL1, memoryAgent, 1160, 240);
   const vSources = place(dL1, featureSource, 1160, 460);
   const vZep = place(dL1, zepCloud, 1160, 60);
+  const vDest = place(dL1, videoDest, 1160, 620);
+  const vJira = place(dL1, jiraTickets, 800, 780);
 
   link(dL1, pkgContext, vAuthor, vSystem, 'Writes flows and runs the stages', 'CLI');
   link(dL1, pkgContext, vSystem, vExt, 'Resolves natural-language selectors before a take via');
@@ -440,6 +448,8 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   link(dL1, pkgContext, vSystem, vTts, 'Renders speech via', 'HTTPS');
   link(dL1, pkgContext, vQaAgent, vSystem, 'Reviews every video built by');
   link(dL1, pkgContext, vSystem, vZep, 'Stores feature catalogs, pages, traces and session threads in', 'HTTPS');
+  link(dL1, pkgContext, vSystem, vDest, 'Publishes approved videos to', 'HTTPS');
+  link(dL1, pkgContext, vAuthor, vJira, 'Posts the published link on the ticket (through Claude)', 'MCP');
   link(dL1, pkgContext, vMemoryAgent, vSources, 'Reads new and changed feature files from', 'MCP');
   link(dL1, pkgContext, vMemoryAgent, vSystem, 'Merges features and syncs memory via', 'CLI');
   link(dL1, pkgContext, vSystem, vMemoryAgent, 'Asks for a sync at session start when a source is stale');
@@ -542,6 +552,10 @@ const cBuild = mk(pkgContainers, 'container', 'Build Orchestrator', 'build.mjs �
 const dManifests = mk(pkgContainers, 'store', 'Video manifests', 'videos/*.json',
   'One per finished video: its parts in recording order with what must be true before each take, ' +
   'the settings every stage runs with, and how the parts join. Committed.');
+const cPublish = mk(pkgContainers, 'container', 'Publisher', 'publish.mjs · Node.js + Google Drive API',
+  'Publishes a finished video after final approval: only a video whose state is done, and only with ' +
+  '--approved. Uploads it to the app destination (a new revision when it was published before, so the ' +
+  'link stays), records the publication in the video state and prints the Jira comment for Claude to post.');
 const cMemory = mk(pkgContainers, 'container', 'Memory', 'memory.mjs · Node.js + @getzep/zep-cloud',
   'Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against ' +
   'the sync lock next to the catalog (files older than the catalog are its baseline), merges new features into ' +
@@ -596,6 +610,9 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   const vMemoryAgent = place(dL2, memoryAgent, 1000, 860);
   const vFeatureSource = place(dL2, featureSource, 1280, 860);
   const vZep = place(dL2, zepCloud, 1560, 860);
+  const vPublish = place(dL2, cPublish, 340, 1020);
+  const vDest2 = place(dL2, videoDest, 1000, 1020);
+  const vJira2 = place(dL2, jiraTickets, 1280, 1020);
 
   link(dL2, pkgContainers, vAuthor, vFlows, 'Writes the flow');
   link(dL2, pkgContainers, vAuthor, vTargets, 'Sets the deployment and credentials');
@@ -661,6 +678,11 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   link(dL2, pkgContainers, vMemory, vTraces, 'Pushes traces');
   link(dL2, pkgContainers, vMemory, vManifests, 'Pushes manifests');
   link(dL2, pkgContainers, vBuild, vMemory, 'Warns on stale sources', 'import');
+  link(dL2, pkgContainers, vAuthor, vPublish, 'Approves and runs after the visual review', 'CLI');
+  link(dL2, pkgContainers, vPublish, vWork, 'Reads the finished MP4');
+  link(dL2, pkgContainers, vPublish, vDest2, 'Uploads the video to', 'HTTPS');
+  link(dL2, pkgContainers, vPublish, vMemory, 'Records the publication via', 'import');
+  link(dL2, pkgContainers, vAuthor, vJira2, 'Posts the link on the ticket (through Claude)', 'MCP');
 }
 
 // ========================================== L3 · 0 — components: author ==
@@ -1497,6 +1519,50 @@ const dL3memory = diagram(pkgMemory, 'c4-l3-memory',
   link(dL3memory, pkgMemory, vPush, vManifests, 'Reads');
   link(dL3memory, pkgMemory, vPush, vZep, 'Adds and deletes episodes', 'HTTPS');
   link(dL3memory, pkgMemory, vSearch, vZep, 'Searches facts', 'HTTPS');
+}
+
+// ===================================== L3 · 12 — components: publisher ==
+const pkgPublish = pkg(
+  '3.12 — Components · Publisher',
+  'Inside publish.mjs. The last step of a video, and the only one that sends it anywhere: gated on ' +
+    'the video state and on the explicit approval of the user.',
+);
+const pPlan = mk(pkgPublish, 'component', 'Publish plan', 'check',
+  'The file, its destination (PUBLISH_DEST_{APP} and its kind), the ticket from the manifest, and ' +
+  'every reason it may not be published yet: state not done, file missing, destination or Google ' +
+  'credentials not set.');
+const pAuth = mk(pkgPublish, 'component', 'Google sign-in', 'auth · OAuth loopback + PKCE',
+  'One-time: the user signs in in the browser, Google redirects to a 127.0.0.1 port, and the refresh ' +
+  'token is written into .env, never printed.');
+const pGate = mk(pkgPublish, 'component', 'Approval gate', 'upload --approved',
+  'Refuses unless the video state is done (or already published) and --approved is given, which ' +
+  'Claude passes only after the user says to publish.');
+const pUpload = mk(pkgPublish, 'component', 'Drive uploader', 'resumable upload · 8 MB chunks',
+  'Uploads into the destination folder as the user, or adds a new revision of the file published ' +
+  'before so its link stays the same.');
+const pRecord = mk(pkgPublish, 'component', 'Publication record', 'memory.mjs recordVideo · video sync',
+  'Records the link, file id and destination in the video state (status published), posts it to the ' +
+  'video thread and states it as facts in the app graph. jira records the comment Claude posted.');
+
+const dL3publish = diagram(pkgPublish, 'c4-l3-publisher',
+  'C4-L3 — Components · Publisher (publish.mjs)',
+  'Level 3, container "Publisher".',
+  { macro: 'Container_Boundary', name: 'Publisher' });
+{
+  const vAuthor = place(dL3publish, author, 60, 40);
+  const [vPlan, vAuth, vGate, vUp, vRec] = grid(dL3publish, [pPlan, pAuth, pGate, pUpload, pRecord], { y: 200, cols: 3 });
+  const [vWorkP, vMemP, vDestP, vJiraP] = column(dL3publish, [dWork, cMemory, videoDest, jiraTickets], { dy: 150 });
+  link(dL3publish, pkgPublish, vAuthor, vAuth, 'Signs in once', 'CLI');
+  link(dL3publish, pkgPublish, vAuthor, vGate, 'Approves, then Claude runs upload', 'CLI');
+  link(dL3publish, pkgPublish, vGate, vPlan, 'Checks');
+  link(dL3publish, pkgPublish, vPlan, vMemP, 'Reads the video state via', 'import');
+  link(dL3publish, pkgPublish, vPlan, vWorkP, 'Finds the MP4 in');
+  link(dL3publish, pkgPublish, vGate, vUp, 'Approved to');
+  link(dL3publish, pkgPublish, vAuth, vUp, 'Refresh token for');
+  link(dL3publish, pkgPublish, vUp, vDestP, 'Uploads to', 'HTTPS');
+  link(dL3publish, pkgPublish, vUp, vRec, 'The link to');
+  link(dL3publish, pkgPublish, vRec, vMemP, 'Records and syncs via', 'import + child process');
+  link(dL3publish, pkgPublish, vAuthor, vJiraP, 'Posts the link on the ticket (through Claude)', 'MCP');
 }
 
 // --------------------------------------------------------------- validate

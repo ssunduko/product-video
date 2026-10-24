@@ -75,3 +75,8 @@ records every build. After showing the user a video-qa verdict, record it:
 The page's "Video status" section is generated from the state; never edit it
 by hand. `node pipeline/memory.mjs video state <name>` answers "where is this
 video?"
+
+Publishing (`pipeline/publish.mjs`) happens only after final approval: state
+done, and the user says to publish. Then run `upload <name> --approved`, post
+the printed link on the manifest's ticket with the Atlassian tool, and record it
+with `publish.mjs jira <name> --ticket <KEY> --comment <id>`.

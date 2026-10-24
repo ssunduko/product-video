@@ -28,6 +28,8 @@ cursor, and a styled window frame.
     qa.mjs          quality gate: overlap, sync, dead air, frozen/loading, lineage
     build.mjs       one command per video: record + render + gate each part, join
     paths.mjs       where stages read/write (DEMO_OUT, default out/)
+    publish.mjs     publishes a finished video after final approval: Drive upload,
+                    video state, Jira comment (see "Publish a finished video")
     memory.mjs      project memory: feature catalogs, source diffs, sync lock, Zep
                     (see "Project memory")
   targets/
@@ -1047,6 +1049,48 @@ Take one at each click + 0.6s and one wide per page. Confirm the zoom lands on
 every click, the cursor is visible where it should be, beats are in order, and
 content actually loaded — not skeletons or spinners. Iterate cuts and zooms
 until clean.
+
+## Publish a finished video
+
+Publishing is the last step of a video, and it only happens after final
+approval:
+- the video's state is **done**: through the quality gate and the visual
+  review (`node memory.mjs video state <name>`);
+- the user has said to publish it. Only then does Claude add `--approved`.
+
+Where to: `memory/destinations.json` is generic. Each app's destination comes
+from `.env` as `PUBLISH_DEST_<APP>`, for example
+`PUBLISH_DEST_ACME=https://drive.google.com/drive/folders/<id>`, a Google Drive
+folder. The manifest names the video's `"title"` (the file name in Drive) and
+its Jira `"ticket"`.
+
+Uploads run as you, with the Drive API (no service account: those cannot upload
+into a personal Drive). One-time setup:
+1. In Google Cloud, enable the Google Drive API and create an OAuth client ID of
+   type **Desktop app**. Put its id and secret in `.env` as
+   `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+2. Run `node publish.mjs auth` and sign in in the browser. It writes
+   `GOOGLE_OAUTH_REFRESH_TOKEN` into `.env` and never prints it.
+
+```bash
+cd pipeline
+node publish.mjs check acme-tour                # what would be published, and what blocks it
+node publish.mjs upload acme-tour --approved    # upload (a new revision if published before)
+node publish.mjs jira acme-tour --ticket ACME-123 --comment <id>   # after Claude posts the link
+npm run publish-video -- check acme-tour        # the same, via npm
+```
+
+After an upload:
+- the video's state is **published**, with the link, the file id and the
+  destination;
+- its page and its Zep thread show it;
+- the app's Zep graph states it as plain facts: the video, its ticket, the
+  date and the link.
+
+Claude then posts the link on the ticket through the Atlassian MCP tool and
+records the comment with `publish.mjs jira`. Publishing again uploads a new
+revision of the same Drive file, so the link stays the same. A new build or
+review moves the status back until the video is published again.
 
 ## Project memory
 

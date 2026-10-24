@@ -20,6 +20,13 @@ ends with its conversation and a summary pushed to Zep (SessionEnd hook).
 *Why:* the user wants each video's work attributable and summarized on its own
 (2026-10-24).
 
+### Publish only after final approval
+A video is published (uploaded to its app's destination, link posted on its
+ticket) only when its state is done and the user has said to publish it.
+`publish.mjs upload` refuses without `--approved`. Never pass it without the
+user's go-ahead for that video. Posting the Jira comment is part of publishing.
+*Why:* the user set this on 2026-10-24.
+
 ### A video is done only after both gates
 `qa.mjs` PASS and a video-qa visual review with no FAIL. A qa.mjs PASS alone is
 not done: an earlier take passed qa.mjs and still showed loading

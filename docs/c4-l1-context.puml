@@ -19,6 +19,8 @@ System_Ext(video_qa_agent, "video-qa agent", "Claude Code subagent. Reviews a fi
 System_Ext(memory_agent, "memory agent", "Claude Code subagent. Runs at session start when a feature source is stale: lists each online source of an app with its MCP tool, reads what changed, merges its features into the catalog and pushes them to Zep.")
 System_Ext(online_feature_sources, "Online feature sources", "e.g. a Google Drive folder per app. Where the features of each app are published, located by FEATURE_SOURCE_{APP} in .env.")
 System_Ext(zep_cloud, "Zep Cloud", "@getzep/zep-cloud · HTTPS. Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and pipeline notes, and a thread per working session.")
+System_Ext(video_destination, "Video destination", "Google Drive API v3 · HTTPS. Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} in .env.")
+System_Ext(jira, "Jira", "Atlassian MCP. The ticket each video is for (the manifest names it).")
 
 Rel(demo_author, demo_video_pipeline, "Writes flows and runs the stages", "CLI")
 Rel(demo_video_pipeline, claude_in_chrome_extension, "Resolves natural-language selectors before a take via")
@@ -30,6 +32,8 @@ Rel(demo_video_pipeline, ffmpeg_ffprobe, "Encodes, decodes and filters via", "ch
 Rel(demo_video_pipeline, text_to_speech_api, "Renders speech via", "HTTPS")
 Rel(video_qa_agent, demo_video_pipeline, "Reviews every video built by")
 Rel(demo_video_pipeline, zep_cloud, "Stores feature catalogs, pages, traces and session threads in", "HTTPS")
+Rel(demo_video_pipeline, video_destination, "Publishes approved videos to", "HTTPS")
+Rel(demo_author, jira, "Posts the published link on the ticket (through Claude)", "MCP")
 Rel(memory_agent, online_feature_sources, "Reads new and changed feature files from", "MCP")
 Rel(memory_agent, demo_video_pipeline, "Merges features and syncs memory via", "CLI")
 Rel(demo_video_pipeline, memory_agent, "Asks for a sync at session start when a source is stale")
