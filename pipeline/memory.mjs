@@ -351,7 +351,7 @@ function graphKey(file) {
   const r = rel(file);
   const own = /^memory\/features\/([^/]+)\//.exec(r);
   if (own) return own[1];
-  if (r.startsWith('memory/')) return 'project';
+  if (r.startsWith('memory/') || r.startsWith('docs/')) return 'project';
   for (const app of apps()) {
     const dir = path.join(FEATURES, app);
     const pages = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(dir, f), 'utf8'));
@@ -366,6 +366,7 @@ function defaultFiles() {
   const list = (d, re) => (fs.existsSync(path.join(ROOT, d)) ? fs.readdirSync(path.join(ROOT, d)).filter((f) => re.test(f)).map((f) => path.join(ROOT, d, f)) : []);
   return [
     ...walk(MEMORY).filter((f) => f.endsWith('.md')),
+    path.join(ROOT, 'docs', 'pipeline-lessons.md'),
     ...apps().map((app) => appInfo(app).featuresPath).filter((f) => fs.existsSync(f)),
     ...list('scenarios', /\.trace\.json$/),
     ...list('videos', /\.json$/),
@@ -404,7 +405,7 @@ function documentsOf(file) {
       episodes: [{ type: 'json', data: JSON.stringify({ product: cat.product, id: d.id, feature: d.feature, category: d.category, subcategory: d.subcategory, description: d.description, is_new: d.is_new, source: d.metadata?.source }) }],
     }));
   }
-  const kind = r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : 'video manifest';
+  const kind = r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') || r.startsWith('docs/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : 'video manifest';
   if (r.endsWith('.json')) {
     const compact = JSON.stringify(JSON.parse(text));
     const episodes = compact.length <= EPISODE_CHARS ? [{ type: 'json', data: compact }] : chunks(text).map((data) => ({ type: 'text', data }));
@@ -454,8 +455,24 @@ async function zepPush(files) {
     }
     console.log(`zep: ${rel(f)} -> productvideo-${key}`);
   }
+  // a full push also drops documents whose file (or catalog feature) is gone
+  let removed = 0;
+  if (!files.length) {
+    const live = new Set(todo.flatMap((f) => documentsOf(f).map((d) => d.key)));
+    for (const [k, d] of Object.entries(st.docs)) {
+      if (live.has(k)) continue;
+      for (const ep of d.episodes ?? []) {
+        try {
+          await client.graph.episode.delete(d.graph, ep);
+        } catch {}
+      }
+      delete st.docs[k];
+      removed++;
+      console.log(`zep: removed ${k}`);
+    }
+  }
   writeJson(ZEP_STATE, st);
-  console.log(`zep: ${pushed} document(s) pushed, ${same} unchanged`);
+  console.log(`zep: ${pushed} document(s) pushed, ${same} unchanged${removed ? `, ${removed} removed` : ''}`);
 }
 
 // one Zep user per person, keyed by their id (an email, usually)

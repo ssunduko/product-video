@@ -40,7 +40,7 @@ System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   ContainerDb(video_manifests, "Video manifests", "videos/*.json", "One per finished video: its parts in recording order with what must be true before each take, the settings every stage runs with, and how the parts join.")
   ContainerDb(browser_profiles, "Browser profiles", "profile/, profile-*/ · gitignored", "Chrome user-data directories holding signed-in sessions, one per target that needs its own user.")
   Container(memory, "Memory", "memory.mjs · Node.js + @getzep/zep-cloud", "Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against the sync lock next to the catalog (files older than the catalog are its baseline), merges new...")
-  ContainerDb(project_memory, "Project memory", "memory/ · committed", "rules.md, pipeline.md, features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (generic: kinds o...")
+  ContainerDb(project_memory, "Project memory", "memory/ · committed", "rules.md (imported by CLAUDE.md), features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (gener...")
 }
 
 Rel(demo_author, flow_definitions, "Writes the flow")
