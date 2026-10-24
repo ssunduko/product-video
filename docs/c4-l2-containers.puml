@@ -17,6 +17,8 @@ System_Ext(video_qa_agent, "video-qa agent", "Claude Code subagent. Reviews a fi
 System_Ext(memory_agent, "memory agent", "Claude Code subagent. Runs at session start when a feature source is stale: lists each online source of an app with its MCP tool, reads what changed, merges its features into the catalog and pushes them to Zep.")
 System_Ext(online_feature_sources, "Online feature sources", "e.g. a Google Drive folder per app. Where the features of each app are published, located by FEATURE_SOURCE_{APP} in .env.")
 System_Ext(zep_cloud, "Zep Cloud", "@getzep/zep-cloud · HTTPS. Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and pipeline notes, and a thread per working session.")
+System_Ext(video_destination, "Video destination", "Google Drive API v3 · HTTPS. Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} in .env.")
+System_Ext(jira, "Jira", "Atlassian MCP. The ticket each video is for (the manifest names it).")
 
 System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   Container(author, "0 · Author", "author.mjs · Node.js", "Turns an observed walk of the app into the DSL. Reads a trace — the selectors found and the wait times measured — and emits the .demo and its selector sidecar together.")
@@ -41,6 +43,7 @@ System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   ContainerDb(browser_profiles, "Browser profiles", "profile/, profile-*/ · gitignored", "Chrome user-data directories holding signed-in sessions, one per target that needs its own user.")
   Container(memory, "Memory", "memory.mjs · Node.js + @getzep/zep-cloud", "Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against the sync lock next to the catalog (files older than the catalog are its baseline), merges new...")
   ContainerDb(project_memory, "Project memory", "memory/ · committed", "rules.md (imported by CLAUDE.md), features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (gener...")
+  Container(publisher, "Publisher", "publish.mjs · Node.js + Google Drive API", "Publishes a finished video after final approval: only a video whose state is done, and only with --approved.")
 }
 
 Rel(demo_author, flow_definitions, "Writes the flow")
@@ -106,6 +109,11 @@ Rel(memory, zep_cloud, "Pushes documents, sessions; searches", "HTTPS")
 Rel(memory, observed_traces, "Pushes traces")
 Rel(memory, video_manifests, "Pushes manifests")
 Rel(build_orchestrator, memory, "Warns on stale sources", "import")
+Rel(demo_author, publisher, "Approves and runs after the visual review", "CLI")
+Rel(publisher, work_directory, "Reads the finished MP4")
+Rel(publisher, video_destination, "Uploads the video to", "HTTPS")
+Rel(publisher, memory, "Records the publication via", "import")
+Rel(demo_author, jira, "Posts the link on the ticket (through Claude)", "MCP")
 
 LAYOUT_WITH_LEGEND()
 @enduml

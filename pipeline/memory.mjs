@@ -477,7 +477,7 @@ async function zepPush(files) {
   if (!files.length) {
     const live = new Set(todo.flatMap((f) => documentsOf(f).map((d) => d.key)));
     for (const [k, d] of Object.entries(st.docs)) {
-      if (live.has(k)) continue;
+      if (live.has(k) || k.startsWith('video-publication-')) continue; // publication facts have no file
       for (const ep of d.episodes ?? []) {
         try {
           await client.graph.episode.delete(d.graph, ep);
@@ -832,6 +832,7 @@ const STATUS_TEXT = {
   'awaiting review': 'Built and through the quality gate; the visual review (video-qa) has not been recorded.',
   'review failed': 'Through the quality gate, but the visual review failed: see the findings.',
   done: 'Done: through the quality gate and the visual review.',
+  published: 'Published: through both gates, approved by the user and uploaded to its destination.',
 };
 
 function deriveStatus(v) {
@@ -839,7 +840,11 @@ function deriveStatus(v) {
   if (!b) return 'not built';
   if (b.outcome === 'failed') return 'build failed';
   if (b.outcome === 'qa-fail') return 'qa failed';
-  if (v.review && v.review.at >= b.at) return v.review.verdict === 'PASS' ? 'done' : 'review failed';
+  if (v.review && v.review.at >= b.at) {
+    if (v.review.verdict !== 'PASS') return 'review failed';
+    // published counts only for the build that was reviewed: a later build starts over
+    return v.published && v.published.at >= v.review.at ? 'published' : 'done';
+  }
   return 'awaiting review';
 }
 
@@ -860,6 +865,12 @@ function renderStatus(name, v) {
     const r = v.review;
     out.push('', `Visual review ${r.at}: **${r.verdict}**${r.note ? ` - ${r.note}` : ''}.`);
     if (r.findings?.length) out.push(...r.findings.map((f, i) => `${i + 1}. ${f}`));
+  }
+  if (v.published) {
+    const p = v.published;
+    out.push('', `Published ${p.at}: ${p.url} (${p.title ?? ''}, ${p.destination ?? ''}; ${p.revision ?? ''}).`);
+    if (p.jira?.length) out.push(...p.jira.map((j) => `Link posted on ${j.ticket} (comment ${j.comment}) ${j.at}.`));
+    else if (p.ticket) out.push(`Not yet posted on ${p.ticket}.`);
   }
   if (v.history?.length > 1) {
     out.push('', 'History (newest first):', ...v.history.slice(-8).reverse().map((h) => `- ${h.at}: ${h.event}`));
@@ -894,9 +905,18 @@ export function recordVideo(name, event) {
   const at = event.at ?? new Date().toISOString();
   if (event.type === 'build') v.build = { ...event, at, type: undefined };
   if (event.type === 'review') v.review = { at, verdict: event.verdict, note: event.note, findings: event.findings ?? [] };
+  if (event.type === 'publish') v.published = { ...event, at, type: undefined, jira: [] };
+  if (event.type === 'jira') {
+    if (!v.published) throw new Error(`${name} is not published: nothing to post`);
+    v.published.jira = [...(v.published.jira ?? []), { at, ticket: event.ticket, comment: event.comment }];
+  }
   const summary = event.type === 'build'
     ? `build ${event.outcome}${event.scope ? ` (${event.scope})` : ''}${event.joinedQa ? `, joined qa ${event.joinedQa}` : ''}${event.message ? `: ${event.message}` : ''}`
-    : `visual review ${event.verdict}${event.findings?.length ? ` (${event.findings.length} finding(s))` : ''}`;
+    : event.type === 'publish'
+      ? `published to ${event.destination}: ${event.url}`
+      : event.type === 'jira'
+        ? `link posted on ${event.ticket} (comment ${event.comment})`
+        : `visual review ${event.verdict}${event.findings?.length ? ` (${event.findings.length} finding(s))` : ''}`;
   v.history = [...(v.history ?? []), { at, event: summary }].slice(-30);
   v.status = deriveStatus(v);
   v.updatedAt = at;
@@ -958,8 +978,35 @@ async function videoSync(name) {
       messages: parts.map((content) => ({ role: 'system', name: 'productvideo', content, metadata: { claudeSessionId: session, video: name, kind: 'video-state', status: v.status } })),
     });
   }
+  // a publication is also stated as plain facts in the app graph, so it is a
+  // relationship in the knowledge graph (video, ticket, destination, link), not
+  // only a field inside the state document
+  if (v.published) {
+    const p = v.published;
+    const manifest = readJson(path.join(ROOT, 'videos', `${name}.json`), {});
+    const facts = [
+      `The ${manifest.title ?? name} video (${name}) was published on ${p.at.slice(0, 10)}.`,
+      manifest.description ? `The ${name} video shows: ${manifest.description}.` : '',
+      p.ticket ? `The ${name} video is the product video for Jira ticket ${p.ticket}.` : '',
+      `The published ${name} video is in Google Drive at ${p.url}.`,
+      ...(p.jira ?? []).map((j) => `The ${name} video link was posted on Jira ticket ${j.ticket} on ${j.at.slice(0, 10)}.`),
+      `The ${name} video's status is ${v.status}.`,
+    ].filter(Boolean).join(' ');
+    const key = `video-publication-${name}`;
+    const hash = crypto.createHash('sha256').update(facts).digest('hex');
+    if (st.docs[key]?.hash !== hash) {
+      for (const ep of st.docs[key]?.episodes ?? []) {
+        try {
+          await client.graph.episode.delete(st.docs[key].graph, ep);
+        } catch {}
+      }
+      const graph = await graphFor(client, st, home.app);
+      const res = await client.graph.episode.add(graph, { data: facts, type: 'text', documentId: key, sourceDescription: `video publication ${name}`, metadata: { video: name, kind: 'video publication', app: home.app } });
+      st.docs[key] = { hash, graph, episodes: res.episode?.uuid ? [res.episode.uuid] : [], pushedAt: new Date().toISOString() };
+    }
+  }
   writeJson(ZEP_STATE, st);
-  console.log(`zep: ${name} state "${v.status}" pushed${threads.length ? ' and posted to its video thread' : ''}`);
+  console.log(`zep: ${name} state "${v.status}" pushed${threads.length ? ' and posted to its video thread' : ''}${v.published ? ', publication stated in the app graph' : ''}`);
 }
 
 // ---------------------------------------------------------------- CLI

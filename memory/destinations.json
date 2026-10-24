@@ -1,0 +1,16 @@
+{
+  "//": [
+    "Generic: where finished videos are published. No app or location is named here.",
+    "An app's destination is the .env variable <env> (<APP> = the folder name under memory/features/",
+    "upper-cased, dashes as underscores), e.g. PUBLISH_DEST_ACME=https://drive.google.com/drive/folders/<id>.",
+    "Its kind is recognised from that value by each kind's `match`. pipeline/publish.mjs uploads there,",
+    "only for a video whose state is done and only with the user's final approval (--approved)."
+  ],
+  "env": "PUBLISH_DEST_<APP>",
+  "kinds": {
+    "google-drive-folder": {
+      "match": "drive\\.google\\.com/drive/(?:u/\\d+/)?folders/([A-Za-z0-9_-]+)",
+      "upload": "Drive API v3 resumable upload into the folder, as the signed-in user (GOOGLE_OAUTH_* in .env)"
+    }
+  }
+}

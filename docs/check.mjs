@@ -148,10 +148,10 @@ const videos = fs.existsSync(path.join(ROOT, 'videos'))
 rule('video manifest(s)', videos, (v) => featurePages.some((p) => p.includes(v)), 'memory/features/ (name it on the page of the feature it covers)');
 
 // .env.example lists the same keys as .env, in the same order (local only: CI has no .env)
-// per-app keys (FEATURE_SOURCE_<name>) match the template's FEATURE_SOURCE_<APP> line
+// per-app keys (FEATURE_SOURCE_<name>, PUBLISH_DEST_<name>) match the template's <APP> lines
 const envKeys = (f) => [...new Set(fs.readFileSync(path.join(ROOT, f), 'utf8').split(/\r?\n/)
   .map((l) => /^#?\s?([A-Z][A-Z0-9_]*(?:<APP>)?)=/.exec(l)?.[1]).filter(Boolean)
-  .map((k) => (k.startsWith('FEATURE_SOURCE_') ? 'FEATURE_SOURCE_<APP>' : k)))];
+  .map((k) => k.replace(/^(FEATURE_SOURCE_|PUBLISH_DEST_)(?!<APP>).*$/, '$1<APP>')))];
 if (fs.existsSync(path.join(ROOT, '.env')) && fs.existsSync(path.join(ROOT, '.env.example'))) {
   const [local, example] = [envKeys('.env'), envKeys('.env.example')];
   const onlyLocal = local.filter((k) => !example.includes(k));

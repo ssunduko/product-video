@@ -16,6 +16,7 @@
     "author": "node author.mjs",
     "qa": "node qa.mjs",
     "build": "node build.mjs",
+    "publish-video": "node publish.mjs",
     "memory": "node memory.mjs"
   },
   "dependencies": {
