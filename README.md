@@ -1144,6 +1144,19 @@ node docs/check.mjs --ci    # also fail if regenerating changed a committed file
   It catches what is *missing*, not what is *wrong*: when a change alters what
   a stage does, its description in the model and the README still has to be
   updated by whoever made the change.
+- **Every level of the architecture is drawn.** Mentioning a stage somewhere
+  in the model is not enough. The model's own validation (run by every
+  regeneration, so by the check too) fails on a gap:
+
+  | Rule | Fails when |
+  |---|---|
+  | every container has an L3 diagram | a container on L2 has no `Container_Boundary` diagram of its own |
+  | every outside party is on L1 | a person or external system drawn on any diagram is missing from L1 context |
+  | every pipeline file is in an L3 | a `pipeline/*.mjs` file is named by no L3 diagram title or component |
+  | every dependency is drawn | a `dependencies` entry in `pipeline/package.json` is named by no element, so a new client library (an outside service) cannot arrive undrawn |
+
+  These were added after `memory.mjs` and Zep Cloud reached `main` drawn on L2
+  only: the earlier rules passed because the model mentioned both once.
 
 **Where it runs**
 
