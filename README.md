@@ -57,7 +57,7 @@ cursor, and a styled window frame.
   brand/
     StyleGuide.txt          brand colours and fonts, read by brand.mjs
                             (compose.mjs paints the frame with them too)
-    salesmsg-logo-white.png the logo on the title cards
+    *logo-white.png         the logo on the title cards (the first match)
     *.ttf / *.otf           optional: brand font files, registered at render time
   docs/             C4 architecture model and its renderings
   sample-app/       a small Express app to record against (npm install && npm start)
@@ -953,17 +953,17 @@ Every brand asset comes from `brand/`, and only from there — there
 is no flag to point elsewhere. `brand/StyleGuide.txt` drives the look:
 
 ```
-Salesmsg Blue: #1d94ef
-Salesmsg Green CTA Button: #13cb6e
-Headlines: Neue Einstellung
+Brand Blue: #2563eb
+Brand Green CTA Button: #16a34a
+Headlines: Inter Display
 Body Text: Inter
 ```
 
 The blue is the card. Two ways to get this wrong, both of which leave the
 style-guide hex as an ingredient nobody can see: mix it down into a near-black
-navy, or run a gradient off it immediately so `#1d94ef` survives on the top row
+navy, or run a gradient off it immediately so `#2563eb` survives on the top row
 of pixels and nowhere else. So the top 55% of the card is the hex flat and
-unmodified — sample it anywhere up there and you get `#1d94ef` back — and only
+unmodified — sample it anywhere up there and you get `#2563eb` back — and only
 below that does it deepen. The accent rule is the CTA green verbatim.
 
 The same blue is the mat the browser window sits on for the whole demo
@@ -1051,7 +1051,7 @@ How the pipeline behaves in practice (timing, qa, zoom, loading) is in
 Each app can have an online source. `memory/sources.json` is generic: it names
 no app or location, only how to recognise and read each kind of source (a
 Google Drive folder, for now). The location comes from `.env` as
-`FEATURE_SOURCE_<APP>`, for example `FEATURE_SOURCE_SALESMESSAGE=<Drive folder URL>`.
+`FEATURE_SOURCE_<APP>`, for example `FEATURE_SOURCE_ACME=<Drive folder URL>` for `memory/features/acme/`.
 
 Those sources are reachable only as Claude tools (MCP), so a Claude Code agent
 does the sync, `.claude/agents/memory.md`:
@@ -1090,8 +1090,9 @@ the session id. Notes saved with `zep session --session <id>` go to that
 thread, so each session can be traced to who ran it.
 
 **Private apps stay out of the repo.** An app's target, flows, traces,
-scripts, manifests, catalog and brand files can be gitignored; Salesmessage's
-are. They stay on disk for local builds. The sync record
+scripts, manifests, catalog and brand files can be kept out of the repo by
+listing them in `.git/info/exclude`, which is local and never committed, so the
+public `.gitignore` names no private app. They stay on disk for local builds. The sync record
 (`data/sources.lock.json`) sits next to each catalog, so it's private with it.
 `node docs/check.mjs` fails if a committed trace, script or manifest uses a
 gitignored target. It also fails if `.env` and `.env.example` list different
@@ -1100,15 +1101,15 @@ keys.
 ```bash
 cd pipeline
 node memory.mjs status                       # apps, catalogs, sources, last sync, Zep configured?
-node memory.mjs source salesmessage          # the source's kind, id, and the tools to list/read it
-node memory.mjs diff salesmessage list.json  # remote listing vs the lock
-node memory.mjs baseline salesmessage list.json
-node memory.mjs upsert salesmessage found.json --source "Surveys Rollout One-Pager.pdf"
-node memory.mjs mark salesmessage <fileId> --title "<t>" --modified <iso> --kind feature --features feature-262
-node memory.mjs synced salesmessage
+node memory.mjs source acme                # the source's kind, id, and the tools to list/read it
+node memory.mjs diff acme list.json        # remote listing vs the lock
+node memory.mjs baseline acme list.json
+node memory.mjs upsert acme found.json --source "Surveys Rollout One-Pager.pdf"
+node memory.mjs mark acme <fileId> --title "<t>" --modified <iso> --kind feature --features feature-262
+node memory.mjs synced acme
 node memory.mjs zep push                     # changed catalog features, pages, traces, manifests
 node memory.mjs zep session --session <id> --title "2026-10-23 click tracking" --file notes.md
-node memory.mjs zep search "where is click tracking" --app salesmessage
+node memory.mjs zep search "where is click tracking" --app acme
 npm run memory -- status                     # the same, via npm
 ```
 

@@ -16,13 +16,15 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const BRAND_DIR = path.join(HERE, '..', 'brand');
 export const STYLEGUIDE = path.join(BRAND_DIR, 'StyleGuide.txt');
-export const LOGO_WHITE = path.join(BRAND_DIR, 'salesmsg-logo-white.png');
+// the white logo for the title cards: the first brand/*logo-white.png (none: cards without a logo)
+const logoFile = fs.existsSync(BRAND_DIR) ? fs.readdirSync(BRAND_DIR).filter((f) => /logo-white\.png$/i.test(f)).sort()[0] : null;
+export const LOGO_WHITE = path.join(BRAND_DIR, logoFile ?? 'logo-white.png');
 
-// Only used if a line is missing from the file — these mirror it.
+// Only used if a line is missing from the file, or there is no file: a neutral brand.
 const DEFAULTS = {
-  blue: '#1d94ef',
-  green: '#13cb6e',
-  headlineFont: 'Neue Einstellung',
+  blue: '#2563eb',
+  green: '#16a34a',
+  headlineFont: 'Inter',
   bodyFont: 'Inter',
 };
 

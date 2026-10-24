@@ -44,8 +44,9 @@ stay private with it. Read that file before working on the app.
 ### Private apps stay out of the repo
 An app whose target is gitignored is private. Its flows, traces, scripts,
 manifests, catalog, video pages and brand files are gitignored too: add each new
-one to `.gitignore` when you create it. Salesmessage is private.
-*Why:* the user asked for no Salesmessage assets in the repo (2026-10-23); the
+one to `.git/info/exclude` (local, never committed) when you create it, so the
+public `.gitignore` names no private app.
+*Why:* the user asked for no private app assets in the repo (2026-10-23); the
 repo is public.
 
 ### Words the voice gets wrong

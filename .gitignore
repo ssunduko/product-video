@@ -16,7 +16,7 @@ node_modules/
 memory/.zep-state.json
 
 # renders, frames, narration and TTS cache: regenerable, and they show live
-# account data (claude.ai sidebar, Salesmessage analytics). The folder itself
+# account data (signed-in sidebars, analytics). The folder itself
 # stays in the repo (out/.gitkeep); nothing inside it is ever committed.
 out/*
 !out/.gitkeep
@@ -24,10 +24,11 @@ out/*
 profile/
 profile-*/
 
-# commercial font (Hanken Design Co): licence does not allow redistribution
-brand/fonts/Hanken Design Co - Neue Einstellung*.otf
+# commercial brand fonts dropped at brand/fonts/: licences rarely allow
+# redistribution (the open Inter files under brand/fonts/ are committed)
+brand/fonts/*.otf
 
-# Salesmsg logos and internal page screenshots: keep local, not for a public
+# brand logos and internal page screenshots: keep local, not for a public
 # repo. cards.mjs renders title cards without the logo when it is absent.
 brand/*.png
 
@@ -37,17 +38,10 @@ Thumbs.db
 npm-debug.log*
 *.log
 
-# Salesmessage assets: never in this public repo. They stay on disk for local
-# builds. A trace, script or manifest whose target is gitignored is itself
-# private: list it here too (docs/check.mjs fails if one is committed).
-targets/salesmessage*.json
-input/click-tracking.flow
-scenarios/click-tracking.trace.json
-scripts/click-tracking.demo
-scripts/click-tracking.selectors.json
-videos/click-tracking.json
-memory/features/salesmessage/
-brand/StyleGuide.txt
-# model videos are Salesmessage videos; only the folder is kept
+# private apps: their targets, flows, traces, scripts, manifests and feature
+# folders are listed in .git/info/exclude (local, never committed), so this
+# public file names none of them. docs/check.mjs fails if a committed trace,
+# script or manifest uses a target that is not committed.
+# model videos are app videos; only the folder is kept
 sample/*
 !sample/.gitkeep

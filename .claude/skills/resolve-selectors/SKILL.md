@@ -54,7 +54,7 @@ model round-trip during a run would land in the finished video as dead air.
 
    **Live data. Before any step that creates, modifies, sends or deletes
    anything, stop and ask the user.** `feature.demo` sends four messages to a
-   real Salesmessage account. Hover instead of clicking where you only need to
+   real, live account. Hover instead of clicking where you only need to
    locate something, and never click a destructive control to "see what it is".
 
 4. **Find the element and pick the most durable handle.** In preference order:

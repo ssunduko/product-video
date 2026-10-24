@@ -60,11 +60,11 @@ const STYLE = readStyleGuide();
 //
 //   1. mixing the blue down into a near-black navy, so the card is not the
 //      brand colour at all;
-//   2. running a gradient off the hex immediately, so #1d94ef survives on the
+//   2. running a gradient off the hex immediately, so the hex survives on the
 //      literal top row of pixels and nowhere else.
 //
 // So the top 55% of the card is the hex flat and unmodified — sample anywhere
-// in it and you get #1d94ef back — and only below that does it deepen.
+// in it and you get the hex back — and only below that does it deepen.
 const BRAND = {
   blue: STYLE.blue,
   green: STYLE.green,
