@@ -14,6 +14,7 @@ node_modules/
 *.local.json
 # Zep graph/episode ids for this machine (memory.mjs)
 memory/.zep-state.json
+memory/.zep-session.lock
 
 # renders, frames, narration and TTS cache: regenerable, and they show live
 # account data (signed-in sidebars, analytics). The folder itself

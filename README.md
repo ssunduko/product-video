@@ -175,8 +175,10 @@ node build.mjs ..\videos\<name>.json --join-only                 # just re-join 
   - qa counts per part and for the joined video;
   - a history.
 
-  It regenerates the page's "Video status" section from that file, and sends
-  the change to Zep and to the video's thread. Record the visual review with
+  It regenerates the page's "Video status" section from that file. It sends
+  the file to the app's Zep graph, and posts the whole status to the video's
+  thread: the builds, qa counts, review findings and history. So the state is
+  in the video's session and in its user's graph, not only the app graph. Record the visual review with
   `node memory.mjs video review <name> PASS|FAIL --findings <file>`. The status
   then reads one of: not built, build failed, qa failed, awaiting review,
   review failed, or done. `node memory.mjs video state <name>` prints it.
@@ -1101,6 +1103,11 @@ this machine's Zep ids and is gitignored.
 `MEMORY_USER` (default: `git config user.email`). At session start the hook
 opens a Zep thread for the Claude session under that user and tells Claude
 the session id, so each session can be traced to who ran it.
+
+**Sessions are pushed as they happen.** A Stop hook
+(`node pipeline/memory.mjs session flush`) pushes the new turns after every
+Claude turn, quietly, so a session shows up in Zep while it runs. A lock keeps
+a turn's push and the session's end from overlapping.
 
 **Every session ends with a summary.** A SessionEnd hook
 (`node pipeline/memory.mjs session end`) reads the session's transcript and
