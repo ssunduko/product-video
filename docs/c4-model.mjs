@@ -1452,8 +1452,8 @@ const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session flush 
   'emails and phone numbers masked, then a summary built from the record: prompts, files changed, ' +
   'commits, pull requests. Each new video starts a new thread, so a video is a session of its own.');
 const mPush = mk(pkgMemory, 'component', 'Zep publisher', 'zep push',
-  'Turns catalogs (one document per feature), video pages, rules, pipeline lessons, traces and ' +
-  'manifests into Zep documents in the graph of their app. Sends only what changed; a full push ' +
+  'Turns catalogs (one document per feature), video pages, rules, pipeline lessons, flows, traces and ' +
+  'manifests (not generated scripts or videos) into Zep documents in the graph of their app. Sends only what changed; a full push ' +
   'removes documents whose file is gone.');
 const mSearch = mk(pkgMemory, 'component', 'Zep search', 'zep search',
   'Facts from the graph of one app, or of all of them.');

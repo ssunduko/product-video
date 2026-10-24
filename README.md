@@ -1091,7 +1091,9 @@ Zep Cloud (`@getzep/zep-cloud`, key in `ZEP_API_KEY`) is the searchable store:
 - one graph per app (`productvideo-<app>`) holds:
   - its catalog, one Zep document per feature;
   - its video pages;
-  - the traces and manifests those pages name;
+  - the flows, traces and manifests those pages name;
+    (generated scripts and the rendered videos are not pushed: scripts are
+    regenerated from traces, and a video's state stands in for the file);
 - `productvideo-project` holds the rules and pipeline notes;
 - each working session is its own thread.
 

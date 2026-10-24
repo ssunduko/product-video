@@ -69288,7 +69288,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: zep push\n\nTurns catalogs (one document per feature), video pages, rules, pipeline lessons, traces and manifests into Zep documents in the graph of their app. Sends only what changed; a full push removes documents whose file is gone."
+              "documentation": "Technology: zep push\n\nTurns catalogs (one document per feature), video pages, rules, pipeline lessons, flows, traces and manifests (not generated scripts or videos) into Zep documents in the graph of their app. Sends only what changed; a full push removes documents whose file is gone."
             },
             {
               "_type": "UMLClass",
