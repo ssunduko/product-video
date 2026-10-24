@@ -14,7 +14,7 @@ session (and every person) starts from it instead of relearning it.
 Each app is a folder under `features/`. Its `README.md` holds the app's own rules,
 `data/features.json` its catalog, and the other `.md` pages its filmed features.
 A private app's folder is gitignored and exists only on the machines that work on
-it (Salesmessage is private).
+it.
 
 `node docs/check.mjs` fails if a `videos/*.json` manifest isn't named on a video
 page.

@@ -3,7 +3,7 @@
     "Generic: no app or location is named here. An app is a folder memory/features/<app>/.",
     "Its feature catalog is <features>, and its online source is the .env variable <env>",
     "(<APP> = the folder name upper-cased, dashes as underscores), e.g.",
-    "  FEATURE_SOURCE_SALESMESSAGE=https://drive.google.com/drive/folders/<id>",
+    "  FEATURE_SOURCE_ACME=https://drive.google.com/drive/folders/<id>",
     "The kind of source is recognised from that value by each kind's `match`. The memory agent",
     "(.claude/agents/memory.md) lists and reads it with the tools named for its kind, diffs it with",
     "`node pipeline/memory.mjs diff <app> <listing.json>`, and merges what changed into the catalog",

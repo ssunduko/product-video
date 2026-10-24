@@ -144,8 +144,10 @@ const videos = fs.existsSync(path.join(ROOT, 'videos'))
 rule('video manifest(s)', videos, (v) => featurePages.some((p) => p.includes(v)), 'memory/features/ (name it on the page of the feature it covers)');
 
 // .env.example lists the same keys as .env, in the same order (local only: CI has no .env)
-const envKeys = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8').split(/\r?\n/)
-  .map((l) => /^#?\s?([A-Z][A-Z0-9_]*)=/.exec(l)?.[1]).filter(Boolean);
+// per-app keys (FEATURE_SOURCE_<name>) match the template's FEATURE_SOURCE_<APP> line
+const envKeys = (f) => [...new Set(fs.readFileSync(path.join(ROOT, f), 'utf8').split(/\r?\n/)
+  .map((l) => /^#?\s?([A-Z][A-Z0-9_]*(?:<APP>)?)=/.exec(l)?.[1]).filter(Boolean)
+  .map((k) => (k.startsWith('FEATURE_SOURCE_') ? 'FEATURE_SOURCE_<APP>' : k)))];
 if (fs.existsSync(path.join(ROOT, '.env')) && fs.existsSync(path.join(ROOT, '.env.example'))) {
   const [local, example] = [envKeys('.env'), envKeys('.env.example')];
   const onlyLocal = local.filter((k) => !example.includes(k));
@@ -155,7 +157,7 @@ if (fs.existsSync(path.join(ROOT, '.env')) && fs.existsSync(path.join(ROOT, '.en
 }
 
 // nothing committed depends on a private target: a trace, script or manifest whose
-// target file is gitignored (Salesmessage) is private too and must be gitignored
+// target file is gitignored is private too and must be gitignored
 const git = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' });
 if (git.status === 0) {
   const tracked = new Set(git.stdout.split(/\r?\n/).filter(Boolean));
