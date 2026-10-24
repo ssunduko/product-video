@@ -259,7 +259,7 @@ function status(json) {
   const stale = new Set(staleSources().map((s) => s.app));
   const rows = apps().map((app) => {
     const a = appInfo(app);
-    const pages = fs.readdirSync(path.join(FEATURES, app)).filter((f) => f.endsWith('.md')).length;
+    const pages = fs.readdirSync(path.join(FEATURES, app)).filter((f) => f.endsWith('.md') && f !== 'README.md').length;
     const l = lockOf(app);
     const at = l.lastSyncAt;
     return {
@@ -413,6 +413,9 @@ function documentsOf(file) {
   return [{ key: r, kind, episodes: chunks(text).map((data) => ({ type: 'text', data })) }];
 }
 
+// Zep document ids may not contain / ? # or control characters; the repo path stays in the metadata
+const zepDocId = (key) => key.replace(/[/?#\x00-\x1f]/g, '_');
+
 async function zepPush(files) {
   const client = await zepClient();
   const st = zepState();
@@ -439,7 +442,7 @@ async function zepPush(files) {
         const res = await client.graph.episode.add(graph, {
           data: ep.data,
           type: ep.type,
-          documentId: doc.key,
+          documentId: zepDocId(doc.key),
           sourceDescription: `${doc.kind} ${doc.key}${doc.episodes.length > 1 ? ` (part ${i + 1}/${doc.episodes.length})` : ''}`,
           metadata: { path: rel(f), kind: doc.kind, app: key },
         });
