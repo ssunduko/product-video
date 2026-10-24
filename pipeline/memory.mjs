@@ -383,6 +383,8 @@ function defaultFiles() {
     ...walk(MEMORY).filter((f) => f.endsWith('.md') || f.endsWith('.state.json')),
     path.join(ROOT, 'docs', 'pipeline-lessons.md'),
     ...apps().map((app) => appInfo(app).featuresPath).filter((f) => fs.existsSync(f)),
+    // flows: the plain-English intent of each video (the template is not one)
+    ...list('input', /^(?!_).*\.flow$/),
     ...list('scenarios', /\.trace\.json$/),
     ...list('videos', /\.json$/),
   ];
@@ -420,7 +422,7 @@ function documentsOf(file) {
       episodes: [{ type: 'json', data: JSON.stringify({ product: cat.product, id: d.id, feature: d.feature, category: d.category, subcategory: d.subcategory, description: d.description, is_new: d.is_new, source: d.metadata?.source }) }],
     }));
   }
-  const kind = r.endsWith('.state.json') ? 'video state' : r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') || r.startsWith('docs/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : 'video manifest';
+  const kind = r.endsWith('.state.json') ? 'video state' : r.startsWith('memory/features/') ? 'video page' : r.startsWith('memory/') || r.startsWith('docs/') ? 'project notes' : r.startsWith('scenarios/') ? 'trace' : r.startsWith('input/') ? 'flow' : 'video manifest';
   if (r.endsWith('.json')) {
     const compact = JSON.stringify(JSON.parse(text));
     const episodes = compact.length <= EPISODE_CHARS ? [{ type: 'json', data: compact }] : chunks(text).map((data) => ({ type: 'text', data }));
