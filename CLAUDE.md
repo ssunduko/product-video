@@ -29,6 +29,27 @@ never edit the generated files. `node pipeline/author.mjs --check` (pre-commit
 and CI) fails while they disagree. Define each selector once in the trace's
 `selectors` table and refer to it by name from the steps.
 
+## Memory
+
+`memory/` is what the project has learned, kept in the repo:
+`memory/rules.md` (standing rules that override defaults),
+`memory/pipeline.md` (timing, qa and zoom lessons) and
+`memory/features/<app>/<feature>.md` (one page per app feature, with the
+videos that cover it).
+
+- Read the rules, the pipeline page and the feature's page before authoring a
+  trace or recording.
+- After each take or review, update the feature page's status and quirks.
+- When the user sets a standing rule, add it to `memory/rules.md` with why and
+  the date.
+- Every `videos/*.json` must be named on a feature page; `node docs/check.mjs`
+  fails otherwise.
+- Never write personal data, credentials or internal ids there.
+- Online sources (`memory/sources.json`) are synced by the `memory` agent
+  (`.claude/agents/memory.md`) when the SessionStart hook says they are stale;
+  it reads them through their MCP tools only and pushes pages, traces and
+  manifests to Zep with `node pipeline/memory.mjs zep push`.
+
 ## Videos
 
 Never call a video done without the quality gate: `node pipeline/qa.mjs`, then
