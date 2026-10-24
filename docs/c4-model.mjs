@@ -1373,6 +1373,9 @@ const bJoin = mk(pkgBuild, 'component', 'Joiner', 'ffmpeg xfade + acrossfade',
 const bJoinGate = mk(pkgBuild, 'component', 'Joined gate', 'qa.mjs --cues none',
   'Whole-video checks on the result, with the first part intro card and the last part outro card ' +
   'left out.');
+const bState = mk(pkgBuild, 'component', 'Video state recorder', 'memory.mjs recordVideo · video sync',
+  'On every way a build ends (built, failed the quality gate, failed outright) records the outcome, ' +
+  'scope and qa counts in the video state file next to its page, and sends it to Zep.');
 const bReport = mk(pkgBuild, 'component', 'Build report', 'build.json',
   'The trims and every verdict, beside the parts.');
 
@@ -1382,10 +1385,10 @@ const dL3build = diagram(pkgBuild, 'c4-l3-build',
   { macro: 'Container_Boundary', name: 'Build Orchestrator' });
 {
   const vAuthor = place(dL3build, author, 60, 40);
-  const [vMan, vFold, vRun, vGate, vTrim, vJoin, vJGate, vRep] = grid(dL3build,
-    [bManifest, bFolders, bRunner, bGate, bTrim, bJoin, bJoinGate, bReport], { y: 200, cols: 3 });
-  const [vManifests, vWork, vStages, vQa, vFfmpeg] =
-    column(dL3build, [dManifests, dWork, cDriver, cQa, ffmpeg], { dy: 150 });
+  const [vMan, vFold, vRun, vGate, vTrim, vJoin, vJGate, vRep, vState] = grid(dL3build,
+    [bManifest, bFolders, bRunner, bGate, bTrim, bJoin, bJoinGate, bReport, bState], { y: 200, cols: 3 });
+  const [vManifests, vWork, vStages, vQa, vFfmpeg, vMemoryC] =
+    column(dL3build, [dManifests, dWork, cDriver, cQa, ffmpeg, cMemory], { dy: 150 });
 
   link(dL3build, pkgBuild, vAuthor, vMan, 'Runs', 'CLI');
   link(dL3build, pkgBuild, vMan, vManifests, 'Reads');
@@ -1404,6 +1407,9 @@ const dL3build = diagram(pkgBuild, 'c4-l3-build',
   link(dL3build, pkgBuild, vJGate, vQa, 'Runs', 'child process');
   link(dL3build, pkgBuild, vJGate, vRep, 'Verdict to');
   link(dL3build, pkgBuild, vRep, vWork, 'Writes build.json');
+  link(dL3build, pkgBuild, vGate, vState, 'A failed gate to');
+  link(dL3build, pkgBuild, vRep, vState, 'The finished build to');
+  link(dL3build, pkgBuild, vState, vMemoryC, 'Records the state and sends it to Zep via', 'import + child process');
 }
 
 // ======================================== L3 · 11 — components: memory ==
@@ -1436,6 +1442,14 @@ const mHook = mk(pkgMemory, 'component', 'Session hook', 'hook · SessionStart',
 const mUsers = mk(pkgMemory, 'component', 'Session attribution', 'MEMORY_USER · Zep users and threads',
   'One Zep user per person (MEMORY_USER, else git user.email) and one thread per Claude session; ' +
   'zep session adds notes to it.');
+const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video sync',
+  'One state file per video next to its page: status (not built, build failed, qa failed, awaiting ' +
+  'review, review failed, done), last build with qa counts, the visual review and a history. ' +
+  'Generates the Video status section of the page and sends changes to Zep and the video thread.');
+const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session end (SessionEnd) · session video',
+  'Pushes what the person typed and Claude answered from the transcript, tool output left out and ' +
+  'emails and phone numbers masked, then a summary built from the record: prompts, files changed, ' +
+  'commits, pull requests. Each new video starts a new thread, so a video is a session of its own.');
 const mPush = mk(pkgMemory, 'component', 'Zep publisher', 'zep push',
   'Turns catalogs (one document per feature), video pages, rules, pipeline lessons, traces and ' +
   'manifests into Zep documents in the graph of their app. Sends only what changed; a full push ' +
@@ -1449,8 +1463,9 @@ const dL3memory = diagram(pkgMemory, 'c4-l3-memory',
   { macro: 'Container_Boundary', name: 'Memory' });
 {
   const vAgent = place(dL3memory, memoryAgent, 60, 40);
-  const [vSrc, vDiff, vCat, vLock, vStale, vHook, vUsers, vPush, vSearch] = grid(dL3memory,
-    [mSource, mDiff, mCatalog, mLock, mStale, mHook, mUsers, mPush, mSearch], { y: 200, cols: 3 });
+  const vMemAuthor = place(dL3memory, author, 400, 40);
+  const [vSrc, vDiff, vCat, vLock, vStale, vHook, vUsers, vPush, vSearch, vRec, vVideo] = grid(dL3memory,
+    [mSource, mDiff, mCatalog, mLock, mStale, mHook, mUsers, mPush, mSearch, mRecorder, mVideo], { y: 200, cols: 3 });
   const [vStore, vTraces, vManifests, vBuild, vZep] =
     column(dL3memory, [dMemory, dTraces, dManifests, cBuild, zepCloud], { dy: 150 });
 
@@ -1468,6 +1483,14 @@ const dL3memory = diagram(pkgMemory, 'c4-l3-memory',
   link(dL3memory, pkgMemory, vHook, vStale, 'Checks');
   link(dL3memory, pkgMemory, vHook, vUsers, 'Opens the session thread via');
   link(dL3memory, pkgMemory, vUsers, vZep, 'Users, threads, messages', 'HTTPS');
+  link(dL3memory, pkgMemory, vRec, vUsers, 'Opens and switches threads via');
+  link(dL3memory, pkgMemory, vRec, vZep, 'Conversation and summary messages', 'HTTPS');
+  link(dL3memory, pkgMemory, vBuild, vVideo, 'Records every build', 'import');
+  link(dL3memory, pkgMemory, vMemAuthor, vVideo, 'Records the visual review (through Claude)', 'CLI');
+  link(dL3memory, pkgMemory, vVideo, vStore, 'Writes the state file and the page status');
+  link(dL3memory, pkgMemory, vVideo, vPush, 'Sends the state via');
+  link(dL3memory, pkgMemory, vVideo, vZep, 'Posts each change to the video thread', 'HTTPS');
+  link(dL3memory, pkgMemory, vMemAuthor, vRec, 'Starts each new video as a new session (through Claude)', 'CLI');
   link(dL3memory, pkgMemory, vPush, vStore, 'Reads catalogs, pages, rules');
   link(dL3memory, pkgMemory, vPush, vTraces, 'Reads');
   link(dL3memory, pkgMemory, vPush, vManifests, 'Reads');

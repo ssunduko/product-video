@@ -166,6 +166,20 @@ node build.mjs ..\videos\<name>.json --join-only                 # just re-join 
   stills folders to hand it.
 - A record of what was built — trims, per-part verdicts — is written to
   `out/<name>/build.json`.
+- **Every build is recorded as the video's state.** That covers a build that
+  finished, one that failed the quality gate, and one that failed outright.
+  `build.mjs` writes `memory/features/<app>/<name>.state.json`, next to the page
+  that names the manifest:
+  - the status;
+  - the last build: outcome, scope, output, length;
+  - qa counts per part and for the joined video;
+  - a history.
+
+  It regenerates the page's "Video status" section from that file, and sends
+  the change to Zep and to the video's thread. Record the visual review with
+  `node memory.mjs video review <name> PASS|FAIL --findings <file>`. The status
+  then reads one of: not built, build failed, qa failed, awaiting review,
+  review failed, or done. `node memory.mjs video state <name>` prints it.
 
 ### Run the stages yourself
 
@@ -1086,8 +1100,25 @@ this machine's Zep ids and is gitignored.
 **Sessions are attributed to a person.** Each person is one Zep user, keyed by
 `MEMORY_USER` (default: `git config user.email`). At session start the hook
 opens a Zep thread for the Claude session under that user and tells Claude
-the session id. Notes saved with `zep session --session <id>` go to that
-thread, so each session can be traced to who ran it.
+the session id, so each session can be traced to who ran it.
+
+**Every session ends with a summary.** A SessionEnd hook
+(`node pipeline/memory.mjs session end`) reads the session's transcript and
+pushes to its thread:
+- what the person typed and what Claude answered, with tool output and
+  subagents' work left out, and emails and phone numbers masked;
+- a summary built from the record, not by a model: who, when, the prompts,
+  files changed, commits and pull requests, and where it ended.
+
+A resumed session pushes only what is new. Run
+`session end --dry-run --transcript <jsonl>` to see what would be sent.
+
+**Every new video is a new session.** Before starting work on a new video
+(a new flow, trace or manifest), Claude runs
+`node pipeline/memory.mjs session video <name> --session <id>`. That closes
+the current thread with its summary and opens a new one named for the video,
+so each video's work is a session of its own in Zep, even mid-conversation.
+Notes can still be added by hand with `zep session --session <id>`.
 
 **Private apps stay out of the repo.** An app's target, flows, traces,
 scripts, manifests, catalog and brand files can be kept out of the repo by
@@ -1108,6 +1139,8 @@ node memory.mjs upsert acme found.json --source "Surveys Rollout One-Pager.pdf"
 node memory.mjs mark acme <fileId> --title "<t>" --modified <iso> --kind feature --features feature-262
 node memory.mjs synced acme
 node memory.mjs zep push                     # changed catalog features, pages, traces, manifests
+node memory.mjs session video sherpa-ai --session <id>   # a new video: a new session in Zep
+node memory.mjs session end --dry-run --transcript <jsonl>   # what the SessionEnd hook would push
 node memory.mjs zep session --session <id> --title "2026-10-23 click tracking" --file notes.md
 node memory.mjs zep search "where is click tracking" --app acme
 npm run memory -- status                     # the same, via npm

@@ -13,6 +13,13 @@ re-rendering or re-recording.
 FAIL was applied straight away (2026-10-18). Also in `CLAUDE.md` and
 `.claude/agents/video-qa.md`.
 
+### Every new video is a new session
+Before starting work on a new video (a new flow, trace or manifest), run
+`node pipeline/memory.mjs session video <name> --session <id>`. Every session
+ends with its conversation and a summary pushed to Zep (SessionEnd hook).
+*Why:* the user wants each video's work attributable and summarized on its own
+(2026-10-24).
+
 ### A video is done only after both gates
 `qa.mjs` PASS and a video-qa visual review with no FAIL. A qa.mjs PASS alone is
 not done: the click-tracking take passed qa.mjs and still showed loading

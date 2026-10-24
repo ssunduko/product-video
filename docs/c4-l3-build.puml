@@ -13,6 +13,7 @@ ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "On
 Container(driver, "2 · Driver", "driver.mjs · Node.js + puppeteer-core", "Launches Chrome, signs in if the target says to, runs the flow, and records a screencast plus cursor, click and narration-cue telemetry, plus the real start and end of every wait.")
 Container(quality_gate, "9 · Quality Gate", "qa.mjs · Node.js + ffmpeg", "Measures what a viewer notices and a stage only warns about: two narration lines at once, a line off its cue, dead air, a frozen or loading screen, black frames, mismatched streams, loudness, and a...")
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
+Container(memory, "Memory", "memory.mjs · Node.js + @getzep/zep-cloud", "Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against the sync lock next to the catalog (files older than the catalog are its baseline), merges new...")
 
 Container_Boundary(build_orchestrator_2, "Build Orchestrator") {
   Component(manifest_reader, "Manifest reader", "videos/*.json", "The parts in recording order, the env every stage gets, the crossfade and the silence to keep either side of a join.")
@@ -23,6 +24,7 @@ Container_Boundary(build_orchestrator_2, "Build Orchestrator") {
   Component(joiner_2, "Joiner", "ffmpeg xfade + acrossfade", "Chains a crossfade between every pair of parts, video and audio together.")
   Component(joined_gate, "Joined gate", "qa.mjs --cues none", "Whole-video checks on the result, with the first part intro card and the last part outro card left out.")
   Component(build_report, "Build report", "build.json", "The trims and every verdict, beside the parts.")
+  Component(video_state_recorder, "Video state recorder", "memory.mjs recordVideo · video sync", "On every way a build ends (built, failed the quality gate, failed outright) records the outcome, scope and qa counts in the video state file next to its page, and sends it to Zep.")
 }
 
 Rel(demo_author, manifest_reader, "Runs", "CLI")
@@ -42,6 +44,9 @@ Rel(joiner_2, joined_gate, "The joined video to")
 Rel(joined_gate, quality_gate, "Runs", "child process")
 Rel(joined_gate, build_report, "Verdict to")
 Rel(build_report, work_directory, "Writes build.json")
+Rel(part_gate, video_state_recorder, "A failed gate to")
+Rel(build_report, video_state_recorder, "The finished build to")
+Rel(video_state_recorder, memory, "Records the state and sends it to Zep via", "import + child process")
 
 LAYOUT_WITH_LEGEND()
 @enduml
