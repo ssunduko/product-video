@@ -866,7 +866,12 @@ const kTeardown = mk(pkgDriver, 'component', 'Teardown', 'driver.mjs',
 const kConditioner = mk(pkgDriver, 'component', 'Page conditioner', 'CDP Network.setBlockedURLs + injected CSS',
   "Applies the target to the page before the take: blockUrls keeps third-party widgets such as a " +
   'chat bubble from loading, and hideSelectors hides app banners on this page and every page ' +
-  'loaded after it.');
+  'loaded after it. The fake option is handed to the fake-data component.');
+const kFake = mk(pkgDriver, 'component', 'Fake data', 'fake.mjs · in-page MutationObserver',
+  "Shows realistic fake values in place of personal data: the elements the target's fake option " +
+  'names (names, initials, messages, tags, inputs) and any email or phone by pattern. Swapped before ' +
+  'each paint and the same fake for the same value on every page. Display only: a focused input gets ' +
+  'its real value back, so nothing fake is ever saved.');
 const kWaits = mk(pkgDriver, 'component', 'Wait logger', 'driver.mjs · timed()',
   'Times every open, wait and wait-gone the flow makes, keeping { start, end, kind, spec }. ' +
   'Written to actions.json for the assembler to fast-forward the long ones.');
@@ -895,6 +900,7 @@ const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver 
   const vWork = place(dL3a, dWork, 1020, 500, 220, 180);
   const vCond = place(dL3a, kConditioner, 60, 200);
   const vWaits = place(dL3a, kWaits, 380, 500);
+  const vFake = place(dL3a, kFake, 60, 520);
   const vProfiles = place(dL3a, dProfiles, 1020, 720);
 
   link(dL3a, pkgDriver, vAuthor, vInput, 'Runs', 'CLI');
@@ -917,8 +923,10 @@ const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver 
   link(dL3a, pkgDriver, vTeardown, vWork, 'Writes actions.json + frames.json');
   link(dL3a, pkgDriver, vLauncher, vProfiles, "Runs Chrome on the target's");
   link(dL3a, pkgDriver, vLauncher, vCond, 'Conditions the page via');
-  link(dL3a, pkgDriver, vCond, vTargetLib, 'Reads blockUrls and hideSelectors from');
+  link(dL3a, pkgDriver, vCond, vTargetLib, 'Reads blockUrls, hideSelectors and fake from');
   link(dL3a, pkgDriver, vCond, vChrome, 'Blocks URLs and injects CSS', 'CDP');
+  link(dL3a, pkgDriver, vCond, vFake, 'Installs the fake option via');
+  link(dL3a, pkgDriver, vFake, vChrome, 'Swaps personal data before each paint', 'CDP');
   link(dL3a, pkgDriver, vPrim, vWaits, 'Every open and wait is timed by');
   link(dL3a, pkgDriver, vTeardown, vWaits, 'Serialises');
 }

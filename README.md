@@ -25,6 +25,8 @@ cursor, and a styled window frame.
                     plain English")
     brand.mjs       StyleGuide.txt -> colours and fonts, shared by every stage
     tts.mjs         shared text-to-speech provider + clip cache
+    fake.mjs        fake data: shows fake names, phones, emails and messages in
+                    place of personal data during a take (target `fake`)
     qa.mjs          quality gate: overlap, sync, dead air, frozen/loading, lineage
     build.mjs       one command per video: record + render + gate each part, join
     paths.mjs       where stages read/write (DEMO_OUT, default out/)
@@ -268,13 +270,53 @@ Everything except `app` is optional. Selector strings use the same grammar as a
 scenario (`btn:Exact Text` or a puppeteer selector). Keys starting with `//` are
 treated as comments.
 
-Three more options shape the browser a take records in:
+Four more options shape the browser a take records in:
 
 | Option | Does |
 |--------|------|
 | `"profile": "profile-member"` | record from this Chrome profile instead of `profile/` — one signed-in user per profile, so a video can show two users without anyone signing in on camera |
 | `"blockUrls": ["*intercom.io*"]` | keep these from loading during the take (CDP `Network.setBlockedURLs`): chat bubbles and surveys that pop up over the controls a flow clicks |
 | `"hideSelectors": ["[aria-label^=\"AlertBanner\"]"]` | hide these with CSS on every page of the take: app banners that have nothing to do with the flow |
+| `"fake": { "names": [...], "text": ["email", "phone"] }` | show realistic fake values in place of personal data. See "Fake data" below |
+
+#### Fake data
+
+A take on a live account shows real contacts. The `fake` option shows fake
+ones instead. It works on any app, because the target says which elements hold
+what:
+
+```jsonc
+"fake": {
+  "names":    ["[aria-label=\"ContactRowCellName\"]"],   // text is a person's name
+  "initials": ["[aria-label=\"Avatar_Name\"]"],          // avatar initials
+  "messages": ["[aria-label=\"MessageCard\"]"],          // message bodies, previews
+  "tags":     ["[aria-label=\"AddedTagsListItem\"]"],    // tag chips
+  "inputs":   { "<selector>": "phone" },                  // name | first | last | email | phone
+  "text":     ["email", "phone"],                         // by pattern, anywhere on the page
+  "seed":     "optional: change it to get different fakes"
+}
+```
+
+- **Before each paint.** `pipeline/fake.mjs` swaps the text in the recorder's
+  Chrome before each paint, including rows that load later, so no frame shows a
+  real value.
+- **Consistent fakes.** The same real value always gets the same fake (a hash),
+  so a contact keeps one name across the list, the header and the details panel,
+  and across takes.
+- **Initials follow the name.** They follow the fake name in the same row or
+  card. First and last name fields follow a full name already shown.
+- **Fictional numbers.** Phones fall in the reserved fictional range 555-0100
+  to 555-0199. Emails use `example.com`.
+- **What pattern matching skips.** Dates, times and counts are left alone,
+  because a phone needs at least 9 digits.
+- **Display only.** Nothing is typed, no input event fires, and a faked
+  `<input>` gets its real value back the moment it is focused. So an app that
+  saves on blur saves the real value.
+- **Checking it worked.** The driver prints what it swapped at the end of the
+  take (`faked: names 12, phones 9, ...`). A zero where the page shows data
+  means a selector no longer matches the app.
+- **Photos aren't swapped.** A profile photo is an image, not text. Hide it with
+  `hideSelectors` if it shows a real person.
 
 `auth.start` decides what the take opens on:
 

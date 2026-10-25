@@ -34,15 +34,18 @@ spinners and personal data.
 
 ## Content
 
-### Blur contact details
+### Blur or fake contact details
 Blur any contact's full name, phone number, email address and tags wherever
 they appear on screen (contact tabs, contact rows, names next to avatars,
-conversation headers). Blur, don't hide or drop the step. An unblurred one
-blocks publishing.
+conversation headers), or show fake values in their place with the target's
+`fake` option (`pipeline/fake.mjs`). Either way, don't hide or drop the step.
+A real value on screen blocks publishing.
 *Why:* an earlier take showed a real contact on a contacts tab
-(2026-10-23).
-*Status:* the pipeline only hides elements (`hideSelectors`, display:none) and has
-no blur option yet. One is needed before this rule can be met.
+(2026-10-23). Fake values were added as an option because the user disliked
+how blur looks in the UI and the video (2026-10-24).
+*Status:* the pipeline has no blur option; `fake` is the one available. Photos
+can't be faked: hide them with `hideSelectors`. Check the driver's
+`faked: ...` line and a still before calling a take clean.
 
 ### Match the samples
 `sample/` holds model videos (cards, outro, pacing, style). Compare new videos
