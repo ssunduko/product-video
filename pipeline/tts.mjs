@@ -18,7 +18,8 @@ const CACHE = path.join(HERE, '..', 'out', 'tts');
 export const TTS_CACHE = CACHE;
 
 export function pickProvider() {
-  const forced = process.env.DEMO_TTS;
+  // empty counts as unset: .env.example ships `DEMO_TTS=`
+  const forced = process.env.DEMO_TTS || null;
   const voiceOverride = process.env.DEMO_TTS_VOICE || null;
 
   const name =
