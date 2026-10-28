@@ -78,6 +78,17 @@ if (!telemetry.length) {
   console.warn(`warning: no telemetry at ${cursorPath} — rendering without a cursor`);
 }
 
+// The element each hover, click and type acted on (assemble.mjs), framed in a
+// red rectangle while it is the subject. A take recorded before the driver
+// logged boxes has none and renders without the frame.
+const highlightPath = `${videoPath}.highlights.json`;
+const highlights = process.env.HIGHLIGHT === '0' || !fs.existsSync(highlightPath)
+  ? []
+  : readJson(highlightPath);
+const HIGHLIGHT_COLOR = process.env.HIGHLIGHT_COLOR || '#E5322D';
+const HIGHLIGHT_FADE_MS = 150;
+const HIGHLIGHT_PAD = 6; // source pixels around the element's box
+
 // ---- look ----
 // The mat the browser window sits on is most of what the viewer sees for the
 // length of the demo, so it is the brand colour or the brand colour is not in
@@ -550,14 +561,35 @@ function renderFrame(raw, index) {
   dctx.drawImage(src, 0, 0);
   dctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 4. cursor + ripples, in output space so they keep a constant size,
+  const toOut = (ncx, ncy) => ({
+    x: centreX + (ncx * W - fx) * scale,
+    y: centreY + (ncy * H - fy) * scale,
+  });
+
+  // 4. the red frame round the element being acted on: placed through the
+  //    zoom so it stays on the element, stroked in output space so its line
+  //    keeps one width at every zoom, under the cursor
+  for (const h of highlights) {
+    if (ms < h.startMs || ms > h.endMs) continue;
+    const k = Math.min(1, (ms - h.startMs) / HIGHLIGHT_FADE_MS, (h.endMs - ms) / HIGHLIGHT_FADE_MS);
+    // a typed field that grew: its latest box by now
+    const box = h.track?.findLast((b) => b.atMs <= ms) ?? h;
+    const padX = HIGHLIGHT_PAD / W;
+    const padY = HIGHLIGHT_PAD / H;
+    const a = toOut(box.x - padX, box.y - padY);
+    const b = toOut(box.x + box.w + padX, box.y + box.h + padY);
+    dctx.globalAlpha = Math.max(0, k);
+    dctx.strokeStyle = HIGHLIGHT_COLOR;
+    dctx.lineWidth = 4;
+    dctx.beginPath();
+    dctx.roundRect(a.x, a.y, b.x - a.x, b.y - a.y, 8);
+    dctx.stroke();
+    dctx.globalAlpha = 1;
+  }
+
+  // 5. cursor + ripples, in output space so they keep a constant size,
   //    still clipped to the window
   if (LOOK.showCursor) {
-    const toOut = (ncx, ncy) => ({
-      x: centreX + (ncx * W - fx) * scale,
-      y: centreY + (ncy * H - fy) * scale,
-    });
-
     let pressK = 0;
     for (const c of clicks) {
       const dt = ms - c.timeMs;
@@ -628,6 +660,7 @@ const mb = (fs.statSync(outputPath).size / 1e6).toFixed(1);
 console.log(
   `composed ${index} frames in ${secs}s -> ${outputPath} (${mb} MB)\n` +
     `  frame: ${ww}x${wh} inset ${LOOK.padding}px, radius ${LOOK.radius}, ` +
-    `${regions.length} zoom region(s), cursor ${LOOK.showCursor ? 'on' : 'off'}\n` +
+    `${regions.length} zoom region(s), cursor ${LOOK.showCursor ? 'on' : 'off'}, ` +
+    `${highlights.length} highlight(s)\n` +
     `  background: ${[].concat(LOOK.background).join(' -> ')}`,
 );

@@ -20311,7 +20311,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: author.mjs · emitOne()\n\nOne DSL line per trace step: say, hold, wait, type, press, click, hover. A waitGone pulls in the budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI that only shows up sometimes."
+              "documentation": "Technology: author.mjs · emitOne()\n\nOne DSL line per trace step: say, hold, wait, type, press, click, hover, park. A waitGone pulls in the budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI that only shows up sometimes."
             },
             {
               "_type": "UMLClass",
@@ -24654,7 +24654,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: script.mjs\n\nBeats of wait, click, hover, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order."
+              "documentation": "Technology: script.mjs\n\nBeats of wait, click, hover, park, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order."
             },
             {
               "_type": "UMLClass",
@@ -29033,7 +29033,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: driver.mjs\n\nSamples synthesized pointer moves and clicks into actions.json. The cursor in the finished video is drawn from this, which is why the capture needs no real cursor."
+              "documentation": "Technology: driver.mjs\n\nSamples synthesized pointer moves and clicks into actions.json. The cursor in the finished video is drawn from this, which is why the capture needs no real cursor. It also keeps the box of the visible part (hit-tested, so an element under a side panel is cut at its edge) of the element each hover, click and type acted on, with when it was the subject, for the red frame."
             },
             {
               "_type": "UMLClass",
@@ -35692,7 +35692,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: assemble.mjs\n\nNormalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps the rest. Nothing surviving is an error, because a silent empty cursor track is worse."
+              "documentation": "Technology: assemble.mjs\n\nNormalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps the rest. Nothing surviving is an error, because a silent empty cursor track is worse. The element boxes go through the same warp into highlights.json, a hover capped at HIGHLIGHT_HOLD_MS and a click ended at its release."
             },
             {
               "_type": "UMLClass",
@@ -42410,7 +42410,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: @napi-rs/canvas\n\nPer frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, then the cursor on top."
+              "documentation": "Technology: @napi-rs/canvas\n\nPer frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, a red rectangle round the element being acted on (highlights.json; HIGHLIGHT, HIGHLIGHT_COLOR), then the cursor on top."
             },
             {
               "_type": "UMLClass",

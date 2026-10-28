@@ -48,6 +48,19 @@ problem. The README says what the stages are; this page says how to get a pass.
   an element on the right (for example open a grid row through a right-hand
   cell). A full-width input centres the zoom mid-page, off the text being typed,
   so hover the input's left end or its icon.
+- **Every hover, click and type is framed in red** (compose.mjs, from takes
+  recorded on 2026-10-28 on). A hover that only parks the cursor, such as
+  moving it back to a panel's input, is framed too, so park it on something
+  the next line is about, or on the input the next `type` uses. A hover's
+  frame lasts until the next action, at most `HIGHLIGHT_HOLD_MS` (4s): when a
+  chat answer scrolls the panel, the frame can be left on the old position,
+  so act again (or end the hold) before the content moves.
+- **Check a red frame against overlays before recording.** The driver frames only
+  the part of an element nothing covers, but a big element (a table, a scroll
+  view) under a side panel can show in two places, beside the panel and below
+  it. The first version boxed both and framed straight through the panel
+  (2026-10-28); it now keeps the main visible block. Prefer hovering something
+  that sits clear of the panel anyway.
 - **Before a line about something, hover it.** The hover forces a fresh frame,
   because the CDP screencast can skip frames until input arrives. Without one,
   a loaded page can sit on a stale frame (Sources froze for 3.6s).
@@ -56,6 +69,12 @@ problem. The README says what the stages are; this page says how to get a pass.
   the assistant's answers). Over a chat panel, cover the wait with narration instead:
   `say`, a hold sized to the line, a second `say` and a hold that lets it
   finish, then the `waitGone`.
+- **Speed typing up, don't leave it to tighten.** Covering each silent stretch of
+  typing with a `SPEEDS_MS` range (x3–x4) leaves tighten no dead run to
+  crossfade there: on one take that took tighten from 6 seams to none, cleared
+  every ghost and passed both gates on a re-render, with no new recording
+  (2026-10-28). Size the ranges on the take's own timeline, so they only fit a
+  re-render of that take.
 - **Don't hover a card in a chat panel after a long answer.** The answer
   scrolls the card out of view, so the hover lands outside the panel and the
   cursor drifts onto the page behind it. Size the hold

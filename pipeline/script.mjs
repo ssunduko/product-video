@@ -414,6 +414,11 @@ export function parseScript(src, { file = 'script' } = {}) {
         push({ op: 'hover', sel: specKey(rest, 'text') });
         break;
 
+      // a hover that only moves the cursor, so compose draws no red frame round it
+      case 'park':
+        push({ op: 'park', sel: specKey(rest, 'text') });
+        break;
+
       case 'hold':
         push({ op: 'hold', ms: parseDuration(rest, fail) });
         break;
@@ -530,6 +535,9 @@ function emitSteps(steps, indent, out) {
         break;
       case 'hover':
         out.push(`${pad}await d.hoverSel(SEL.${step.sel});`);
+        break;
+      case 'park':
+        out.push(`${pad}await d.hoverSel(SEL.${step.sel}, { frame: false });`);
         break;
       case 'hold':
         out.push(`${pad}await d.hold(${step.ms});`);

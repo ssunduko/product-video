@@ -99,6 +99,11 @@ own rules and any blur waivers the user has given.
    - **Cursor and scroll.** Fail a line where the cursor sits outside the panel
      or page being described, or the card the line is about has scrolled out of
      view. The user has rejected takes for both.
+   - **Red frame.** Takes recorded from 2026-10-28 frame each hovered, clicked
+     and typed-in element in red (`<take>.highlights.json`). Fail a frame that
+     sits off its element (the page scrolled or the panel grew under it) or
+     frames something the line is not about; WARN a missing one where the line
+     points at an element. Tag `highlight`.
 
 6. **Decide.** FAIL if `qa.mjs` reported any FAIL, or steps 2–4 found a FAIL.
    Otherwise PASS, listing any warnings worth knowing. Steps 2–5 FAILs count
@@ -149,7 +154,7 @@ Stills: <frames directory>
 
 Tag each finding with one of: `overlap`, `sync`, `line`, `loading`, `frozen`,
 `deadair`, `ghost`, `cursor`, `scroll`, `frame`, `banner`, `pii`, `loudness`,
-`streams`, `black`, `autospeed`, `waived`. Use the same tag for the same defect
+`streams`, `black`, `autospeed`, `highlight`, `waived`. Use the same tag for the same defect
 in every video, so the state records compare.
 
 Order fails by time. Quote narration lines exactly. Never soften a FAIL into a

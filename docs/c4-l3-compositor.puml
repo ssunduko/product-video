@@ -18,7 +18,7 @@ Container_Boundary(compositor_2, "5 · Compositor") {
   Component(cursor_track, "Cursor track", "compose.mjs", "Splits telemetry into moves and clicks, then works out when the cursor actually left one point and settled on the next.")
   Component(zoom_keyframe_track, "Zoom keyframe track", "compose.mjs", "Four keyframes per region — ramp up, hold, hold, ramp down — interpolated with an ease-in-out cubic.")
   Component(cursor_sprites, "Cursor sprites", "@napi-rs/canvas", "Arrow and pointing hand drawn once into sprites, then composited with a press scale and a click ripple.")
-  Component(frame_renderer, "Frame renderer", "@napi-rs/canvas", "Per frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, then the cursor on top.")
+  Component(frame_renderer, "Frame renderer", "@napi-rs/canvas", "Per frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, a red rectangle round the element being acted on (highlights.json; HIGHLIGHT, HIGHLIGHT_COLO...")
   Component(decoder_pipe, "Decoder pipe", "ffmpeg rawvideo rgba", "Streams the take in.")
   Component(encoder_pipe, "Encoder pipe", "ffmpeg libx264", "Takes rendered frames straight back, with faststart.")
 }

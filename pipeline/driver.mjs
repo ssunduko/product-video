@@ -397,6 +397,25 @@ async function timed(kind, spec, fn) {
   }
 }
 
+// The element each hover, click and type acted on, with its box in viewport
+// pixels and how long it was the subject. compose.mjs frames it in a rectangle
+// so the viewer sees what the voice and the cursor are about. A hover's box
+// stays up until the flow does something else (the next action, a key, a page
+// open, a scroll); assemble.mjs caps it at HIGHLIGHT_HOLD_MS.
+const targets = [];
+let openTarget = null;
+function endTarget() {
+  if (openTarget) openTarget.end = Date.now();
+  openTarget = null;
+}
+function markTarget(kind, box, start, end = null) {
+  endTarget();
+  const t = { kind, start, end, x: box.x, y: box.y, w: box.width, h: box.height };
+  targets.push(t);
+  if (end == null) openTarget = t;
+  return t;
+}
+
 async function moveTo(x, y, cursorType = 'arrow') {
   const dist = Math.hypot(x - cursor.x, y - cursor.y);
   const dur = Math.max(350, Math.min(1100, dist * 0.9));
@@ -485,6 +504,71 @@ async function waitGone(spec, timeout = 30000) {
   throw new Error(`timeout waiting for ${spec} to disappear`);
 }
 
+// The part of an element nothing else covers: a table running under a side
+// panel is framed, and pointed at, only where it shows. Samples a grid of
+// hit tests over the box, then walks each edge in to where the element stops
+// being the thing on top. Falls back to the whole box when nothing hits (an
+// element in an iframe, or one under an overlay).
+async function visibleBox(el, box) {
+  const vis = await el
+    .evaluate((node) => {
+      const r = node.getBoundingClientRect();
+      const x0 = Math.max(0, r.left), x1 = Math.min(innerWidth, r.right);
+      const y0 = Math.max(0, r.top), y1 = Math.min(innerHeight, r.bottom);
+      if (x1 <= x0 || y1 <= y0) return null;
+      const shows = (x, y) => {
+        const hit = document.elementFromPoint(x, y);
+        return !!hit && (hit === node || node.contains(hit));
+      };
+      const N = 16, M = 10, sx = (x1 - x0) / N, sy = (y1 - y0) / M;
+      const grid = [];
+      for (let i = 0; i < N; i++) {
+        grid.push([]);
+        for (let j = 0; j < M; j++) grid[i].push(shows(x0 + sx * (i + 0.5), y0 + sy * (j + 0.5)));
+      }
+      // The visible part can be L-shaped (a table under a side panel, with its
+      // last row showing below the panel). Keep the longest run of columns that
+      // are mostly visible, then the longest run of rows within them, so the
+      // frame is the main visible block rather than a box round both arms.
+      const longest = (flags) => {
+        let best = null, from = -1;
+        flags.forEach((f, k) => {
+          if (f && from < 0) from = k;
+          if (f && (k === flags.length - 1 || !flags[k + 1]) && (!best || k - from > best[1] - best[0])) best = [from, k];
+          if (!f) from = -1;
+        });
+        return best;
+      };
+      const cols = longest(grid.map((c) => c.filter(Boolean).length * 2 >= M));
+      if (!cols) return null;
+      const rows = longest(Array.from({ length: M }, (_, j) => {
+        let n = 0;
+        for (let i = cols[0]; i <= cols[1]; i++) n += grid[i][j] ? 1 : 0;
+        return n * 2 >= cols[1] - cols[0] + 1;
+      }));
+      if (!rows) return null;
+      const l = x0 + sx * (cols[0] + 0.5), rt = x0 + sx * (cols[1] + 0.5);
+      const t = y0 + sy * (rows[0] + 0.5), b = y0 + sy * (rows[1] + 0.5);
+      // from the outermost visible sample, out to the edge where it stops showing
+      const edge = (inside, limit, probe) => {
+        let lo = inside, hi = limit;
+        if (probe(hi)) return hi;
+        for (let k = 0; k < 10; k++) { const m = (lo + hi) / 2; if (probe(m)) lo = m; else hi = m; }
+        return lo;
+      };
+      const my = (t + b) / 2, mx = (l + rt) / 2;
+      const L = edge(l, x0, (x) => shows(x, my));
+      const R = edge(rt, x1 - 0.5, (x) => shows(x, my));
+      const T = edge(t, y0, (y) => shows(mx, y));
+      const B = edge(b, y1 - 0.5, (y) => shows(mx, y));
+      return { dx: r.left, dy: r.top, x: L, y: T, w: R - L, h: B - T };
+    })
+    .catch(() => null);
+  if (!vis || vis.w < 4 || vis.h < 4) return box;
+  // page coordinates to boundingBox's (the same in the main frame)
+  return { x: box.x + (vis.x - vis.dx), y: box.y + (vis.y - vis.dy), width: vis.w, height: vis.h };
+}
+
 async function center(spec, timeout = 10000) {
   const el = await waitSpec(spec, timeout);
   let box = await el.boundingBox();
@@ -503,7 +587,8 @@ async function center(spec, timeout = 10000) {
     if (!box) throw new Error(`no box for ${spec} after scrolling it into view`);
   }
 
-  return { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200) };
+  box = await visibleBox(el, box);
+  return { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200), box };
 }
 
 const d = {
@@ -516,19 +601,27 @@ const d = {
   waitSel: (spec, timeout) => timed('wait', spec, () => waitSpec(spec, timeout)),
   waitGone: (spec, timeout) => timed('waitGone', spec, () => waitGone(spec, timeout)),
   appears: (spec, timeout) => appears(spec, timeout),
-  async hoverSel(spec) {
+  // frame: false parks the cursor without the red frame (the script's `park`)
+  async hoverSel(spec, { frame = true } = {}) {
+    endTarget();
     const c = await center(spec);
     await moveTo(c.x, c.y, 'pointer');
+    if (frame) markTarget('hover', c.box, Date.now());
   },
   async clickSel(spec) {
+    endTarget();
     const c = await center(spec);
     await moveTo(c.x, c.y, 'pointer');
+    const start = Date.now();
     await sleep(600);
     await page.mouse.down();
     log('click', 'pointer');
     await sleep(80);
     await page.mouse.up();
     log('mouseup', 'pointer');
+    // ends at the release: a clicked button often closes its card or dialog,
+    // and a frame kept after it outlines whatever moves into its place
+    markTarget('click', c.box, start, Date.now());
     await sleep(120);
   },
   // Types at human pace, logging a sample per keystroke so the composited
@@ -544,17 +637,21 @@ const d = {
   async type(spec, text, { clear = true } = {}) {
     if (text == null) throw new Error(`nothing to type into ${spec}`);
 
+    endTarget();
     let el = null;
+    let box = null;
+    let start = 0;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       el = await waitSpec(spec, 15000);
 
       // re-measure immediately before clicking: the layout may have moved
       // since the previous beat
-      const box = await el.boundingBox();
+      box = await el.boundingBox();
       if (!box) throw new Error(`no box for ${spec}`);
 
       await moveTo(box.x + box.width / 2, box.y + Math.min(box.height / 2, 200), 'text');
+      start = Date.now();
       await sleep(300);
 
       await page.mouse.down();
@@ -590,26 +687,43 @@ const d = {
       await sleep(80);
     }
 
+    // A field that grows as it fills (a chat input wrapping to more lines)
+    // moves its edges; re-measure after each key so the red frame follows it.
+    const track = [];
+    const shown = await visibleBox(el, box);
+    let last = shown;
     for (const ch of String(text)) {
       await page.keyboard.type(ch);
       log('move', 'text');
+      const raw = await el.boundingBox().catch(() => null);
+      const now = raw && (await visibleBox(el, raw));
+      if (now && (Math.abs(now.y - last.y) > 1 || Math.abs(now.height - last.height) > 1 ||
+          Math.abs(now.x - last.x) > 1 || Math.abs(now.width - last.width) > 1)) {
+        track.push({ t: Date.now(), x: now.x, y: now.y, w: now.width, h: now.height });
+        last = now;
+      }
       await sleep(55);
     }
 
     await sleep(200);
+    const mark = markTarget('type', shown, start, Date.now() + 300);
+    if (track.length) mark.track = track;
   },
   async key(name) {
+    endTarget();
     await page.keyboard.press(name);
     log('move');
     await sleep(200);
   },
   async open(where) {
+    endTarget();
     const url = new URL(fillSecrets(where, 'open'), APP).href;
     await timed('open', where, () => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }));
     log('move');
     await sleep(400);
   },
   async wheel(dy) {
+    endTarget();
     const chunks = Math.max(1, Math.round(Math.abs(dy) / 40));
     for (let i = 0; i < chunks; i++) {
       await page.mouse.wheel({ deltaY: Math.sign(dy) * 40 });
@@ -819,6 +933,7 @@ try {
       // the take's name, from the script's file name: names its zoom project (paths.mjs projectPath)
       name: path.basename(resolvedInput).replace(/\.[^.]+$/, ''),
       viewport: VIEWPORT, samples, narration, waits,
+      targets: (endTarget(), targets),
     }, null, 1),
   );
 

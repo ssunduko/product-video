@@ -17,7 +17,7 @@ Container_Boundary(author_2, "0 · Author") {
   Component(speech_rate_model, "Speech-rate model", "author.mjs · CHARS_PER_SEC", "How long a line takes to say, at 12.5 characters per second.")
   Component(narration_budgeter, "Narration budgeter", "author.mjs · budget()", "Fits as many lines as the measured wait allows, spacing them so none overlaps the next, and stops at a ceiling because wall-to-wall talking over a 40s wait reads worse than a visible fast-forward.")
   Component(selector_registry, "Selector registry", "author.mjs · ref()", "Runs once per step that touches an element and feeds both outputs from that one call: the name and intent go to the .demo selectors block, the spec and evidence to the sidecar.")
-  Component(step_emitter, "Step emitter", "author.mjs · emitOne()", "One DSL line per trace step: say, hold, wait, type, press, click, hover.")
+  Component(step_emitter, "Step emitter", "author.mjs · emitOne()", "One DSL line per trace step: say, hold, wait, type, press, click, hover, park.")
   Component(header_writer, "Header writer", "author.mjs", "Writes the provenance line, any hazards the walk recorded, and the ready-to-paste SPEEDS_MS command.")
   Component(provenance_stamper, "Provenance stamper", "author.mjs", "Takes resolvedBy and the note from the trace instead of stamping them on.")
   Component(writer, "Writer", "author.mjs", "Writes the .demo and derives the sidecar path by swapping the extension — the same rule script.mjs uses to find it, which is why the two must sit together.")
