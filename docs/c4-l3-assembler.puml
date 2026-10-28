@@ -14,7 +14,7 @@ ContainerDb(tts_clip_cache, "TTS clip cache", "out/tts/ · mp3", "One mp3 per li
 Container_Boundary(assembler_2, "3 · Assembler") {
   Component(cut_and_speed_config, "Cut and speed config", "CUTS_MS, SPEEDS_MS · env", "Two ways to shorten a take: a cut drops the frames, a speed keeps them and plays them fast.")
   Component(time_warp, "Time warp", "assemble.mjs", "The single function that moves a timestamp.")
-  Component(frame_selector, "Frame selector", "assemble.mjs", "Drops frames inside a cut and rewrites the timestamp of the rest.")
+  Component(frame_selector, "Frame selector", "assemble.mjs", "Drops frames stamped earlier than the frame before them (they would push the picture behind the voice), drops frames inside a cut and rewrites the timestamp of the rest.")
   Component(gap_reporter, "Gap reporter", "assemble.mjs", "Prints the five largest inter-frame gaps over a second.")
   Component(concat_list_writer, "Concat list writer", "ffmpeg concat demuxer", "A file and duration pair per frame, with the last frame repeated so its duration is honoured.")
   Component(encoder, "Encoder", "ffmpeg libx264", "Scales to 1920x1080 with lanczos at 60fps, CRF 18.")

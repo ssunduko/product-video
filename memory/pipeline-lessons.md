@@ -51,6 +51,15 @@ problem. The README says what the stages are; this page says how to get a pass.
 - **Before a line about something, hover it.** The hover forces a fresh frame,
   because the CDP screencast can skip frames until input arrives. Without one,
   a loaded page can sit on a stale frame (Sources froze for 3.6s).
+- **Fast-forwarding streaming text leaves ghost text.** The user rejected
+  an assistant-panel take for it (SPEEDS_MS up to x25 plus AUTO_SPEED x10 over
+  the assistant's answers). Over a chat panel, cover the wait with narration instead:
+  `say`, a hold sized to the line, a second `say` and a hold that lets it
+  finish, then the `waitGone`.
+- **Don't hover a card in a chat panel after a long answer.** The answer
+  scrolls the card out of view, so the hover lands outside the panel and the
+  cursor drifts onto the page behind it. Size the hold
+  to the line instead: a 6s hold after a 2.6s line failed qa as frozen.
 
 ## Loading
 
@@ -59,6 +68,23 @@ problem. The README says what the stages are; this page says how to get a pass.
   a wait on the slowest panel, or the spinner shows under the narration.
 - **Wait for a spinner to go.** Use `waitGone` on `[role="progressbar"]` when
   values arrive after the frame (tiles that render empty first).
+- **Picture behind the voice.** If lines seem to play ahead of the screen more
+  and more as the take goes on, check `frames.json` for timestamps that step
+  back. One take had 102 such frames, and the picture ended 3s behind
+  the voice; qa.mjs's sync check can't see it, because it only compares audio
+  with cues. `assemble.mjs` now drops those frames (2026-10-27), so re-render
+  any take assembled before that.
+- **Volume rising and falling between lines.** The default `NARRATION_FILTER`
+  (`speechnorm` + single-pass `loudnorm`) adjusts the volume continuously while
+  the track plays. Clips are already levelled before the mix, so a fixed master
+  is enough: `volume=4dB,alimiter=limit=0.84:level=false:attack=5:release=50`
+  in the manifest's `env`. On one take it kept -16.2 LUFS,
+  narrowed the phrase spread from 6.0 to 4.6 LU, and cut the loudness range
+  from 8.4 to 7.7 LU (2026-10-27).
+- **A tool card is not the page.** When an assistant opens a page, a wait on
+  its "Open …" tool card still lands before the page loads, and the line plays
+  over the page's spinner. Wait on an element of the opened page instead
+  (an "Open … form" tool card came 3.5s before the form itself).
 - **Allow for live-app variance.** On a live app, load times swing 5–10x
   between takes, and the frame count can halve. A take that aborts on a wait
   usually means the app stalled: check the app before changing the script.

@@ -183,7 +183,12 @@ node build.mjs ..\videos\<name>.json --join-only                 # just re-join 
   in the video's session and in its user's graph, not only the app graph. Record the visual review with
   `node memory.mjs video review <name> PASS|FAIL --findings <file>`. The status
   then reads one of: not built, build failed, qa failed, awaiting review,
-  review failed, or done. `node memory.mjs video state <name>` prints it.
+  review failed, done, accepted or published. `node memory.mjs video state <name>` prints it.
+  When the user takes a build that did not pass both gates, record it with
+  `node memory.mjs video accept <name> --reason "<their words>" --findings <file>`:
+  the status reads accepted, with the reason and the open findings, and
+  `publish.mjs` allows it. It is never recorded as a PASS, and a later build
+  needs both gates or a new acceptance.
 
 ### Run the stages yourself
 
@@ -629,7 +634,10 @@ node assemble.mjs
 ```
 
 Writes `out/raw.mp4` and `out/raw.mp4.cursor.json`, and prints the largest
-inter-frame gaps — the video freezes there. Spot-check beats:
+inter-frame gaps — the video freezes there. Frames the screencast stamped
+earlier than the frame before them are dropped (it prints how many): kept,
+each one pushed the rest of the picture later than the narration, up to 3s by
+the end of a take. Spot-check beats:
 
 ```powershell
 ffmpeg -ss 12.5 -i ..\out\raw.mp4 -frames:v 1 ..\out\f.png
@@ -1094,13 +1102,12 @@ review moves the status back until the video is published again.
 
 ## Project memory
 
-How the pipeline behaves in practice (timing, qa, zoom, loading) is in
-[docs/pipeline-lessons.md](docs/pipeline-lessons.md).
-
 
 `memory/` holds what the project knows:
 - `rules.md`: standing rules. `CLAUDE.md` imports it (`@memory/rules.md`), so
   Claude Code loads it in every session.
+- `pipeline-lessons.md`: how the pipeline behaves in practice, and the trace
+  changes that fixed each problem.
 - `features/<app>/`: one folder per application.
   - `data/features.json` is the app's **feature catalog**, the initial feature
     set: one document per feature, with category, description and source. Its

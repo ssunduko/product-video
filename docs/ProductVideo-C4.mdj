@@ -35644,7 +35644,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: assemble.mjs\n\nDrops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is an error naming the cut rather than a two-frame video."
+              "documentation": "Technology: assemble.mjs\n\nDrops frames stamped earlier than the frame before them (they would push the picture behind the voice), drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is an error naming the cut rather than a two-frame video."
             },
             {
               "_type": "UMLClass",
@@ -71144,7 +71144,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: video state · video review · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done), last build with qa counts, the visual review and a history. Generates the Video status section of the page, sends the state to the app graph and posts the whole status to the video thread."
+              "documentation": "Technology: video state · video review · video accept · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done, accepted, published), last build with qa counts, the visual review, the user's acceptance of a build with open findings (never recorded as a PASS) and a history. Generates the Video status section of the page, sends the state to the app graph and posts the whole status to the video thread."
             },
             {
               "_type": "UMLClass",
@@ -73771,7 +73771,7 @@
                           "top": 715,
                           "width": 210,
                           "height": 13,
-                          "text": "«component: video state · video review · video sync»",
+                          "text": "«component: video state · video review · video accept · video sync»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },

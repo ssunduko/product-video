@@ -158,7 +158,18 @@ function warp(vtMs) {
   return out;
 }
 
-const frames = allFrames
+// The screencast can deliver a frame stamped earlier than the one before it
+// (99 of 3508 on one take, up to 0.47s back). Each one would get the 1ms floor
+// below and the next frame the whole gap, so every out-of-order frame pushed
+// the picture later while the narration kept its own clock: 3s behind by the
+// end of that take. Keep capture order and drop any frame that steps back.
+let lastTs = -Infinity;
+const ordered = allFrames.filter((f) => (f.ts > lastTs ? ((lastTs = f.ts), true) : false));
+if (ordered.length < allFrames.length) {
+  console.log(`frames: dropped ${allFrames.length - ordered.length} stamped earlier than the frame before them`);
+}
+
+const frames = ordered
   .filter((f) => !inCut((f.ts - t0) * 1000))
   .map((f) => ({ ...f, ts: t0 + warp((f.ts - t0) * 1000) / 1000 }));
 

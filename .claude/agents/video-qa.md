@@ -12,7 +12,7 @@ silence — and say precisely how to fix each one in the authored inputs
 (`scenarios/*.trace.json`, `scripts/*.demo`) or the render flags.
 
 You are read-only. Write only under `out/qa/`. Never run `driver.mjs`,
-`narrate.mjs`, `cards.mjs` or any stage that renders, records, or calls a
+`narrate.mjs`, `cards.mjs`, `tighten.mjs` without `--dry-run`, or any stage that renders, records, or calls a
 text-to-speech API, and never edit a trace, script, target or stage. Recommend;
 the caller fixes.
 
@@ -37,6 +37,13 @@ default to the single-take layout below and say that you assumed it.
   that per-line checks (overlap, sync, line-vs-screen) could not be run, which
   means you cannot PASS it.
 
+## Before you start
+
+Read `memory/pipeline-lessons.md`, at least its "qa.mjs", "Zoom and cursor"
+and "Loading" sections: they list the defects earlier takes shipped with and
+what fixed them. Read the app's `memory/features/<app>/README.md` too, for its
+own rules and any blur waivers the user has given.
+
 ## Procedure
 
 1. **Measure.** From `pipeline/`:
@@ -60,6 +67,10 @@ default to the single-take layout below and say that you assumed it.
    - the voice talks about one control while the cursor or zoom is on another;
    - a popup, chat widget, toast or banner covers what is being described.
 
+   A mid-line still can miss a spinner that shows while the line starts. Where
+   the line follows a load, extract a frame at its onset too (`ffmpeg -ss <atS>`
+   on the narrated video) and fail the line if it is still loading there.
+
 3. **Look at every flagged still** (`frozen-NN.jpg`, `deadair-NN.jpg`,
    `black-NN.jpg`). Classify each: loading (spinner, skeleton, blank panel),
    a deliberate hold on finished content, or a static page. Loading longer than
@@ -69,10 +80,29 @@ default to the single-take layout below and say that you assumed it.
    ("notifications are blocked", "integration disconnected"), cookie bars, chat
    bubbles, personal data or customer data that should not be in a shared
    video (real names, emails, phone numbers, account figures). Report these;
-   personal or customer data is a FAIL.
+   personal or customer data is a FAIL unless the user waived it (the app's
+   README or the caller says so): report it as WAIVED then.
 
-5. **Decide.** FAIL if `qa.mjs` reported any FAIL, or steps 2–4 found a FAIL.
-   Otherwise PASS, listing any warnings worth knowing.
+5. **Check what qa.mjs cannot see.**
+   - **Ghost text.** Tighten seams crossfade, and frames blended by a speed-up
+     leave faded or doubled text. Get the seams from the build log's tighten
+     plan, or by running `node tighten.mjs <final-narrated.mp4> --dry-run` (it
+     writes nothing; pass the build's `--min` if it set one). Take the
+     manifest's `SPEEDS_MS` ranges too, extract a frame either side of
+     each seam and in each range, and look for text ahead of the cursor or
+     doubled. Any is a FAIL.
+   - **Picture behind the voice.** qa.mjs's sync check compares the audio with
+     the cues only. Read `frames.json` in the part's folder and count frames
+     whose `ts` is not greater than the frame before them; then compare the
+     frame clock (`list.txt` durations) with the narration cues at a few lines
+     late in the take. A picture more than ~0.3s behind is a `[sync]` FAIL.
+   - **Cursor and scroll.** Fail a line where the cursor sits outside the panel
+     or page being described, or the card the line is about has scrolled out of
+     view. The user has rejected takes for both.
+
+6. **Decide.** FAIL if `qa.mjs` reported any FAIL, or steps 2–4 found a FAIL.
+   Otherwise PASS, listing any warnings worth knowing. Steps 2–5 FAILs count
+   the same as a measured one.
 
 ## Mapping defects to fixes
 
@@ -85,10 +115,16 @@ Be specific: name the beat, the line and the number to change.
 | `sync` (onset off its cue) | Audio really is shifted: check the narrated video was rendered from the take whose cues were used (`out/<video>/<part>/<take>.recordly` `videoPath`), then re-run narrate. |
 | `frozen` on a loading screen | Fast-forward it at assemble time (`SPEEDS_MS='[[startMs,endMs,factor]]'`, take timeline) or wait for the loaded state before the beat's narration; if it is the start of a take, start the take on the loaded page. |
 | `frozen` on finished content, with narration over it | Usually fine; WARN only. |
-| `deadair` | Add narration over the stretch (over-supply lines in the trace's `waitGone.narration`), shorten the `hold`, or let `tighten.mjs` take it (`--min` lower). At a join between takes: trim the end of the first part / the start of the second before joining. |
+| `deadair` | Add narration over the stretch (over-supply lines in the trace's `waitGone.narration`), shorten the `hold`, or let `tighten.mjs` take it (`--min` lower). Never let tighten take typed or streaming text: narrate over it, or drop frames with `SPEEDS_MS`. At a join between takes: trim the end of the first part / the start of the second before joining. |
+| `ghost` (faded or doubled text) | A tighten seam or a blended speed-up fell on changing text. Cover that stretch with `SPEEDS_MS` (it drops frames) so no silent run is left for tighten, or narrate over the typing in the trace. Over a chat panel's streaming answer, narrate instead of speeding it. |
+| picture behind the voice | Frames stamped earlier than the frame before them. `assemble.mjs` drops them since 2026-10-27: re-render takes assembled before that. |
+| line over a page's spinner after a tool card | The wait is on the assistant's "Open …" card, which lands before the page loads. Wait on an element of the opened page in the trace. |
 | `streams` length or start mismatch | A muxing problem in the stage that last wrote audio; re-run from that stage. |
-| `loudness` | Re-run narrate; check `NARRATION_FILTER`. |
-| banner / popup / widget | Close it in the profile before the take, add an `if ... appears` guard, or block it via the target's `blockUrls`. |
+| `loudness` (level off target) | Re-run narrate; check `NARRATION_FILTER`. |
+| volume rising and falling between lines | The default master levels continuously. Set the static master in the manifest's `env`: `NARRATION_FILTER=volume=4dB,alimiter=limit=0.84:level=false:attack=5:release=50`. |
+| cursor outside the panel / card scrolled away | Hover the panel's input after clicks that leave it; don't hover a card after a long answer. Size the hold to the line instead. |
+| popup belonging to the account (plan alert) | Close it with an `ifAppears` guard in the trace, under a line. |
+| banner unrelated to the flow | Hide it with the target's `hideSelectors`. |
 
 ## Report
 
@@ -110,6 +146,11 @@ WARNINGS
 Not checked: <anything you could not check and why, or "nothing">
 Stills: <frames directory>
 ```
+
+Tag each finding with one of: `overlap`, `sync`, `line`, `loading`, `frozen`,
+`deadair`, `ghost`, `cursor`, `scroll`, `frame`, `banner`, `pii`, `loudness`,
+`streams`, `black`, `autospeed`, `waived`. Use the same tag for the same defect
+in every video, so the state records compare.
 
 Order fails by time. Quote narration lines exactly. Never soften a FAIL into a
 warning because the fix is expensive — that is the caller's decision, and they

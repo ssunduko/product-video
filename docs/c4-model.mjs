@@ -940,7 +940,8 @@ const aWarp = mk(pkgAssemble, 'component', 'Time warp', 'assemble.mjs',
   'falls inside one, which keeps a sped-up span in sync with itself rather than only at its far ' +
   'edge. No other stage does its own; that is what stops the picture and the voice drifting apart.');
 const aFrames = mk(pkgAssemble, 'component', 'Frame selector', 'assemble.mjs',
-  'Drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is ' +
+  'Drops frames stamped earlier than the frame before them (they would push the picture behind ' +
+  'the voice), drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is ' +
   'an error naming the cut rather than a two-frame video.');
 const aGaps = mk(pkgAssemble, 'component', 'Gap reporter', 'assemble.mjs',
   'Prints the five largest inter-frame gaps over a second. Those are exactly where the video ' +
@@ -1464,9 +1465,10 @@ const mHook = mk(pkgMemory, 'component', 'Session hook', 'hook · SessionStart',
 const mUsers = mk(pkgMemory, 'component', 'Session attribution', 'MEMORY_USER · Zep users and threads',
   'One Zep user per person (MEMORY_USER, else git user.email) and one thread per Claude session; ' +
   'zep session adds notes to it.');
-const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video sync',
+const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video accept · video sync',
   'One state file per video next to its page: status (not built, build failed, qa failed, awaiting ' +
-  'review, review failed, done), last build with qa counts, the visual review and a history. ' +
+  'review, review failed, done, accepted, published), last build with qa counts, the visual review, the ' +
+  "user's acceptance of a build with open findings (never recorded as a PASS) and a history. " +
   'Generates the Video status section of the page, sends the state to the app graph and posts the whole ' +
   'status to the video thread.');
 const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session flush (Stop) · session end (SessionEnd) · session video',

@@ -13,7 +13,8 @@
 //                                         record that the link was posted on the ticket
 //
 // Final approval: upload refuses unless the video's state is "done" (through the
-// quality gate and the visual review) or already "published", and --approved is
+// quality gate and the visual review), "accepted" (the user took it with open
+// findings: memory.mjs video accept) or already "published", and --approved is
 // given. --approved means the user said to publish this video; never add it on
 // your own.
 //
@@ -73,7 +74,7 @@ function plan(name) {
   }
   const problems = [];
   if (!state) problems.push('the video has no state yet (build it first)');
-  else if (!['done', 'published'].includes(state.status)) problems.push(`the video is "${state.status}", not "done": it needs the quality gate and the visual review first`);
+  else if (!['done', 'accepted', 'published'].includes(state.status)) problems.push(`the video is "${state.status}", not "done": it needs the quality gate and the visual review first, or the user's acceptance (memory.mjs video accept)`);
   if (!fs.existsSync(file)) problems.push(`${path.relative(ROOT, file)} does not exist`);
   if (!dest) problems.push(`no destination: set ${envVar} in .env`);
   else if (kind !== 'google-drive-folder') problems.push(`${envVar} is not a destination kind memory/destinations.json knows`);

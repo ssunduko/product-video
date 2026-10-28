@@ -6,6 +6,7 @@ session (and every person) starts from it instead of relearning it.
 | File | Holds |
 |---|---|
 | [rules.md](rules.md) | Standing rules for every video. They override defaults and the target's settings. `CLAUDE.md` imports it, so every session loads it. |
+| [pipeline-lessons.md](pipeline-lessons.md) | How the pipeline behaves in practice (timing, qa, zoom, loading) and the trace changes that fixed each problem. Read before authoring or recording; add to it after a take. |
 | [sources.json](sources.json) | Generic: how to recognise and read each kind of online source. The location of each app's source is in `.env` (`FEATURE_SOURCE_<APP>`). |
 | [features/](features/) | One folder per app: `data/features.json`, the app's feature catalog (the initial feature set, kept current from its source), plus video pages: how to reach a filmed feature, what's on screen, data it needs, quirks, and the videos that cover it. |
 
@@ -31,10 +32,10 @@ repo README.
 
 ## Reading and writing it
 
-- **Before** authoring a trace or recording: read `../docs/pipeline-lessons.md`,
+- **Before** authoring a trace or recording: read `pipeline-lessons.md`,
   the app's `README.md` and the feature's page (create it if the feature is new).
 - **After** each take or review: update the feature page's status and quirks,
-  and add to `docs/pipeline-lessons.md` anything that would have saved a re-take.
+  and add to `pipeline-lessons.md` anything that would have saved a re-take.
 - A new standing rule from the user goes in `rules.md`, with why and the date.
 - Write facts, not narratives. Date anything that can change ("as of
   2026-10-23"). Delete what turns out to be wrong.

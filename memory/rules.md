@@ -31,6 +31,12 @@ user's go-ahead for that video. Posting the Jira comment is part of publishing.
 `qa.mjs` PASS and a video-qa visual review with no FAIL. A qa.mjs PASS alone is
 not done: an earlier take passed qa.mjs and still showed loading
 spinners and personal data.
+The user may still take a build that failed a gate. Only on their explicit
+word, record it with `node pipeline/memory.mjs video accept <name> --reason
+"<their words>" --findings <file>`. That puts the video in "accepted", which
+publish.mjs allows, and never records a PASS.
+*Why:* the user accepted a take with its open findings and asked to publish
+it (2026-10-27).
 
 ## Content
 
