@@ -41,11 +41,11 @@ Standing rules, loaded into every session (they override defaults):
 `memory/` also holds `memory/features/<app>/`: each app's feature catalog
 (`data/features.json`), its own rules (`README.md`) and one page per filmed
 feature, naming its videos. How the pipeline behaves in practice (timing, qa,
-zoom) is in `docs/pipeline-lessons.md`.
+zoom) is in `memory/pipeline-lessons.md`.
 
-- Read `docs/pipeline-lessons.md`, the app's `README.md` and the feature's page
+- Read `memory/pipeline-lessons.md`, the app's `README.md` and the feature's page
   before authoring a trace or recording.
-- Add to `docs/pipeline-lessons.md` anything that would have saved a re-take.
+- Add to `memory/pipeline-lessons.md` anything that would have saved a re-take.
 - After each take or review, update the feature page's status and quirks.
 - When the user sets a standing rule, add it to `memory/rules.md` with why and
   the date.

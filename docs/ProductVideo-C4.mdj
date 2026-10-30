@@ -20311,7 +20311,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: author.mjs · emitOne()\n\nOne DSL line per trace step: say, hold, wait, type, press, click, hover. A waitGone pulls in the budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI that only shows up sometimes."
+              "documentation": "Technology: author.mjs · emitOne()\n\nOne DSL line per trace step: say, hold, wait, type, press, click, hover, park. A waitGone pulls in the budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI that only shows up sometimes."
             },
             {
               "_type": "UMLClass",
@@ -24654,7 +24654,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: script.mjs\n\nBeats of wait, click, hover, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order."
+              "documentation": "Technology: script.mjs\n\nBeats of wait, click, hover, park, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order."
             },
             {
               "_type": "UMLClass",
@@ -29033,7 +29033,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: driver.mjs\n\nSamples synthesized pointer moves and clicks into actions.json. The cursor in the finished video is drawn from this, which is why the capture needs no real cursor."
+              "documentation": "Technology: driver.mjs\n\nSamples synthesized pointer moves and clicks into actions.json. The cursor in the finished video is drawn from this, which is why the capture needs no real cursor. It also keeps the box of the visible part (hit-tested, so an element under a side panel is cut at its edge) of the element each hover, click and type acted on, with when it was the subject, for the red frame."
             },
             {
               "_type": "UMLClass",
@@ -35644,7 +35644,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: assemble.mjs\n\nDrops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is an error naming the cut rather than a two-frame video."
+              "documentation": "Technology: assemble.mjs\n\nDrops frames stamped earlier than the frame before them (they would push the picture behind the voice), drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is an error naming the cut rather than a two-frame video."
             },
             {
               "_type": "UMLClass",
@@ -35692,7 +35692,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: assemble.mjs\n\nNormalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps the rest. Nothing surviving is an error, because a silent empty cursor track is worse."
+              "documentation": "Technology: assemble.mjs\n\nNormalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps the rest. Nothing surviving is an error, because a silent empty cursor track is worse. The element boxes go through the same warp into highlights.json, a hover capped at HIGHLIGHT_HOLD_MS and a click ended at its release."
             },
             {
               "_type": "UMLClass",
@@ -42410,7 +42410,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: @napi-rs/canvas\n\nPer frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, then the cursor on top."
+              "documentation": "Technology: @napi-rs/canvas\n\nPer frame: the source into its own canvas, the zoom transform clipped to the rounded window, the shadow, a red rectangle round the element being acted on (highlights.json; HIGHLIGHT, HIGHLIGHT_COLOR), then the cursor on top."
             },
             {
               "_type": "UMLClass",
@@ -71144,7 +71144,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: video state · video review · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done), last build with qa counts, the visual review and a history. Generates the Video status section of the page, sends the state to the app graph and posts the whole status to the video thread."
+              "documentation": "Technology: video state · video review · video accept · video sync\n\nOne state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done, accepted, published), last build with qa counts, the visual review, the user's acceptance of a build with open findings (never recorded as a PASS) and a history. Generates the Video status section of the page, sends the state to the app graph and posts the whole status to the video thread."
             },
             {
               "_type": "UMLClass",
@@ -73771,7 +73771,7 @@
                           "top": 715,
                           "width": 210,
                           "height": 13,
-                          "text": "«component: video state · video review · video sync»",
+                          "text": "«component: video state · video review · video accept · video sync»",
                           "horizontalAlignment": 2,
                           "verticalAlignment": 5
                         },

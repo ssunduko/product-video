@@ -203,6 +203,7 @@ export function demoFromTrace(trace) {
 
         case 'click':
         case 'hover':
+        case 'park':
           beatLines.push(`  ${step.op} ${ref(step)}`);
           clock += 800;
           break;

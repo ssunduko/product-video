@@ -44,6 +44,8 @@ const AUTO_SPEED_MIN_MS = Number(process.env.AUTO_SPEED_MIN_MS || 2000);
 const AUTO_HEAD_MS = 300; // keep the first moment of a wait at 1x: the click registering
 const AUTO_TAIL_MS = 500; // and the last: the result landing
 const AUTO_LINE_AIR_MS = 300; // never closer than this to a line
+// a hovered element stays framed until the flow acts again, but no longer than this
+const HIGHLIGHT_HOLD_MS = Number(process.env.HIGHLIGHT_HOLD_MS || 4000);
 const OUT_NAME = process.env.OUT_NAME || 'raw.mp4';
 
 for (const [a, b, factor] of SPEEDS) {
@@ -59,7 +61,7 @@ for (const [a, b] of CUTS) {
 }
 
 const allFrames = JSON.parse(fs.readFileSync(path.join(OUT, 'frames.json'), 'utf8'));
-const { viewport, samples, narration = [], waits = [] } = JSON.parse(
+const { viewport, samples, narration = [], waits = [], targets = [] } = JSON.parse(
   fs.readFileSync(path.join(OUT, 'actions.json'), 'utf8'),
 );
 
@@ -158,7 +160,18 @@ function warp(vtMs) {
   return out;
 }
 
-const frames = allFrames
+// The screencast can deliver a frame stamped earlier than the one before it
+// (99 of 3508 on one take, up to 0.47s back). Each one would get the 1ms floor
+// below and the next frame the whole gap, so every out-of-order frame pushed
+// the picture later while the narration kept its own clock: 3s behind by the
+// end of that take. Keep capture order and drop any frame that steps back.
+let lastTs = -Infinity;
+const ordered = allFrames.filter((f) => (f.ts > lastTs ? ((lastTs = f.ts), true) : false));
+if (ordered.length < allFrames.length) {
+  console.log(`frames: dropped ${allFrames.length - ordered.length} stamped earlier than the frame before them`);
+}
+
+const frames = ordered
   .filter((f) => !inCut((f.ts - t0) * 1000))
   .map((f) => ({ ...f, ts: t0 + warp((f.ts - t0) * 1000) / 1000 }));
 
@@ -247,6 +260,49 @@ const cues = narration
   .sort((a, b) => a.atMs - b.atMs);
 
 fs.writeFileSync(`${raw}.narration.json`, JSON.stringify(cues, null, 1));
+
+// The element boxes the driver measured, for compose.mjs's red frame: on the
+// same clock as everything else, normalised to the viewport like the cursor.
+// A box whose start fell inside a cut is dropped; one that runs into a cut
+// ends where the cut begins.
+const highlights = targets
+  .map((t) => {
+    const s = t.start - t0 * 1000;
+    let end = t.end;
+    if (t.kind === 'hover') end = Math.min(t.end ?? Infinity, t.start + HIGHLIGHT_HOLD_MS);
+    // a click's frame ends at its release (takes recorded before 2026-10-28
+    // logged 500ms past it, by when the button's card had often closed)
+    if (t.kind === 'click') end = Math.min(end, samples.find((x) => x.type === 'mouseup' && x.t >= t.start)?.t ?? end);
+    const e = end - t0 * 1000;
+    return { ...t, s, e };
+  })
+  .filter((t) => t.s >= 0 && t.e > t.s && !inCut(t.s))
+  .map((t) => ({
+    startMs: Math.round(warp(t.s)),
+    endMs: Math.round(warp(t.e)),
+    kind: t.kind,
+    x: t.x / viewport.width,
+    y: t.y / viewport.height,
+    w: t.w / viewport.width,
+    h: t.h / viewport.height,
+    // where a typed field grew, its later boxes, from when each took over
+    ...(t.track && {
+      track: t.track.map((b) => ({
+        atMs: Math.round(warp(b.t - t0 * 1000)),
+        x: b.x / viewport.width,
+        y: b.y / viewport.height,
+        w: b.w / viewport.width,
+        h: b.h / viewport.height,
+      })),
+    }),
+  }))
+  .filter((h) => h.endMs > h.startMs)
+  .sort((a, b) => a.startMs - b.startMs);
+
+fs.writeFileSync(`${raw}.highlights.json`, JSON.stringify(highlights, null, 1));
+if (!targets.length) {
+  console.log('highlights: actions.json has no element boxes (recorded before they were logged) - no red frames');
+}
 
 const droppedCues = narration.length - cues.length;
 

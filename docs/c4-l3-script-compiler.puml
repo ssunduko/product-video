@@ -17,7 +17,7 @@ Container_Boundary(script_compiler_2, "1 · Script Compiler") {
   Component(selector_spec_parser, "Selector spec parser", "script.mjs", "Turns the button, text and css forms of a selector line into the driver spec strings.")
   Component(sel_registry, "SEL registry", "script.mjs", "Names in the selectors block become slugged keys on the exported SEL map, deduped so two similar labels cannot quietly collide on one key.")
   Component(header_parser, "Header parser", "script.mjs", "target, app, viewport, match, intro, outro and brand.")
-  Component(beat_parser, "Beat parser", "script.mjs", "Beats of wait, click, hover, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order.")
+  Component(beat_parser, "Beat parser", "script.mjs", "Beats of wait, click, hover, park, hold, type, press, scroll, open, login, logout, say and if-appears, each becoming one step in order.")
   Component(ask_resolver, "Ask resolver", "script.mjs · selectors sidecar", "An ask selector parses to a sentinel spec that travels through the registry as an ordinary string, then gets swapped here for what the sidecar resolved it to.")
   Component(code_generator, "Code generator", "script.mjs", "Emits a scenario module: the SEL map, run(d), and the header exports.")
   Component(overwrite_guard, "Overwrite guard", "script.mjs · generated marker", "Refuses to overwrite a scenario it did not generate; a marker in the header is what tells them apart.")

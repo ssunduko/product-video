@@ -712,7 +712,7 @@ const aRegistry = mk(pkgAuthor, 'component', 'Selector registry', 'author.mjs ·
   'written independently, so they cannot drift apart. A step names an element defined once in the ' +
   "trace's selectors table, and a name the table lacks is an error, not a guess.");
 const aEmit = mk(pkgAuthor, 'component', 'Step emitter', 'author.mjs · emitOne()',
-  'One DSL line per trace step: say, hold, wait, type, press, click, hover. A waitGone pulls in the ' +
+  'One DSL line per trace step: say, hold, wait, type, press, click, hover, park. A waitGone pulls in the ' +
   'budgeter and labels the number measured or ESTIMATED, because a figure a reader trusts as measured ' +
   'when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI ' +
   'that only shows up sometimes.');
@@ -776,7 +776,7 @@ const sHeader = mk(pkgScript, 'component', 'Header parser', 'script.mjs',
   'target, app, viewport, match, intro, outro and brand. An unknown directive is an error naming ' +
   'the file and line, not a silently ignored line.');
 const sBeats = mk(pkgScript, 'component', 'Beat parser', 'script.mjs',
-  'Beats of wait, click, hover, hold, type, press, scroll, open, login, logout, say and ' +
+  'Beats of wait, click, hover, park, hold, type, press, scroll, open, login, logout, say and ' +
   'if-appears, each becoming one step in order.');
 const sCodegen = mk(pkgScript, 'component', 'Code generator', 'script.mjs',
   'Emits a scenario module: the SEL map, run(d), and the header exports. Ordinary readable ' +
@@ -854,7 +854,9 @@ const kScreencast = mk(pkgDriver, 'component', 'Screencast recorder', 'CDP Page.
   'off-camera sign-in never reaches the video.');
 const kTelemetry = mk(pkgDriver, 'component', 'Input telemetry recorder', 'driver.mjs',
   'Samples synthesized pointer moves and clicks into actions.json. The cursor in the finished video ' +
-  'is drawn from this, which is why the capture needs no real cursor.');
+  'is drawn from this, which is why the capture needs no real cursor. It also keeps the box of the ' +
+  'visible part (hit-tested, so an element under a side panel is cut at its edge) of the element ' +
+  'each hover, click and type acted on, with when it was the subject, for the red frame.');
 const kCues = mk(pkgDriver, 'component', 'Narration cue collector', 'driver.mjs · d.say()',
   'Stamps { t, text } at wall-clock time and returns immediately — the voice plays over the visuals ' +
   'instead of the flow pausing for it. Cue times are recorded during the take precisely because ' +
@@ -940,7 +942,8 @@ const aWarp = mk(pkgAssemble, 'component', 'Time warp', 'assemble.mjs',
   'falls inside one, which keeps a sped-up span in sync with itself rather than only at its far ' +
   'edge. No other stage does its own; that is what stops the picture and the voice drifting apart.');
 const aFrames = mk(pkgAssemble, 'component', 'Frame selector', 'assemble.mjs',
-  'Drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is ' +
+  'Drops frames stamped earlier than the frame before them (they would push the picture behind ' +
+  'the voice), drops frames inside a cut and rewrites the timestamp of the rest. Fewer than ten survivors is ' +
   'an error naming the cut rather than a two-frame video.');
 const aGaps = mk(pkgAssemble, 'component', 'Gap reporter', 'assemble.mjs',
   'Prints the five largest inter-frame gaps over a second. Those are exactly where the video ' +
@@ -952,7 +955,9 @@ const aEncode = mk(pkgAssemble, 'component', 'Encoder', 'ffmpeg libx264',
   'Scales to 1920x1080 with lanczos at 60fps, CRF 18.');
 const aTelemetry = mk(pkgAssemble, 'component', 'Telemetry mapper', 'assemble.mjs',
   'Normalises pointer samples to 0..1 of the viewport, drops what fell inside a cut, and warps ' +
-  'the rest. Nothing surviving is an error, because a silent empty cursor track is worse.');
+  'the rest. Nothing surviving is an error, because a silent empty cursor track is worse. The ' +
+  'element boxes go through the same warp into highlights.json, a hover capped at HIGHLIGHT_HOLD_MS ' +
+  'and a click ended at its release.');
 const aCues = mk(pkgAssemble, 'component', 'Cue mapper', 'assemble.mjs',
   'The identical filter and warp for narration cues, and it reports how many were dropped inside ' +
   'cuts. Doing this anywhere else silently desyncs the voiceover from the picture.');
@@ -1065,7 +1070,8 @@ const xSprites = mk(pkgCompose, 'component', 'Cursor sprites', '@napi-rs/canvas'
   'click ripple. This is why the capture needs no real cursor.');
 const xRender = mk(pkgCompose, 'component', 'Frame renderer', '@napi-rs/canvas',
   'Per frame: the source into its own canvas, the zoom transform clipped to the rounded window, ' +
-  'the shadow, then the cursor on top.');
+  'the shadow, a red rectangle round the element being acted on (highlights.json; HIGHLIGHT, ' +
+  'HIGHLIGHT_COLOR), then the cursor on top.');
 const xDecode = mk(pkgCompose, 'component', 'Decoder pipe', 'ffmpeg rawvideo rgba',
   'Streams the take in. The decoder delivers small pipe chunks, which are reassembled into one ' +
   'reused frame buffer rather than a freshly concatenated one per frame.');
@@ -1464,9 +1470,10 @@ const mHook = mk(pkgMemory, 'component', 'Session hook', 'hook · SessionStart',
 const mUsers = mk(pkgMemory, 'component', 'Session attribution', 'MEMORY_USER · Zep users and threads',
   'One Zep user per person (MEMORY_USER, else git user.email) and one thread per Claude session; ' +
   'zep session adds notes to it.');
-const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video sync',
+const mVideo = mk(pkgMemory, 'component', 'Video state', 'video state · video review · video accept · video sync',
   'One state file per video next to its page: status (not built, build failed, qa failed, awaiting ' +
-  'review, review failed, done), last build with qa counts, the visual review and a history. ' +
+  'review, review failed, done, accepted, published), last build with qa counts, the visual review, the ' +
+  "user's acceptance of a build with open findings (never recorded as a PASS) and a history. " +
   'Generates the Video status section of the page, sends the state to the app graph and posts the whole ' +
   'status to the video thread.');
 const mRecorder = mk(pkgMemory, 'component', 'Session recorder', 'session flush (Stop) · session end (SessionEnd) · session video',

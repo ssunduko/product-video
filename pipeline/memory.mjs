@@ -33,7 +33,11 @@
 //   node memory.mjs video state <name> [--json]  a video's status, last build, review, history
 //   node memory.mjs video review <name> PASS|FAIL [--findings <file|->] [--note <t>]
 //                                              record the visual review (video-qa)
-//   node memory.mjs video sync <name>          the state to Zep (build.mjs runs it after every build)
+//   node memory.mjs video accept <name> --reason <t> [--findings <file|->]
+//                                              the user accepts the last build with its open
+//                                              findings, so publish.mjs allows it. Recorded
+//                                              as an acceptance, never as a PASS
+//   node memory.mjs video sync <name>         the state to Zep (build.mjs runs it after every build)
 //   node memory.mjs zep session [--session <id>] --title <t> --file <md|->
 //                                              notes -> the Claude session's Zep thread (or a new one)
 //   node memory.mjs zep search <query> [--app <app>]       facts from Zep
@@ -381,7 +385,6 @@ function defaultFiles() {
   const list = (d, re) => (fs.existsSync(path.join(ROOT, d)) ? fs.readdirSync(path.join(ROOT, d)).filter((f) => re.test(f)).map((f) => path.join(ROOT, d, f)) : []);
   return [
     ...walk(MEMORY).filter((f) => f.endsWith('.md') || f.endsWith('.state.json')),
-    path.join(ROOT, 'docs', 'pipeline-lessons.md'),
     ...apps().map((app) => appInfo(app).featuresPath).filter((f) => fs.existsSync(f)),
     // flows: the plain-English intent of each video (the template is not one)
     ...list('input', /^(?!_).*\.flow$/),
@@ -832,6 +835,7 @@ const STATUS_TEXT = {
   'awaiting review': 'Built and through the quality gate; the visual review (video-qa) has not been recorded.',
   'review failed': 'Through the quality gate, but the visual review failed: see the findings.',
   done: 'Done: through the quality gate and the visual review.',
+  accepted: 'Accepted by the user with open findings (listed below); not through both gates.',
   published: 'Published: through both gates, approved by the user and uploaded to its destination.',
 };
 
@@ -839,6 +843,10 @@ function deriveStatus(v) {
   const b = v.build;
   if (!b) return 'not built';
   if (b.outcome === 'failed') return 'build failed';
+  // the user's acceptance overrides the gates, and only for the build it was given on
+  if (v.accepted && v.accepted.at >= b.at) {
+    return v.published && v.published.at >= v.accepted.at ? 'published' : 'accepted';
+  }
   if (b.outcome === 'qa-fail') return 'qa failed';
   if (v.review && v.review.at >= b.at) {
     if (v.review.verdict !== 'PASS') return 'review failed';
@@ -850,7 +858,11 @@ function deriveStatus(v) {
 
 function renderStatus(name, v) {
   const out = [`<!-- video-state:${name} (generated from ${name}.state.json by memory.mjs; do not edit) -->`];
-  out.push(`**${name}: ${v.status}.** ${STATUS_TEXT[v.status]} Updated ${v.updatedAt}.`, '');
+  const acceptedBuild = v.accepted && v.build && v.accepted.at >= v.build.at;
+  const text = v.status === 'published' && acceptedBuild
+    ? 'Published: accepted by the user with open findings (listed below), approved and uploaded to its destination.'
+    : STATUS_TEXT[v.status];
+  out.push(`**${name}: ${v.status}.** ${text} Updated ${v.updatedAt}.`, '');
   if (v.build) {
     const b = v.build;
     out.push(`Last build ${b.at}${b.scope ? ` (${b.scope})` : ''}: ${b.outcome}${b.message ? ` - ${b.message}` : ''}.`);
@@ -865,6 +877,11 @@ function renderStatus(name, v) {
     const r = v.review;
     out.push('', `Visual review ${r.at}: **${r.verdict}**${r.note ? ` - ${r.note}` : ''}.`);
     if (r.findings?.length) out.push(...r.findings.map((f, i) => `${i + 1}. ${f}`));
+  }
+  if (v.accepted && v.build && v.accepted.at >= v.build.at) {
+    const a = v.accepted;
+    out.push('', `Accepted by the user ${a.at}: ${a.reason}`);
+    if (a.findings?.length) out.push(...a.findings.map((f, i) => `${i + 1}. ${f}`));
   }
   if (v.published) {
     const p = v.published;
@@ -905,6 +922,7 @@ export function recordVideo(name, event) {
   const at = event.at ?? new Date().toISOString();
   if (event.type === 'build') v.build = { ...event, at, type: undefined };
   if (event.type === 'review') v.review = { at, verdict: event.verdict, note: event.note, findings: event.findings ?? [] };
+  if (event.type === 'accept') v.accepted = { at, reason: event.reason, findings: event.findings ?? [] };
   if (event.type === 'publish') v.published = { ...event, at, type: undefined, jira: [] };
   if (event.type === 'jira') {
     if (!v.published) throw new Error(`${name} is not published: nothing to post`);
@@ -916,7 +934,9 @@ export function recordVideo(name, event) {
       ? `published to ${event.destination}: ${event.url}`
       : event.type === 'jira'
         ? `link posted on ${event.ticket} (comment ${event.comment})`
-        : `visual review ${event.verdict}${event.findings?.length ? ` (${event.findings.length} finding(s))` : ''}`;
+        : event.type === 'accept'
+          ? `accepted by the user with ${event.findings?.length ?? 0} open finding(s): ${event.reason}`
+          : `visual review ${event.verdict}${event.findings?.length ? ` (${event.findings.length} finding(s))` : ''}`;
   v.history = [...(v.history ?? []), { at, event: summary }].slice(-30);
   v.status = deriveStatus(v);
   v.updatedAt = at;
@@ -952,6 +972,23 @@ function videoReview(name, verdict, o) {
     }
   }
   const { summary } = recordVideo(name, { type: 'review', verdict: String(verdict).toUpperCase(), note: o.note !== true ? o.note : undefined, findings: findings.map((f) => redact(String(f))) });
+  console.log(`${name}: ${summary}`);
+}
+
+// `video accept <name> --reason <t>`: the user's go-ahead for a build that did not
+// pass both gates. It never records a PASS: the state says accepted, with the
+// user's reason and the findings left open.
+function videoAccept(name, o) {
+  if (!o.reason || o.reason === true) fail('video accept needs --reason: what the user accepted, in their words');
+  const home = videoHome(name) ?? fail(`no video page names videos/${name}.json`);
+  const v = readJson(home.state, null);
+  if (!v?.build || v.build.outcome === 'failed') fail(`${name} has no rendered build to accept`);
+  let findings = [];
+  if (o.findings && o.findings !== true) {
+    const text = o.findings === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(o.findings, 'utf8');
+    findings = text.split(/\r?\n/).map((l) => l.replace(/^\s*(\d+[.)]|[-*])\s*/, '').trim()).filter(Boolean);
+  }
+  const { summary } = recordVideo(name, { type: 'accept', reason: redact(String(o.reason)), findings: findings.map((f) => redact(String(f))) });
   console.log(`${name}: ${summary}`);
 }
 
@@ -1038,6 +1075,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   else if (cmd === 'session' && o._[0] === 'flush') await sessionFlush(o);
   else if (cmd === 'video' && o._[0] === 'state') videoState(o._[1], o);
   else if (cmd === 'video' && o._[0] === 'review') videoReview(o._[1], o._[2], o);
+  else if (cmd === 'video' && o._[0] === 'accept') videoAccept(o._[1], o);
   else if (cmd === 'video' && o._[0] === 'sync') await videoSync(o._[1]);
   else if (cmd === 'source') source(o._[0]);
   else if (cmd === 'diff') diff(o._[0], o._[1]);

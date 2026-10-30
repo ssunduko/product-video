@@ -10,8 +10,8 @@
 //
 // Two kinds of drift, two answers:
 //
-// 1. Generated docs. Everything in docs/ except this file, c4-model.mjs and
-//    pipeline-lessons.md (prose) is rendered from c4-model.mjs. They are regenerated here, never edited by hand,
+// 1. Generated docs. Everything in docs/ except this file and c4-model.mjs
+//    is rendered from c4-model.mjs. They are regenerated here, never edited by hand,
 //    so they cannot drift from the model.
 //
 // 2. Prose. The model's descriptions and README.md are written by people, so they

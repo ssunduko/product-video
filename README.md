@@ -183,7 +183,12 @@ node build.mjs ..\videos\<name>.json --join-only                 # just re-join 
   in the video's session and in its user's graph, not only the app graph. Record the visual review with
   `node memory.mjs video review <name> PASS|FAIL --findings <file>`. The status
   then reads one of: not built, build failed, qa failed, awaiting review,
-  review failed, or done. `node memory.mjs video state <name>` prints it.
+  review failed, done, accepted or published. `node memory.mjs video state <name>` prints it.
+  When the user takes a build that did not pass both gates, record it with
+  `node memory.mjs video accept <name> --reason "<their words>" --findings <file>`:
+  the status reads accepted, with the reason and the open findings, and
+  `publish.mjs` allows it. It is never recorded as a PASS, and a later build
+  needs both gates or a new acceptance.
 
 ### Run the stages yourself
 
@@ -482,7 +487,8 @@ Commands:
 | `wait <sel> gone [within 60s]` | wait for something to **disappear** — a spinner, a Stop button, a skeleton |
 | `say "..."` | a narration line, timestamped here and voiced by `narrate.mjs`. Does not pause the flow |
 | `click <sel>` | glide the cursor over and click (an off-screen element is scrolled into view first) |
-| `hover <sel>` | glide the cursor over |
+| `hover <sel>` | glide the cursor over; compose frames the element in red |
+| `park <sel>` | glide the cursor over without the red frame: for moves that only keep the cursor in place |
 | `hold 2s` / `hold 800ms` | pause on camera |
 | `type "text" into <sel>` | click the field and type at human pace |
 | `type secret <name> into <sel>` | same, with a value from the target's `secrets` |
@@ -585,7 +591,7 @@ Driver primitives:
 | `d.waitGone(spec, timeout)` | wait for a spec to disappear, throws on timeout |
 | `d.say(text)` | record a narration cue at this moment (non-blocking) |
 | `d.appears(spec, timeout)` | same, but returns `true`/`false` |
-| `d.hoverSel(spec)` | glide the cursor to a spec |
+| `d.hoverSel(spec, { frame })` | glide the cursor to a spec; `frame: false` skips the red frame |
 | `d.clickSel(spec)` | glide, pause, click |
 | `d.type(spec, text)` | click a field and type at human pace |
 | `d.key(name)` | press a key |
@@ -620,7 +626,9 @@ header in the script, or a `TARGET` export in the scenario. A script is compiled
 to `out/generated/<name>.mjs` on the way in, and the path is printed.
 
 A Chrome window opens and runs the flow (roughly flow length + 15s). Writes
-`out/frames/`, `out/frames.json`, `out/actions.json`.
+`out/frames/`, `out/frames.json`, `out/actions.json`. `actions.json` holds the
+cursor samples, the narration cues, every wait, and the box of each element a
+hover, click or type acted on (`targets`), which compose frames in red.
 
 ### 4. Assemble and inspect
 
@@ -628,8 +636,12 @@ A Chrome window opens and runs the flow (roughly flow length + 15s). Writes
 node assemble.mjs
 ```
 
-Writes `out/raw.mp4` and `out/raw.mp4.cursor.json`, and prints the largest
-inter-frame gaps — the video freezes there. Spot-check beats:
+Writes `out/raw.mp4`, `out/raw.mp4.cursor.json` and
+`out/raw.mp4.highlights.json` (the element boxes, on the video's clock), and prints the largest
+inter-frame gaps — the video freezes there. Frames the screencast stamped
+earlier than the frame before them are dropped (it prints how many): kept,
+each one pushed the rest of the picture later than the narration, up to 3s by
+the end of a take. Spot-check beats:
 
 ```powershell
 ffmpeg -ss 12.5 -i ..\out\raw.mp4 -frames:v 1 ..\out\f.png
@@ -728,6 +740,18 @@ This is the step that replaces Recordly. It renders every frame itself:
 - **Cursor** — synthesized from `*.cursor.json`, so the capture needs no real
   cursor. Arrow and pointing-hand variants, with a click ripple and a slight
   press. Drawn at constant size in output space, clipped to the window.
+- **Highlight** — a red rounded rectangle around the visible part of the
+  element each hover, click and type acts on (the driver hit-tests the box, so
+  a table running under a side panel is framed only where it shows, and the
+  cursor aims at that part), from `*.highlights.json` (assemble writes it from the
+  boxes the driver measured). A click is framed from the moment the cursor
+  arrives until the button is released (it often closes its card or dialog), a typed field for the whole typing (re-measured after each key, so the frame grows with an input that wraps), and
+  a hovered element, which is how a trace points at what the next line is
+  about, until the flow does something else, capped at `HIGHLIGHT_HOLD_MS`
+  (default 4000). It fades in and out, follows the zoom and pan, and sits
+  under the cursor. `HIGHLIGHT=0` turns it off, `HIGHLIGHT_COLOR` sets the
+  colour (default `#E5322D`). Takes recorded before 2026-10-28 have no boxes,
+  so they render without it: re-record to get it.
 - **Window frame** — the video inset with padding, rounded corners, a drop
   shadow, over a gradient background.
 
@@ -753,7 +777,7 @@ fields optional:
 ```
 
 Env overrides: `NO_FRAME=1` (bare video, no padding/rounding/shadow),
-`PADDING=<px>`, `X264_PRESET`, `X264_CRF`.
+`PADDING=<px>`, `X264_PRESET`, `X264_CRF`, `HIGHLIGHT=0`, `HIGHLIGHT_COLOR`.
 
 Zoom `depth` maps 1–5 to 1.25×, 1.5×, 1.75×, 2×, 2.5×; `project.mjs` emits
 depth 3.
@@ -1094,13 +1118,12 @@ review moves the status back until the video is published again.
 
 ## Project memory
 
-How the pipeline behaves in practice (timing, qa, zoom, loading) is in
-[docs/pipeline-lessons.md](docs/pipeline-lessons.md).
-
 
 `memory/` holds what the project knows:
 - `rules.md`: standing rules. `CLAUDE.md` imports it (`@memory/rules.md`), so
   Claude Code loads it in every session.
+- `pipeline-lessons.md`: how the pipeline behaves in practice, and the trace
+  changes that fixed each problem.
 - `features/<app>/`: one folder per application.
   - `data/features.json` is the app's **feature catalog**, the initial feature
     set: one document per feature, with category, description and source. Its

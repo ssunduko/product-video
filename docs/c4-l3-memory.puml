@@ -26,7 +26,7 @@ Container_Boundary(memory_2, "Memory") {
   Component(zep_publisher, "Zep publisher", "zep push", "Turns catalogs (one document per feature), video pages, rules, pipeline lessons, flows, traces and manifests (not generated scripts or videos) into Zep documents in the graph of their app.")
   Component(zep_search, "Zep search", "zep search", "Facts from the graph of one app, or of all of them.")
   Component(session_recorder, "Session recorder", "session flush (Stop) · session end (SessionEnd) · session video", "After every Claude turn, and at the end, pushes what the person typed and Claude answered from the transcript, tool output left out and emails and phone numbers masked, then a summary built from th...")
-  Component(video_state, "Video state", "video state · video review · video sync", "One state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done), last build with qa counts, the visual review and a history.")
+  Component(video_state, "Video state", "video state · video review · video accept · video sync", "One state file per video next to its page: status (not built, build failed, qa failed, awaiting review, review failed, done, accepted, published), last build with qa counts, the visual review, the...")
 }
 
 Rel(memory_agent, source_resolver, "Asks where the source is", "CLI")
