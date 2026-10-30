@@ -510,7 +510,7 @@ Header directives for the title cards (read by `cards.mjs`, not the driver):
 | Directive | Meaning |
 |-----------|---------|
 | `intro: Headline \| Subhead` | opening card; both lines appear and are read aloud |
-| `outro: Headline \| Subhead` | closing card |
+| `outro: Headline \| Subhead` | closing card; a third part (`\| support@example.com`) adds a contact line, shown but not read aloud |
 
 Comments start with `#` at the start of a line or surrounded by spaces, so
 `css #search` keeps its id.
@@ -987,7 +987,8 @@ Renders branded title cards and joins them onto the video, writing
 `out/<name>-carded.mp4`. With no path given it takes the newest stage that
 exists — tightened, else narrated, else composed — so the usual output is
 `out/final-narrated-tight-carded.mp4`. Copy comes from the script's `intro:` / `outro:`
-headers (`Headline | Subhead`). Both cards are voiced with the same TTS provider
+headers (`Headline | Subhead`, plus an optional `| contact` line shown under the
+subhead and not voiced). Both cards are voiced with the same TTS provider
 as the narration; `--no-voice` makes them silent. Card length follows the
 voiceover, with a floor of 5-6s.
 

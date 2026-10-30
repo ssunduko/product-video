@@ -54843,7 +54843,7 @@
               "stereotype": {
                 "$ref": "c4-st-0009"
               },
-              "documentation": "Technology: cards.mjs + script.mjs\n\nThe intro and outro header directives, split on a pipe into headline and subhead. Both appear on the card and both are read aloud. Without a pipe the text becomes the subhead under a default headline."
+              "documentation": "Technology: cards.mjs + script.mjs\n\nThe intro and outro header directives, split on a pipe into headline and subhead. Both appear on the card and both are read aloud. Without a pipe the text becomes the subhead under a default headline. An optional third part is a contact line (an email) under the subhead: shown, not read aloud."
             },
             {
               "_type": "UMLClass",
@@ -57998,7 +57998,7 @@
                       },
                       "visible": true,
                       "font": "Arial;11;0",
-                      "text": "Headline and subhead to",
+                      "text": "Headline, subhead and contact line to",
                       "left": 60,
                       "top": 125,
                       "width": 150,
@@ -59301,7 +59301,7 @@
               "_parent": {
                 "$ref": "c4-pkg-2590"
               },
-              "name": "Headline and subhead to",
+              "name": "Headline, subhead and contact line to",
               "source": {
                 "$ref": "c4-el-2591"
               },
