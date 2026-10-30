@@ -27,7 +27,7 @@ Container_Boundary(card_renderer_2, "8 · Card Renderer") {
 Rel(flow_definitions, copy_parser, "intro and outro headers to")
 Rel(style_guide_reader, brand_assets, "Reads colour and type")
 Rel(font_loader, brand_assets, "Registers the font files")
-Rel(copy_parser, card_painter, "Headline and subhead to")
+Rel(copy_parser, card_painter, "Headline, subhead and contact line to")
 Rel(style_guide_reader, card_painter, "Palette to")
 Rel(font_loader, card_painter, "Resolved typefaces to")
 Rel(card_painter, brand_assets, "Reads the logo")

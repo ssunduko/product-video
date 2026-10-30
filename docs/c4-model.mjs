@@ -1256,7 +1256,8 @@ const pkgCards = pkg(
 const rCopy = mk(pkgCards, 'component', 'Copy parser', 'cards.mjs + script.mjs',
   'The intro and outro header directives, split on a pipe into headline and subhead. Both appear ' +
   'on the card and both are read aloud. Without a pipe the text becomes the subhead under a ' +
-  'default headline.');
+  'default headline. An optional third part is a contact line (an email) under the subhead: ' +
+  'shown, not read aloud.');
 const rStyle = mk(pkgCards, 'component', 'Style guide reader', 'brand.mjs · shared',
   'Colour and type from brand/StyleGuide.txt, shared with the compositor so the style-guide hex ' +
   'cannot end up in one stage and not the other.');
@@ -1294,7 +1295,7 @@ const dL3cards = diagram(pkgCards, 'c4-l3-card-renderer',
   link(dL3cards, pkgCards, vFlows, vCopy, 'intro and outro headers to');
   link(dL3cards, pkgCards, vStyle, vBrand, 'Reads colour and type');
   link(dL3cards, pkgCards, vFonts, vBrand, 'Registers the font files');
-  link(dL3cards, pkgCards, vCopy, vPaint, 'Headline and subhead to');
+  link(dL3cards, pkgCards, vCopy, vPaint, 'Headline, subhead and contact line to');
   link(dL3cards, pkgCards, vStyle, vPaint, 'Palette to');
   link(dL3cards, pkgCards, vFonts, vPaint, 'Resolved typefaces to');
   link(dL3cards, pkgCards, vPaint, vBrand, 'Reads the logo');

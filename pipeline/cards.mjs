@@ -245,7 +245,7 @@ function balance(lines) {
   return [a, b];
 }
 
-async function renderCard({ headline, sub, file }) {
+async function renderCard({ headline, sub, contact, file }) {
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
@@ -279,6 +279,8 @@ async function renderCard({ headline, sub, file }) {
   const RULE_GAP = 40;
   const HEAD_LINE = 92;
   const SUB_LINE = 48;
+  const CONTACT_GAP = 34;
+  const CONTACT_LINE = 44;
 
   ctx.font = `600 74px "${HEAD_FONT}"`;
   const headLines = wrap(ctx, headline, W * 0.72);
@@ -294,7 +296,8 @@ async function renderCard({ headline, sub, file }) {
     (logoImg ? logoH + GAP_LOGO : 0) +
     RULE_GAP +
     headLines.length * HEAD_LINE +
-    (subLines.length ? 14 + subLines.length * SUB_LINE : 0);
+    (subLines.length ? 14 + subLines.length * SUB_LINE : 0) +
+    (contact ? CONTACT_GAP + CONTACT_LINE : 0);
 
   // sit slightly above true centre — optically centred for a title card
   let y = (H - blockH) / 2 - 30;
@@ -324,6 +327,15 @@ async function renderCard({ headline, sub, file }) {
       ctx.fillText(line, W / 2, y);
       y += SUB_LINE;
     }
+  }
+
+  // full white and heavier than the muted subhead, so the address is the
+  // thing the eye lands on last
+  if (contact) {
+    y += CONTACT_GAP;
+    ctx.fillStyle = BRAND.text;
+    ctx.font = `600 36px "${BODY_FONT}"`;
+    ctx.fillText(contact, W / 2, y);
   }
 
   fs.writeFileSync(file, canvas.encodeSync('png'));
@@ -379,26 +391,30 @@ const parts = [];
 
 // `intro: Headline | Subhead` splits into the two lines on the card; the voice
 // reads both. Without a `|`, the text is the subhead under a default headline.
+// A third part (`Headline | Subhead | support@example.com`) is a contact line
+// under the subhead: shown, not spoken, since a voice reading an address out
+// letter by letter helps nobody who can see it.
 function splitCopy(kind, text) {
   const i = text.indexOf('|');
   if (i === -1) {
     return {
       headline: kind === 'intro' ? 'Product demo' : 'Thanks for watching',
       sub: text.trim(),
+      contact: null,
       spoken: text.trim(),
     };
   }
-  const headline = text.slice(0, i).trim();
-  const sub = text.slice(i + 1).trim();
-  return { headline, sub, spoken: `${headline}. ${sub}` };
+  const [headline, sub, ...rest] = text.split('|').map((s) => s.trim());
+  const contact = rest.join(' | ') || null;
+  return { headline, sub, contact, spoken: `${headline}. ${sub}` };
 }
 
 async function makeCard(kind, text) {
   if (!text) return;
 
-  const { headline, sub, spoken } = splitCopy(kind, text);
+  const { headline, sub, contact, spoken } = splitCopy(kind, text);
 
-  const png = await renderCard({ headline, sub, file: path.join(tmp, `${kind}.png`) });
+  const png = await renderCard({ headline, sub, contact, file: path.join(tmp, `${kind}.png`) });
 
   let audioFile = null;
   let seconds = kind === 'intro' ? 5 : 6;
