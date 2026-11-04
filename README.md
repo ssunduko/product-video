@@ -32,6 +32,7 @@ cursor, and a styled window frame.
                     video state, Jira comment (see "Publish a finished video")
     memory.mjs      project memory: feature catalogs, source diffs, sync lock, Zep
                     (see "Project memory")
+    test/           unit/ and integration/ suites, node:test (see "Tests")
   targets/
     signed-in.json          template for an app that needs sign-in
     local-app.json          the Express app in sample-app/
@@ -61,7 +62,11 @@ cursor, and a styled window frame.
                             (compose.mjs paints the frame with them too)
     *logo-white.png         the logo on the title cards (the first match)
     *.ttf / *.otf           optional: brand font files, registered at render time
+  avatar/           presenter avatar clips made by hand in ElevenCreative, gitignored
+                    (see "Avatar cards")
   docs/             C4 architecture model and its renderings
+  .github/workflows/ docs.yml (docs check), tests.yml (unit + integration tests),
+                    osv-scanner-pr.yml (dependency scan)
   sample-app/       a small Express app to record against (npm install && npm start)
   sample/           model videos new ones should match: cards, outro, pacing
   memory/           what the project has learned: rules.md (imported by CLAUDE.md), and
@@ -79,7 +84,8 @@ be rebuilt from anything else, which is why it lives in `scenarios/` and not in
 `out/`.
 
 **Architecture diagrams** are in [`docs/`](docs/C4.md) — C4 at three
-levels, with a component diagram for every stage including `author.mjs`.
+levels, with a component diagram for every stage including `author.mjs`, and
+one for the test suites.
 `docs/C4.md` reads anywhere; the same model is also published as C4-PlantUML
 (`docs/c4-*.puml`) and a StarUML project (`docs/ProductVideo-C4.mdj`). All three
 are generated from `docs/c4-model.mjs` — change the model there and re-run
@@ -511,6 +517,8 @@ Header directives for the title cards (read by `cards.mjs`, not the driver):
 |-----------|---------|
 | `intro: Headline \| Subhead` | opening card; both lines appear and are read aloud |
 | `outro: Headline \| Subhead` | closing card; a third part (`\| support@example.com`) adds a contact line, shown but not read aloud |
+| `intro-avatar: avatar/x-intro.mp4` | a talking-head clip that voices the intro card from a round bubble beside its copy (see [Avatar cards](#avatar-cards)) |
+| `outro-avatar: avatar/x-outro.mp4` | the same for the outro |
 
 Comments start with `#` at the start of a line or surrounded by spaces, so
 `css #search` keeps its id.
@@ -796,7 +804,10 @@ Anthropic has no text-to-speech API, so this calls a third party. The provider
 is chosen by `DEMO_TTS`, else by whichever key is set — `ELEVENLABS_API_KEY`
 (best voice quality) or `OPENAI_API_KEY` (cheaper, close). Keys resolve through
 the same path as every other credential: your shell or `/.env`, never a
-committed file. Pick a voice with `DEMO_TTS_VOICE`.
+committed file. Pick a voice with `DEMO_TTS_VOICE`. With `DEMO_AVATAR` on, the
+avatar's voice (`DEMO_AVATAR_VOICE`, ElevenLabs) takes precedence over both, so
+the walkthrough matches the presenter on the cards; `DEMO_TTS_VOICE` keeps the
+premium voice for when it is off.
 
 Why cues are timestamped at record time rather than authored on a timeline:
 beat length varies per run — an assistant thinking, a slow query — so a
@@ -894,6 +905,8 @@ into the next, or when narration outlasts the video.
 |-----|---------|--------------|
 | `DEMO_TTS` | key-dependent | `elevenlabs` or `openai` |
 | `DEMO_TTS_VOICE` | provider default | voice **ID**, not name |
+| `DEMO_AVATAR` | off | `on` or `off`; any other value is an error. On: avatar clips voice the cards and `DEMO_AVATAR_VOICE` reads the narration |
+| `DEMO_AVATAR_VOICE` | — | the avatar's ElevenLabs voice **ID**; required while `DEMO_AVATAR` is on, ignored otherwise |
 | `TTS_ONSET_DB` | `-34` | level that counts as speaking, for the breath trim |
 | `NARRATION_PREMIX_LUFS` | `-20` | common level every clip is put on before the mix |
 | `NARRATION_FILTER` | `speechnorm=e=3:r=0.0008:l=1,loudnorm=I=-16:TP=-1.5:LRA=11` | the master chain over the finished mix |
@@ -991,6 +1004,33 @@ headers (`Headline | Subhead`, plus an optional `| contact` line shown under the
 subhead and not voiced). Both cards are voiced with the same TTS provider
 as the narration; `--no-voice` makes them silent. Card length follows the
 voiceover, with a floor of 5-6s.
+
+#### Avatar cards
+
+A presenter avatar can read the intro and outro instead of the TTS voice. The
+title card stays as it is and the presenter talks from a round bubble in its
+bottom-right corner, never full screen. ElevenCreative (ElevenLabs) avatars have no API yet, so each clip is
+made by hand:
+
+1. Run cards.mjs once with the header pointing at a file that is not there yet.
+   It stops and prints the exact line the avatar must say: `Headline. Subhead`.
+   The contact line is never spoken.
+2. In ElevenCreative, Image & Video > Avatars, paste that line as the script,
+   generate, and download the MP4 to the path in the header. Any shape works:
+   the clip is cropped square to the bubble, centred across and biased to the
+   top of a tall clip, so keep the face centred with some headroom.
+3. Re-run. The clip's own audio is the voice, levelled like the narration. The
+   card copy, contact line included, moves left to make room for the bubble.
+
+`avatar/` is gitignored: a clip is a real person's face and voice. Flags
+`--intro-avatar` / `--outro-avatar` override the headers. In a trace, set
+`introAvatar` / `outroAvatar` and `author.mjs` writes the headers.
+
+The avatar is optional and off by default. It runs only with `DEMO_AVATAR=on`
+(in `.env`, the shell, or a manifest's `env`). Then the clips voice the cards
+and `DEMO_AVATAR_VOICE` voices the narration, taking precedence over
+`DEMO_TTS` and `DEMO_TTS_VOICE`. Off, a script that names clips renders plain
+cards in the `DEMO_TTS_VOICE` voice, and the clips are ignored.
 
 Every brand asset comes from `brand/`, and only from there — there
 is no flag to point elsewhere. `brand/StyleGuide.txt` drives the look:
@@ -1277,6 +1317,32 @@ node docs/check.mjs --ci    # also fail if regenerating changed a committed file
 | every PR and push to `main` | `.github/workflows/docs.yml` | fails if the diagrams were not regenerated or coverage has a gap |
 
 `CLAUDE.md` states the same rule for any Claude session.
+
+## Tests
+
+Node's built-in runner (`node:test`), so there is nothing extra to install.
+From `pipeline/`:
+
+```powershell
+npm run test               # everything
+npm run test:unit          # pure functions, no ffmpeg, no network (well under a second)
+npm run test:integration   # the real CLIs end to end; needs ffmpeg (about a minute)
+```
+
+| Suite | Folder | Covers |
+|---|---|---|
+| unit | `pipeline/test/unit/` | voice choice and the avatar switch (`tts.mjs`, `fetch` stubbed); the script language (`script.mjs`); trace authoring and narration budgeting (`author.mjs`); brand colour helpers (`brand.mjs`) |
+| integration | `pipeline/test/integration/` | `author.mjs` -> `script.mjs` -> loading the scenario, in a temp folder; `author.mjs --check` on the committed traces; `cards.mjs` with the avatar on, off, with a clip missing and with a bad `DEMO_AVATAR`, checking durations, audio and pixels in the rendered cards |
+
+Neither suite calls a text-to-speech API, a browser or the app: the avatar
+clips and the take are solid-colour stand-ins made with ffmpeg, and the voice
+and avatar variables are cleared for every run, so a developer's `.env` cannot
+change a result. Fixtures are the committed example trace and generated files
+only, never a private app's. The integration suite skips itself where ffmpeg is
+missing; CI installs it.
+
+`.github/workflows/tests.yml` runs both suites, as separate jobs, on every pull
+request, every push to `main` and every merge-queue group.
 
 ## Differences from the gist
 

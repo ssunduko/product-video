@@ -313,6 +313,8 @@ export function demoFromTrace(trace) {
   if (trace.startUrl) out.push(`start: ${trace.startUrl}`);
   if (trace.intro) out.push(`intro: ${trace.intro}`);
   if (trace.outro) out.push(`outro: ${trace.outro}`);
+  if (trace.introAvatar) out.push(`intro-avatar: ${trace.introAvatar}`);
+  if (trace.outroAvatar) out.push(`outro-avatar: ${trace.outroAvatar}`);
 
   out.push('');
   out.push('# Stated as intent; resolved against the live DOM into the sidecar beside');

@@ -17,7 +17,10 @@
     "qa": "node qa.mjs",
     "build": "node build.mjs",
     "publish-video": "node publish.mjs",
-    "memory": "node memory.mjs"
+    "memory": "node memory.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:unit": "node --test \"test/unit/**/*.test.mjs\"",
+    "test:integration": "node --test \"test/integration/**/*.test.mjs\""
   },
   "dependencies": {
     "@getzep/zep-cloud": "^4.0.1",

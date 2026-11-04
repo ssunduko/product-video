@@ -17,12 +17,32 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CACHE = path.join(HERE, '..', 'out', 'tts');
 export const TTS_CACHE = CACHE;
 
+// DEMO_AVATAR turns the presenter avatar on. Its clips voice the intro and
+// outro (cards.mjs), so the narration has to be in the avatar's voice too, or
+// the video changes speaker at the first join. While it is on,
+// DEMO_AVATAR_VOICE (an ElevenLabs voice) takes precedence over DEMO_TTS and
+// DEMO_TTS_VOICE; turning it off goes back to them untouched.
+// `on` or `off` (empty is off). Anything else is refused rather than read as
+// off, so a typo cannot quietly drop the presenter from a video.
+export function avatarEnabled() {
+  const v = (process.env.DEMO_AVATAR ?? '').trim().toLowerCase();
+  if (v === 'on') return true;
+  if (v === 'off' || v === '') return false;
+  throw new Error(`DEMO_AVATAR must be on or off, got "${process.env.DEMO_AVATAR}"`);
+}
+
 export function pickProvider() {
-  const forced = process.env.DEMO_TTS;
-  const voiceOverride = process.env.DEMO_TTS_VOICE || null;
+  const avatar = avatarEnabled();
+  const avatarVoice = process.env.DEMO_AVATAR_VOICE || null;
+  if (avatar && !avatarVoice) {
+    throw new Error('DEMO_AVATAR is on but DEMO_AVATAR_VOICE is not set: give the avatar\'s ElevenLabs voice ID');
+  }
+
+  const forced = avatar ? 'elevenlabs' : process.env.DEMO_TTS;
+  const voiceOverride = (avatar ? avatarVoice : process.env.DEMO_TTS_VOICE) || null;
 
   const name =
-    forced ??
+    forced ||
     (process.env.ELEVENLABS_API_KEY ? 'elevenlabs' : process.env.OPENAI_API_KEY ? 'openai' : null);
 
   if (!name) {
@@ -34,7 +54,9 @@ export function pickProvider() {
 
   if (name === 'elevenlabs') {
     const key = process.env.ELEVENLABS_API_KEY;
-    if (!key) throw new Error('DEMO_TTS=elevenlabs but ELEVENLABS_API_KEY is not set');
+    if (!key) {
+      throw new Error(`${avatar ? 'DEMO_AVATAR is on' : 'DEMO_TTS=elevenlabs'} but ELEVENLABS_API_KEY is not set`);
+    }
     const voice = voiceOverride || '21m00Tcm4TlvDq8ikWAM';
     return {
       name,

@@ -21,6 +21,8 @@ System_Ext(online_feature_sources, "Online feature sources", "e.g. a Google Driv
 System_Ext(zep_cloud, "Zep Cloud", "@getzep/zep-cloud · HTTPS. Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and pipeline notes, and a thread per working session.")
 System_Ext(video_destination, "Video destination", "Google Drive API v3 · HTTPS. Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} in .env.")
 System_Ext(jira, "Jira", "Atlassian MCP. The ticket each video is for (the manifest names it).")
+System_Ext(elevencreative, "ElevenCreative", "ElevenLabs web app · by hand. Where the presenter avatar clips are made: Image and Video, Avatars, Create Lip Sync, with the card line the card renderer prints.")
+System_Ext(github_actions, "GitHub Actions", "GitHub-hosted runners. Runs the unit and integration tests (tests.yml) on every pull request, push to main and merge group, and the docs check (docs.yml).")
 
 Rel(demo_author, demo_video_pipeline, "Writes flows and runs the stages", "CLI")
 Rel(demo_video_pipeline, claude_in_chrome_extension, "Resolves natural-language selectors before a take via")
@@ -37,6 +39,8 @@ Rel(demo_author, jira, "Posts the published link on the ticket (through Claude)"
 Rel(memory_agent, online_feature_sources, "Reads new and changed feature files from", "MCP")
 Rel(memory_agent, demo_video_pipeline, "Merges features and syncs memory via", "CLI")
 Rel(demo_video_pipeline, memory_agent, "Asks for a sync at session start when a source is stale")
+Rel(demo_author, elevencreative, "Generates the presenter avatar clips by hand in", "web app")
+Rel(github_actions, demo_video_pipeline, "Runs the tests and docs check on every PR, push to main and merge group")
 
 LAYOUT_WITH_LEGEND()
 @enduml
