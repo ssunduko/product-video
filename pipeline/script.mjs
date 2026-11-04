@@ -58,6 +58,8 @@ const HEADER_KEYS = new Set([
   'selectors',
   'intro',
   'outro',
+  'intro-avatar',
+  'outro-avatar',
 ]);
 
 const DEFAULT_WAIT_MS = 15000;
@@ -275,6 +277,8 @@ export function parseScript(src, { file = 'script' } = {}) {
     match: [],
     intro: null,
     outro: null,
+    introAvatar: null,
+    outroAvatar: null,
   };
 
   const sel = new SelRegistry();
@@ -327,6 +331,13 @@ export function parseScript(src, { file = 'script' } = {}) {
           break;
         case 'start':
           meta.startUrl = value;
+          break;
+        // consumed by cards.mjs: a talking-head clip that stands in for the card
+        case 'intro-avatar':
+          meta.introAvatar = value;
+          break;
+        case 'outro-avatar':
+          meta.outroAvatar = value;
           break;
         default:
           meta[key] = value;

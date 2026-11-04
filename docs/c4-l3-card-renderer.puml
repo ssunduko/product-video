@@ -13,6 +13,8 @@ ContainerDb(tts_clip_cache, "TTS clip cache", "out/tts/ · mp3", "One mp3 per li
 System_Ext(text_to_speech_api, "Text-to-speech API", "ElevenLabs or OpenAI. Chosen by DEMO_TTS, or by whichever key is set.")
 ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "One folder per take: out/ by default, or out/{video}/{part}/ when the build orchestrator sets DEMO_OUT, so takes never overwrite each other.")
 System_Ext(ffmpeg_ffprobe, "ffmpeg / ffprobe", "Local CLI. On PATH, or via FFMPEG / FFPROBE. Every encode, decode, probe and audio filter graph.")
+ContainerDb(targets_secrets, "Targets & secrets", "targets/*.json, *.local.json, .env", "Which deployment, and how to sign in.")
+ContainerDb(avatar_clips, "Avatar clips", "avatar/ · MP4 · gitignored", "Talking-head clips of the presenter avatar, one per card, made by hand in ElevenCreative and named by a script intro-avatar and outro-avatar headers.")
 
 Container_Boundary(card_renderer_2, "8 · Card Renderer") {
   Component(copy_parser, "Copy parser", "cards.mjs + script.mjs", "The intro and outro header directives, split on a pipe into headline and subhead.")
@@ -22,8 +24,17 @@ Container_Boundary(card_renderer_2, "8 · Card Renderer") {
   Component(tts_gateway_2, "TTS gateway", "tts.mjs · shared", "The same provider, cache and breath trim the narrator uses.")
   Component(clip_builder, "Clip builder", "ffmpeg", "Still plus voice, with a lead-in long enough to clear the dissolve.")
   Component(joiner, "Joiner", "ffmpeg xfade + acrossfade", "Normalises frame rate, pixel format and timebase on every input first, then dissolves card into demo.")
+  Component(avatar_switch, "Avatar switch", "tts.mjs avatarEnabled · DEMO_AVATAR", "on or off, from .env, the shell or a manifest env; empty is off and any other value is an error, so a typo cannot quietly drop the presenter.")
+  Component(avatar_bubble, "Avatar bubble", "cards.mjs · canvas mask + ffmpeg alphamerge", "The card stays and the clip is its voice: cropped square (centred across, biased to the top of a tall clip, where the face is) into a 460px round bubble in the bottom-right corner, over a white rin...")
 }
 
+Rel(copy_parser, avatar_switch, "intro-avatar and outro-avatar clips to")
+Rel(avatar_switch, targets_secrets, "Reads DEMO_AVATAR from .env")
+Rel(avatar_switch, avatar_bubble, "The clips, when on")
+Rel(avatar_bubble, avatar_clips, "Reads the presenter clip")
+Rel(card_painter, avatar_bubble, "Card PNG with the bubble ring to")
+Rel(avatar_bubble, ffmpeg_ffprobe, "Runs", "child process")
+Rel(avatar_bubble, joiner, "Avatar card clips to")
 Rel(flow_definitions, copy_parser, "intro and outro headers to")
 Rel(style_guide_reader, brand_assets, "Reads colour and type")
 Rel(font_loader, brand_assets, "Registers the font files")

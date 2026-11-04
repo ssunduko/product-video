@@ -396,7 +396,16 @@ const chromeExt = mk(pkgContext, 'external', 'Claude in Chrome extension', 'Brow
 const ttsApi = mk(pkgContext, 'external', 'Text-to-speech API', 'ElevenLabs or OpenAI',
   'Chosen by DEMO_TTS, or by whichever key is set. Anthropic has no TTS API, so this is a third ' +
   'party. Keys come from the shell or .env, never a committed file. With Zep, the only network ' +
-  'dependencies other than the app under demo.');
+  'dependencies other than the app under demo. With DEMO_AVATAR on, ElevenLabs reads the narration ' +
+  'in the presenter avatar voice (DEMO_AVATAR_VOICE) instead of DEMO_TTS_VOICE.');
+const elevenCreative = mk(pkgContext, 'external', 'ElevenCreative', 'ElevenLabs web app · by hand',
+  'Where the presenter avatar clips are made: Image and Video, Avatars, Create Lip Sync, with the ' +
+  'card line the card renderer prints. It has no avatar API, so the demo author generates each clip ' +
+  'there and saves the MP4 in avatar/; the pipeline never calls it.');
+const ciRunner = mk(pkgContext, 'external', 'GitHub Actions', 'GitHub-hosted runners',
+  'Runs the unit and integration tests (tests.yml) on every pull request, push to main and merge ' +
+  'group, and the docs check (docs.yml). Installs ffmpeg for the integration suite; holds no keys, ' +
+  'since no test calls a TTS API, a browser or an app.');
 
 const qaAgent = mk(pkgContext, 'external', 'video-qa agent', 'Claude Code subagent',
   'Reviews a finished video: runs the quality gate, then checks every narration line against a ' +
@@ -437,6 +446,8 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   const vZep = place(dL1, zepCloud, 1160, 60);
   const vDest = place(dL1, videoDest, 1160, 620);
   const vJira = place(dL1, jiraTickets, 800, 780);
+  const vElevenCreative = place(dL1, elevenCreative, 60, 780);
+  const vCi = place(dL1, ciRunner, 440, 780);
 
   link(dL1, pkgContext, vAuthor, vSystem, 'Writes flows and runs the stages', 'CLI');
   link(dL1, pkgContext, vSystem, vExt, 'Resolves natural-language selectors before a take via');
@@ -453,6 +464,8 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   link(dL1, pkgContext, vMemoryAgent, vSources, 'Reads new and changed feature files from', 'MCP');
   link(dL1, pkgContext, vMemoryAgent, vSystem, 'Merges features and syncs memory via', 'CLI');
   link(dL1, pkgContext, vSystem, vMemoryAgent, 'Asks for a sync at session start when a source is stale');
+  link(dL1, pkgContext, vAuthor, vElevenCreative, 'Generates the presenter avatar clips by hand in', 'web app');
+  link(dL1, pkgContext, vCi, vSystem, 'Runs the tests and docs check on every PR, push to main and merge group');
 }
 
 // ======================================================= L2 — containers ==
@@ -504,7 +517,8 @@ const cTighten = mk(pkgContainers, 'container', '7 · Tightener', 'tighten.mjs �
   'nothing to cut, so the next stage can never pick up an earlier take.');
 const cCards = mk(pkgContainers, 'container', '8 · Card Renderer', 'cards.mjs · Node.js + canvas + ffmpeg',
   'Renders branded intro/outro title cards, voices them with the same provider, and dissolves them ' +
-  'on with the concat filter rather than the demuxer.');
+  'on with the concat filter rather than the demuxer. With DEMO_AVATAR on, a presenter avatar clip ' +
+  'voices each card from a round bubble in its bottom-right corner instead of TTS.');
 
 const dFlows = mk(pkgContainers, 'store', 'Flow definitions', 'input/ + scenarios/ authored, scripts/ generated',
   'What happens on screen and what is said over it. Split by who writes it: input/ holds the ' +
@@ -570,6 +584,15 @@ const dProfiles = mk(pkgContainers, 'store', 'Browser profiles', 'profile/, prof
   'user. Signed in by hand once; a take never signs out. Sensitive: whoever has the folder has ' +
   'the session.');
 
+const dAvatar = mk(pkgContainers, 'store', 'Avatar clips', 'avatar/ · MP4 · gitignored',
+  'Talking-head clips of the presenter avatar, one per card, made by hand in ElevenCreative and ' +
+  'named by a script intro-avatar and outro-avatar headers. Gitignored: a clip is a real person face ' +
+  'and voice. Read only while DEMO_AVATAR is on.');
+const cTests = mk(pkgContainers, 'container', 'Test Suites', 'pipeline/test · node:test',
+  'Unit tests of the pure functions (voice and avatar selection, the script language, trace ' +
+  'authoring, brand colours) and integration tests that run the real CLIs end to end with ffmpeg ' +
+  'and synthetic clips. Run locally with npm run test and in CI on every PR, push to main and merge group.');
+
 const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   'Level 2. The stages inside the pipeline and the files they hand work over through.',
   { macro: 'System_Boundary', name: 'Demo Video Pipeline' });
@@ -613,6 +636,10 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   const vPublish = place(dL2, cPublish, 340, 1020);
   const vDest2 = place(dL2, videoDest, 1000, 1020);
   const vJira2 = place(dL2, jiraTickets, 1280, 1020);
+  const vAvatar = place(dL2, dAvatar, 1280, 700);
+  const vElevenCreative2 = place(dL2, elevenCreative, 1560, 1020);
+  const vTests = place(dL2, cTests, 60, 1180);
+  const vCi2 = place(dL2, ciRunner, 340, 1180);
 
   link(dL2, pkgContainers, vAuthor, vFlows, 'Writes the flow');
   link(dL2, pkgContainers, vAuthor, vTargets, 'Sets the deployment and credentials');
@@ -683,6 +710,19 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   link(dL2, pkgContainers, vPublish, vDest2, 'Uploads the video to', 'HTTPS');
   link(dL2, pkgContainers, vPublish, vMemory, 'Records the publication via', 'import');
   link(dL2, pkgContainers, vAuthor, vJira2, 'Posts the link on the ticket (through Claude)', 'MCP');
+
+  link(dL2, pkgContainers, vAuthor, vElevenCreative2, 'Generates each avatar clip in', 'web app');
+  link(dL2, pkgContainers, vAuthor, vAvatar, 'Saves the downloaded clips');
+  link(dL2, pkgContainers, v8, vAvatar, 'Reads the presenter clips while DEMO_AVATAR is on');
+  link(dL2, pkgContainers, v8, vTargets, 'Reads DEMO_AVATAR from .env');
+  link(dL2, pkgContainers, v6, vTargets, 'Reads the voice settings from .env');
+
+  link(dL2, pkgContainers, vCi2, vTests, 'Runs on every PR, push to main and merge group');
+  link(dL2, pkgContainers, vAuthor, vTests, 'Runs npm run test after a pipeline change', 'CLI');
+  for (const v of [v0, v1, v8]) link(dL2, pkgContainers, vTests, v, 'Exercises, as a CLI and by import', 'child process');
+  link(dL2, pkgContainers, vTests, v6, 'Unit-tests the shared voice choice of', 'import');
+  link(dL2, pkgContainers, vTests, vFfmpeg, 'Makes synthetic clips and reads pixels via', 'child process');
+  link(dL2, pkgContainers, vTests, vTraces, 'Reads the committed example trace');
 }
 
 // ========================================== L3 · 0 — components: author ==
@@ -717,7 +757,9 @@ const aEmit = mk(pkgAuthor, 'component', 'Step emitter', 'author.mjs · emitOne(
   'when it was guessed is worse than no figure. An ifAppears becomes a short-timeout guard for UI ' +
   'that only shows up sometimes.');
 const aHeader = mk(pkgAuthor, 'component', 'Header writer', 'author.mjs',
-  'Writes the provenance line, any hazards the walk recorded, and the ready-to-paste SPEEDS_MS command. ' +
+  'Writes the provenance line, any hazards the walk recorded, the ready-to-paste SPEEDS_MS command, and ' +
+  'the script headers from the trace: name, target, start, intro, outro, and intro-avatar and ' +
+  'outro-avatar from its introAvatar and outroAvatar. ' +
   'Hazards go in the file rather than a chat log because that is where the next person will look.');
 const aProv = mk(pkgAuthor, 'component', 'Provenance stamper', 'author.mjs',
   'Takes resolvedBy and the note from the trace instead of stamping them on. It used to hardcode ' +
@@ -773,7 +815,8 @@ const sRegistry = mk(pkgScript, 'component', 'SEL registry', 'script.mjs',
   'Names in the selectors block become slugged keys on the exported SEL map, deduped so two ' +
   'similar labels cannot quietly collide on one key.');
 const sHeader = mk(pkgScript, 'component', 'Header parser', 'script.mjs',
-  'target, app, viewport, match, intro, outro and brand. An unknown directive is an error naming ' +
+  'target, app, viewport, match, intro, outro, intro-avatar, outro-avatar and brand. The avatar ' +
+  'clip paths are read by cards.mjs, not the driver. An unknown directive is an error naming ' +
   'the file and line, not a silently ignored line.');
 const sBeats = mk(pkgScript, 'component', 'Beat parser', 'script.mjs',
   'Beats of wait, click, hover, park, hold, type, press, scroll, open, login, logout, say and ' +
@@ -1120,7 +1163,9 @@ const nCues = mk(pkgNarrator, 'component', 'Cue file resolver', 'narrate.mjs',
   'silently narrates over the wrong footage — so the project file, not the timestamp, is the authority.');
 const nTts = mk(pkgNarrator, 'component', 'TTS gateway', 'tts.mjs · shared',
   'Shared with cards.mjs, which is why both stages voice a script identically. Picks the provider, ' +
-  'then hits a content-addressed cache keyed by provider+voice+text before spending anything.');
+  'then hits a content-addressed cache keyed by provider+voice+text before spending anything. With ' +
+  'DEMO_AVATAR on, the avatar\'s ElevenLabs voice (DEMO_AVATAR_VOICE) takes precedence over ' +
+  'DEMO_TTS and DEMO_TTS_VOICE, so the narration matches the presenter on the cards.');
 const nBreath = mk(pkgNarrator, 'component', 'Breath trimmer', 'tts.mjs · ffmpeg astats',
   'TTS does not start on the word; it starts on 100-160ms at -50 to -85 dB. Cued at the file start ' +
   'that is heard as the line fading up, and normalising a breath just gives a louder breath. ' +
@@ -1167,7 +1212,9 @@ const dL3b = diagram(pkgNarrator, 'c4-l3-narrator', 'C4-L3 — Components · Nar
   const vApi = place(dL3b, ttsApi, 1020, 200);
   const vWork = place(dL3b, dWork, 1020, 380, 220, 160);
   const vFfmpeg = place(dL3b, ffmpeg, 700, 540);
+  const vTargets = place(dL3b, dTargets, 1020, 600);
 
+  link(dL3b, pkgNarrator, vTts, vTargets, 'Reads DEMO_AVATAR and the voice IDs from .env');
   link(dL3b, pkgNarrator, vCues, vWork, 'Reads {take}.recordly + the cue file');
   link(dL3b, pkgNarrator, vCues, vTts, 'One line at a time to');
   link(dL3b, pkgNarrator, vTts, vCache, 'Hits before spending');
@@ -1257,7 +1304,8 @@ const rCopy = mk(pkgCards, 'component', 'Copy parser', 'cards.mjs + script.mjs',
   'The intro and outro header directives, split on a pipe into headline and subhead. Both appear ' +
   'on the card and both are read aloud. Without a pipe the text becomes the subhead under a ' +
   'default headline. An optional third part is a contact line (an email) under the subhead: ' +
-  'shown, not read aloud.');
+  'shown, not read aloud. intro-avatar and outro-avatar name a talking-head clip that voices ' +
+  'that card from a round bubble beside its copy.');
 const rStyle = mk(pkgCards, 'component', 'Style guide reader', 'brand.mjs · shared',
   'Colour and type from brand/StyleGuide.txt, shared with the compositor so the style-guide hex ' +
   'cannot end up in one stage and not the other.');
@@ -1272,7 +1320,19 @@ const rPaint = mk(pkgCards, 'component', 'Card painter', '@napi-rs/canvas',
   'measured first, then drawn optically centred.');
 const rTts = mk(pkgCards, 'component', 'TTS gateway', 'tts.mjs · shared',
   'The same provider, cache and breath trim the narrator uses. Sharing it is why the cards sit at ' +
-  'the same level as the body of the video instead of the join being audible.');
+  'the same level as the body of the video instead of the join being audible. Not called for a card ' +
+  'an avatar clip voices.');
+const rSwitch = mk(pkgCards, 'component', 'Avatar switch', 'tts.mjs avatarEnabled · DEMO_AVATAR',
+  'on or off, from .env, the shell or a manifest env; empty is off and any other value is an error, ' +
+  'so a typo cannot quietly drop the presenter. Off, the clips a script names are ignored and the ' +
+  'cards render as stills in the DEMO_TTS_VOICE voice. On, the clips voice the cards and the ' +
+  'avatar voice takes precedence for the narration too.');
+const rBubble = mk(pkgCards, 'component', 'Avatar bubble', 'cards.mjs · canvas mask + ffmpeg alphamerge',
+  'The card stays and the clip is its voice: cropped square (centred across, biased to the top of a ' +
+  'tall clip, where the face is) into a 460px round bubble in the bottom-right corner, over a white ' +
+  'ring and shadow the card painter draws, with the copy moved left to make room. The clip audio is ' +
+  'the voice, levelled like the narration; first and last frames are held for the same lead and ' +
+  'tail as a still card. A missing clip stops the stage and prints the line to record.');
 const rClip = mk(pkgCards, 'component', 'Clip builder', 'ffmpeg',
   'Still plus voice, with a lead-in long enough to clear the dissolve. The outro is the incoming ' +
   'side of the last fade, so a shorter lead would put its first word inside that fade — the one ' +
@@ -1287,10 +1347,18 @@ const dL3cards = diagram(pkgCards, 'c4-l3-card-renderer',
   'Level 3, container "8 · Card Renderer".',
   { macro: 'Container_Boundary', name: '8 · Card Renderer' });
 {
-  const [vCopy, vStyle, vFonts, vPaint, vTts, vClip, vJoin] = grid(dL3cards,
-    [rCopy, rStyle, rFonts, rPaint, rTts, rClip, rJoin], { cols: 3 });
-  const [vFlows, vBrand, vCache, vApi, vWork, vFfmpeg] =
-    column(dL3cards, [dFlows, dBrand, dTts, ttsApi, dWork, ffmpeg], { dy: 150 });
+  const [vCopy, vStyle, vFonts, vPaint, vTts, vClip, vJoin, vSwitch, vBubble] = grid(dL3cards,
+    [rCopy, rStyle, rFonts, rPaint, rTts, rClip, rJoin, rSwitch, rBubble], { cols: 3 });
+  const [vFlows, vBrand, vCache, vApi, vWork, vFfmpeg, vTargets, vAvatar] =
+    column(dL3cards, [dFlows, dBrand, dTts, ttsApi, dWork, ffmpeg, dTargets, dAvatar], { dy: 150 });
+
+  link(dL3cards, pkgCards, vCopy, vSwitch, 'intro-avatar and outro-avatar clips to');
+  link(dL3cards, pkgCards, vSwitch, vTargets, 'Reads DEMO_AVATAR from .env');
+  link(dL3cards, pkgCards, vSwitch, vBubble, 'The clips, when on');
+  link(dL3cards, pkgCards, vBubble, vAvatar, 'Reads the presenter clip');
+  link(dL3cards, pkgCards, vPaint, vBubble, 'Card PNG with the bubble ring to');
+  link(dL3cards, pkgCards, vBubble, vFfmpeg, 'Runs', 'child process');
+  link(dL3cards, pkgCards, vBubble, vJoin, 'Avatar card clips to');
 
   link(dL3cards, pkgCards, vFlows, vCopy, 'intro and outro headers to');
   link(dL3cards, pkgCards, vStyle, vBrand, 'Reads colour and type');
@@ -1571,6 +1639,57 @@ const dL3publish = diagram(pkgPublish, 'c4-l3-publisher',
   link(dL3publish, pkgPublish, vUp, vRec, 'The link to');
   link(dL3publish, pkgPublish, vRec, vMemP, 'Records and syncs via', 'import + child process');
   link(dL3publish, pkgPublish, vAuthor, vJiraP, 'Posts the link on the ticket (through Claude)', 'MCP');
+}
+
+// ====================================== L3 · 13 — components: test suites ==
+const pkgTests = pkg(
+  '3.13 — Components · Test Suites',
+  'Inside pipeline/test. Node built-in runner, so nothing extra to install. Neither suite calls a ' +
+    'text-to-speech API, a browser or the app under demo, and fixtures are public: the committed ' +
+    'example trace and media generated on the fly, never a private app files.',
+);
+
+const uUnit = mk(pkgTests, 'component', 'Unit suite', 'pipeline/test/unit · node:test',
+  'Pure functions, no ffmpeg and no network: voice and avatar selection in tts.mjs (on, off, typos, ' +
+  'precedence, missing settings, with fetch stubbed), the .demo language in script.mjs, trace ' +
+  'authoring and narration budgeting in author.mjs, and the colour helpers in brand.mjs. Every test ' +
+  'clears the voice variables first, so a developer .env cannot change a result.');
+const uIntegration = mk(pkgTests, 'component', 'Integration suite', 'pipeline/test/integration · node:test',
+  'The real CLIs end to end. author.mjs to script.mjs to loading the scenario, in a temp folder, plus ' +
+  'author.mjs --check on the committed traces; cards.mjs with the avatar on, off, with a clip missing ' +
+  'and with a bad DEMO_AVATAR, checking durations, audio and pixels in the rendered cards. Skips ' +
+  'itself where ffmpeg is missing.');
+const uHelpers = mk(pkgTests, 'component', 'Integration helpers', 'test/integration/helpers.mjs',
+  'Runs a stage as its CLI with the voice and avatar variables cleared, makes solid-colour stand-in ' +
+  'clips with a tone, and reads durations, audio streams and single pixels back out of a video.');
+const uWorkflow = mk(pkgTests, 'component', 'Tests workflow', '.github/workflows/tests.yml',
+  'Two jobs, unit and integration, on every pull request, push to main and merge group. Node 22 with ' +
+  'npm ci in pipeline/; the integration job installs ffmpeg first.');
+
+const dL3tests = diagram(pkgTests, 'c4-l3-test-suites',
+  'C4-L3 — Components · Test Suites (pipeline/test)',
+  'Level 3, container "Test Suites".',
+  { macro: 'Container_Boundary', name: 'Test Suites' });
+{
+  const [vUnit, vInt, vHelp, vWf] = grid(dL3tests, [uUnit, uIntegration, uHelpers, uWorkflow], { cols: 2 });
+  const [vCi, vAuthor, vAuthorC, vScriptC, vCardsC, vNarrC, vTraces, vFfmpeg] = column(dL3tests,
+    [ciRunner, author, cAuthor, cScript, cCards, cNarrate, dTraces, ffmpeg], { x: 760, dy: 140 });
+
+  link(dL3tests, pkgTests, vCi, vWf, 'Triggers on PR, push to main, merge group');
+  link(dL3tests, pkgTests, vWf, vUnit, 'npm run test:unit');
+  link(dL3tests, pkgTests, vWf, vInt, 'npm run test:integration');
+  link(dL3tests, pkgTests, vAuthor, vUnit, 'npm run test', 'CLI');
+  link(dL3tests, pkgTests, vAuthor, vInt, 'npm run test', 'CLI');
+  link(dL3tests, pkgTests, vUnit, vAuthorC, 'Imports budget and demoFromTrace from', 'import');
+  link(dL3tests, pkgTests, vUnit, vScriptC, 'Imports the parser and compiler from', 'import');
+  link(dL3tests, pkgTests, vUnit, vNarrC, 'Imports the shared voice choice (tts.mjs) of', 'import');
+  link(dL3tests, pkgTests, vUnit, vTraces, 'Reads the example trace');
+  link(dL3tests, pkgTests, vInt, vHelp, 'Uses');
+  link(dL3tests, pkgTests, vHelp, vAuthorC, 'Runs author.mjs', 'child process');
+  link(dL3tests, pkgTests, vHelp, vScriptC, 'Runs script.mjs', 'child process');
+  link(dL3tests, pkgTests, vHelp, vCardsC, 'Runs cards.mjs, avatar on and off', 'child process');
+  link(dL3tests, pkgTests, vHelp, vFfmpeg, 'Makes stand-in clips; reads pixels', 'child process');
+  link(dL3tests, pkgTests, vInt, vTraces, 'Copies the example trace to a temp folder');
 }
 
 // --------------------------------------------------------------- validate

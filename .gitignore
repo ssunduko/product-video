@@ -46,3 +46,8 @@ npm-debug.log*
 # model videos are app videos; only the folder is kept
 sample/*
 !sample/.gitkeep
+
+# avatar clips (talking heads made by hand in ElevenCreative) are a real
+# person's face and voice; only the folder is kept
+avatar/*
+!avatar/.gitkeep

@@ -24,6 +24,14 @@ Docs change in the same commit as the code they describe.
 - The same check runs as a git pre-commit hook (`git config core.hooksPath
   .githooks`) and on every PR (`.github/workflows/docs.yml`).
 
+## Tests
+
+After changing anything in `pipeline/`, run `npm run test` from `pipeline/`
+(unit + integration; integration needs ffmpeg). Add or update a test for the
+behaviour you changed. Fixtures stay public: the example trace and generated
+media, never a private app's files. CI runs both suites
+(`.github/workflows/tests.yml`) on every PR, push to main and merge group.
+
 ## Traces and scripts
 
 A generated `scripts/<name>.demo` and its `.selectors.json` come from

@@ -19,6 +19,8 @@ System_Ext(online_feature_sources, "Online feature sources", "e.g. a Google Driv
 System_Ext(zep_cloud, "Zep Cloud", "@getzep/zep-cloud · HTTPS. Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and pipeline notes, and a thread per working session.")
 System_Ext(video_destination, "Video destination", "Google Drive API v3 · HTTPS. Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} in .env.")
 System_Ext(jira, "Jira", "Atlassian MCP. The ticket each video is for (the manifest names it).")
+System_Ext(elevencreative, "ElevenCreative", "ElevenLabs web app · by hand. Where the presenter avatar clips are made: Image and Video, Avatars, Create Lip Sync, with the card line the card renderer prints.")
+System_Ext(github_actions, "GitHub Actions", "GitHub-hosted runners. Runs the unit and integration tests (tests.yml) on every pull request, push to main and merge group, and the docs check (docs.yml).")
 
 System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   Container(author, "0 · Author", "author.mjs · Node.js", "Turns an observed walk of the app into the DSL. Reads a trace — the selectors found and the wait times measured — and emits the .demo and its selector sidecar together.")
@@ -44,6 +46,8 @@ System_Boundary(demo_video_pipeline_2, "Demo Video Pipeline") {
   Container(memory, "Memory", "memory.mjs · Node.js + @getzep/zep-cloud", "Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against the sync lock next to the catalog (files older than the catalog are its baseline), merges new...")
   ContainerDb(project_memory, "Project memory", "memory/ · committed", "rules.md (imported by CLAUDE.md), features/{app}/data/features.json (the feature catalog, the initial set), features/{app}/*.md (one page per filmed feature, naming its videos), sources.json (gener...")
   Container(publisher, "Publisher", "publish.mjs · Node.js + Google Drive API", "Publishes a finished video after final approval: only a video whose state is done, and only with --approved.")
+  ContainerDb(avatar_clips, "Avatar clips", "avatar/ · MP4 · gitignored", "Talking-head clips of the presenter avatar, one per card, made by hand in ElevenCreative and named by a script intro-avatar and outro-avatar headers.")
+  Container(test_suites, "Test Suites", "pipeline/test · node:test", "Unit tests of the pure functions (voice and avatar selection, the script language, trace authoring, brand colours) and integration tests that run the real CLIs end to end with ffmpeg and synthetic...")
 }
 
 Rel(demo_author, flow_definitions, "Writes the flow")
@@ -114,6 +118,19 @@ Rel(publisher, work_directory, "Reads the finished MP4")
 Rel(publisher, video_destination, "Uploads the video to", "HTTPS")
 Rel(publisher, memory, "Records the publication via", "import")
 Rel(demo_author, jira, "Posts the link on the ticket (through Claude)", "MCP")
+Rel(demo_author, elevencreative, "Generates each avatar clip in", "web app")
+Rel(demo_author, avatar_clips, "Saves the downloaded clips")
+Rel(card_renderer, avatar_clips, "Reads the presenter clips while DEMO_AVATAR is on")
+Rel(card_renderer, targets_secrets, "Reads DEMO_AVATAR from .env")
+Rel(narrator, targets_secrets, "Reads the voice settings from .env")
+Rel(github_actions, test_suites, "Runs on every PR, push to main and merge group")
+Rel(demo_author, test_suites, "Runs npm run test after a pipeline change", "CLI")
+Rel(test_suites, author, "Exercises, as a CLI and by import", "child process")
+Rel(test_suites, script_compiler, "Exercises, as a CLI and by import", "child process")
+Rel(test_suites, card_renderer, "Exercises, as a CLI and by import", "child process")
+Rel(test_suites, narrator, "Unit-tests the shared voice choice of", "import")
+Rel(test_suites, ffmpeg_ffprobe, "Makes synthetic clips and reads pixels via", "child process")
+Rel(test_suites, observed_traces, "Reads the committed example trace")
 
 LAYOUT_WITH_LEGEND()
 @enduml
