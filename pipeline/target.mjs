@@ -34,6 +34,8 @@ const KNOWN_KEYS = new Set([
   'pageUrlMatch',
   'blockUrls',
   'hideSelectors',
+  'blurSelectors',
+  'replaceText',
   'profile',
   'auth',
   'secrets',
@@ -243,11 +245,117 @@ export function loadTarget(ref) {
     pageUrlMatch: cfg.pageUrlMatch ?? null,
     blockUrls: cfg.blockUrls ?? [],
     hideSelectors: cfg.hideSelectors ?? [],
+    blurSelectors: cfg.blurSelectors ?? [],
+    replaceText: normaliseReplace(cfg.replaceText),
     profile: cfg.profile ?? null,
     secrets: cfg.secrets ?? {},
     auth,
     missingEnv,
   };
+}
+
+// replaceText: [{ from, to, whole? }] — real names shown as invented ones.
+function normaliseReplace(pairs) {
+  if (pairs === undefined || pairs === null) return [];
+  if (!Array.isArray(pairs)) throw new Error('target replaceText must be an array of { from, to, whole? }');
+  return pairs.map((p, i) => {
+    if (!isPlain(p) || typeof p.from !== 'string' || !p.from || typeof p.to !== 'string') {
+      throw new Error(`target replaceText[${i}] needs a non-empty "from" and a "to" string`);
+    }
+    return { from: p.from, to: p.to, whole: p.whole === true };
+  });
+}
+
+// Runs in the page (puppeteer serialises it, so it must stay self-contained).
+// Shows `to` wherever the app draws `from`, in every text node, as it draws
+// and whenever it redraws. Longer `from` first, so "Pat Lane" wins over
+// "Text"; `whole` matches only a node whose trimmed text is exactly `from`
+// (initials, short words). Only the browser's copy of the page changes:
+// nothing is sent to the app.
+export function textReplacer(pairs) {
+  const list = [...pairs].sort((a, b) => b.from.length - a.from.length);
+  const swap = (t) => {
+    for (const p of list) {
+      if (p.whole) { if (t.trim() === p.from) return t.replace(p.from, p.to); }
+      else if (t.includes(p.from)) t = t.split(p.from).join(p.to);
+    }
+    return t;
+  };
+  const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA']);
+  const fix = (node) => {
+    if (node.nodeType === 3) {
+      if (node.parentNode && SKIP.has(node.parentNode.nodeName)) return;
+      const next = swap(node.nodeValue);
+      if (next !== node.nodeValue) node.nodeValue = next;
+      return;
+    }
+    if (node.nodeType !== 1 && node.nodeType !== 9 && node.nodeType !== 11) return;
+    if (SKIP.has(node.nodeName)) return;
+    const w = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) fix(n);
+  };
+  // Input values are not text nodes (a contact's Phone field). The app writes
+  // them through the `value` setter, so the setter is wrapped: the invented
+  // value is what lands, with no frame of the real one in between (take 5 of
+  // an earlier take flashed a real number while a 150ms timer was the
+  // only swap). The timer stays for values set any other way. Never a
+  // password, never the field being typed in. Only the shown value changes;
+  // nothing is typed or saved.
+  const proto = typeof HTMLInputElement !== 'undefined' ? HTMLInputElement.prototype : null;
+  const desc = proto && Object.getOwnPropertyDescriptor(proto, 'value');
+  if (desc?.set && !desc.set.__demoReplace) {
+    const set = function (v) {
+      const swapped = this.type === 'password' || this === document.activeElement ? v : swap(String(v ?? ''));
+      return desc.set.call(this, swapped);
+    };
+    set.__demoReplace = true;
+    Object.defineProperty(proto, 'value', { ...desc, set });
+  }
+  const fixInputs = () => {
+    for (const el of document.querySelectorAll('input')) {
+      if (el.type === 'password' || el === document.activeElement) continue;
+      const next = swap(el.value);
+      if (next !== el.value) el.value = next;
+    }
+  };
+  // Text that CSS draws from an attribute (`content: attr(data-name)`) is not
+  // a text node: some apps draw a contact's avatar initials that way, and
+  // a take showed the real initials next to the invented name. Those attributes
+  // are swapped too, as they are set.
+  const ATTRS = ['data-name'];
+  const fixAttrs = (el) => {
+    if (el?.nodeType !== 1 || typeof el.getAttribute !== 'function') return;
+    for (const a of ATTRS) {
+      const v = el.getAttribute(a);
+      if (v == null) continue;
+      const next = swap(v);
+      if (next !== v) el.setAttribute(a, next);
+    }
+  };
+  const fixAttrsUnder = (node) => {
+    if (node?.nodeType !== 1 && node?.nodeType !== 9) return;
+    if (node.nodeType === 1) fixAttrs(node);
+    node.querySelectorAll?.(ATTRS.map((a) => `[${a}]`).join(',')).forEach(fixAttrs);
+  };
+  const start = () => {
+    if (!document.documentElement || document.documentElement.__demoReplace) return;
+    document.documentElement.__demoReplace = true;
+    fix(document.documentElement);
+    fixAttrsUnder(document.documentElement);
+    fixInputs();
+    setInterval(fixInputs, 150);
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        if (m.type === 'characterData') fix(m.target);
+        else if (m.type === 'attributes') fixAttrs(m.target);
+        else m.addedNodes.forEach((n) => { fix(n); fixAttrsUnder(n); });
+      }
+    }).observe(document.documentElement, {
+      subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS,
+    });
+  };
+  start();
+  document.addEventListener('DOMContentLoaded', start);
 }
 
 function normaliseAuth(auth) {

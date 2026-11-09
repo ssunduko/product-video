@@ -3,7 +3,7 @@
 
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { avatarEnabled, pickProvider } from '../../tts.mjs';
+import { avatarEnabled, pickProvider, spokenForm } from '../../tts.mjs';
 
 const KEYS = [
   'DEMO_AVATAR',
@@ -153,5 +153,17 @@ describe('render', () => {
     process.env.ELEVENLABS_API_KEY = 'k';
     globalThis.fetch = async () => new Response('{"detail":"paid_plan_required"}', { status: 402 });
     await assert.rejects(pickProvider().render('x'), /ElevenLabs 402[\s\S]*plan disallows this voice/);
+  });
+});
+
+describe('spokenForm (TTS_PRONOUNCE)', () => {
+  const map = JSON.stringify({ Acmemsg: 'Acme Message' });
+  test('says a shown word the way the map spells it, whole words only', () => {
+    assert.equal(spokenForm('Acmemsg Monthly Update', map), 'Acme Message Monthly Update');
+    assert.equal(spokenForm('Acmemsgs stay', map), 'Acmemsgs stay');
+  });
+  test('leaves text alone without a map, and refuses a map that is not JSON', () => {
+    assert.equal(spokenForm('Acmemsg', ''), 'Acmemsg');
+    assert.throws(() => spokenForm('x', 'Acmemsg=Acme Message'), /TTS_PRONOUNCE/);
   });
 });

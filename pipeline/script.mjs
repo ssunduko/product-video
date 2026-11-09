@@ -266,6 +266,25 @@ class SelRegistry {
 
 // ---- parser ----
 
+// The section cards of a parsed script, in order: each `card` with the text of
+// the first `say` after it, which is where cards.mjs cuts the card in.
+export function sectionCards(steps) {
+  const flat = (list) => list.flatMap((s) => (s.op === 'if' ? [s, ...flat(s.children ?? [])] : [s]));
+  const out = [];
+  let pending = null;
+  for (const s of flat(steps)) {
+    if (s.op === 'card') {
+      if (pending) throw new Error(`line ${pending.lineNo}: card "${pending.text}" has no say before the next card`);
+      pending = s;
+    } else if (s.op === 'say' && pending) {
+      out.push({ text: pending.text, line: s.text, lineNo: pending.lineNo });
+      pending = null;
+    }
+  }
+  if (pending) throw new Error(`line ${pending.lineNo}: card "${pending.text}" has no say after it`);
+  return out;
+}
+
 export function parseScript(src, { file = 'script' } = {}) {
   const meta = {
     name: null,
@@ -387,6 +406,15 @@ export function parseScript(src, { file = 'script' } = {}) {
       case 'note':
         push({ op: 'note', text: rest });
         break;
+
+      case 'card': {
+        // a section card: cards.mjs shows it just before this beat's first
+        // `say`. Nothing happens in the take.
+        const lit = /^"((?:[^"\\]|\\.)*)"$/.exec(rest.trim());
+        if (!lit) fail('card takes a quoted "Headline | Subhead", e.g. card "Emergency Stop | Pause every send"');
+        push({ op: 'card', text: unquote(lit[1]) });
+        break;
+      }
 
       case 'say': {
         // narration cue: timestamped where it appears in the flow, rendered to
@@ -532,6 +560,9 @@ function emitSteps(steps, indent, out) {
       case 'note':
         out.push(`${pad}// ${step.text}`);
         break;
+      case 'card':
+        out.push(`${pad}// section card: ${step.text}`);
+        break;
       case 'say':
         out.push(`${pad}d.say(${q(step.text)});`);
         break;
@@ -642,7 +673,7 @@ export function compileScript(
 
   const flat = (list) =>
     list.flatMap((s) => (s.op === 'if' ? [s, ...flat(s.children)] : [s]));
-  const actions = flat(steps).filter((s) => !['beat', 'note', 'say'].includes(s.op));
+  const actions = flat(steps).filter((s) => !['beat', 'note', 'say', 'card'].includes(s.op));
 
   if (!actions.length) warnings.push('script has no steps — the take will be empty');
 

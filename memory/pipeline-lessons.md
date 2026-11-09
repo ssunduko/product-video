@@ -80,7 +80,53 @@ problem. The README says what the stages are; this page says how to get a pass.
   cursor drifts onto the page behind it. Size the hold
   to the line instead: a 6s hold after a 2.6s line failed qa as frozen.
 
+- **Clicks a few seconds apart zoom in and out at each one.** Clicks merge
+  into one zoom only under 2.5s apart. On a panel driven step by step (tick,
+  Stop, Resume 4-7s apart) the user saw the view go in and out repeatedly.
+  Set `ZOOM_MERGE_MS` above the beat's largest click gap (Stop -> Resume was
+  ~9s, so 7000 still failed in take 5; 9000 merged it). A zoom never spans a
+  page open (`raw.mp4.opens.json`), so a wide gap cannot run a zoom into the
+  next section. A re-render is enough (2026-11-08).
+
+- **A section card must come before its page, not before its line.** Once
+  beats opened their page before speaking (to keep lines off loading screens),
+  cards placed just before the first line let the next feature's screen show
+  before its announcement (user, 2026-11-08). cards.mjs now places a card at
+  the beat's page `open` (`leadAtMs`, which assemble.mjs derives from the
+  take's recorded waits, so a `--no-record` re-render of an older take gets it
+  too); a beat with no `open` before its line falls back to the line.
+- **…and after the previous line, and the take resumes on the new page.** The
+  open can start while the previous line is still speaking (the hold before
+  it shorter than the line): the card then waits for the line to end, or the
+  card cuts the line in two (the user called it "loss of sync" at 0:26 and
+  2:49). After the card the take resumes when the open has finished
+  (`leadEndMs`), or the old screen flashes back between card and new page.
+  `author.mjs` notes an `open` that starts before the line ends: lengthen the
+  hold it names (2026-11-08).
+- **Never speed up the hold that shows a beat's result.** A 3x `SPEEDS_MS`
+  range over the 1s hold after Resume left 0.33s of the resumed state, and the
+  card took the rest. End ranges where the result appears (2026-11-08).
+
+- **Replaced values can flash the real one on load.** The app re-sets an
+  `<input>` (a contact's Phone field) on every render; a 150ms timer swap let
+  the real number show for a few frames at three loads in take 5, which line
+  stills never caught. `textReplacer` now wraps the input `value` setter. In
+  review, step through loads at 0.1-0.2s (2026-11-08).
+- **Avatar initials are not text.** One app draws them with CSS
+  `content: attr(data-name)`, so replacing the name left the real initials
+  (the real initials beside the invented name, take 6). The replacer swaps `data-name` too;
+  when another app draws text from an attribute, add it to `ATTRS` in
+  `textReplacer` (2026-11-08).
+
 ## Loading
+
+- **Check a page in the recording profile, not only in your own browser.** A
+  flow-editor canvas opened its step dialog on a JS click in the user's
+  Chrome, but in the take it was a read-only preview behind an "Edit"
+  overlay, so the wait for the dialog timed out. The same canvas took
+  24s to draw (a wait's default limit is `observedMs`x3, at least 10s). Set
+  `observedMs` from a timed load, and prefer hovering what the preview already
+  shows over opening editors (2026-11-08).
 
 - **Speak only once everything in view has loaded,** not just the element the
   line is about. A page with several panels (header, tiles, a table below) needs

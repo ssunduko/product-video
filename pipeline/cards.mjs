@@ -3,12 +3,19 @@
 //
 //   node cards.mjs [video.mp4] [-o out.mp4] [--script ../scripts/x.demo] [--no-voice]
 //                  [--intro-avatar avatar/x-intro.mp4] [--outro-avatar avatar/x-outro.mp4]
+//                  [--no-sections]
 //
 // Defaults to out/final-narrated.mp4 (else out/final.mp4) and writes
 // out/<name>-carded.mp4. Card copy comes from the script's `intro:` / `outro:`
 // headers, or from --intro/--outro. An `intro-avatar:` / `outro-avatar:` header
 // (or flag) puts a talking-head clip in a round bubble on that card, voicing
 // it in place of TTS.
+//
+// A beat that starts with `card "Headline | Subhead"` also gets a section card:
+// it is cut into the video just before that beat's first narration line, found
+// by the line's cue time mapped through tighten's time map. Its headline is
+// voiced. `--no-sections` leaves them out. Their spans in the output go to
+// cards/sections.json, so qa does not judge a still card as a frozen screen.
 //
 // Brand assets come from brand/ and nowhere else: the logo, plus
 // the colours and fonts declared in brand/StyleGuide.txt. There is no flag to
@@ -19,14 +26,15 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import { loadTarget } from './target.mjs';
-import { parseScript } from './script.mjs';
+import { parseScript, sectionCards } from './script.mjs';
+import { readTimeMap, mapTime } from './timemap.mjs';
 import { pickProvider, speak, audioDuration, avatarEnabled } from './tts.mjs';
 import { BRAND_DIR, LOGO_WHITE as LOGO, readStyleGuide, mix, shade } from './brand.mjs';
-import { OUT } from './paths.mjs';
+import { OUT, projectPath } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
@@ -88,6 +96,7 @@ let outroText = null;
 let introAvatar = null;
 let outroAvatar = null;
 let voice = true;
+let sectionsOn = true;
 
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -98,6 +107,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--intro-avatar') introAvatar = argv[++i];
   else if (a === '--outro-avatar') outroAvatar = argv[++i];
   else if (a === '--no-voice') voice = false;
+  else if (a === '--no-sections') sectionsOn = false;
   else if (!video) video = a;
   else {
     console.error(`unexpected argument "${a}"`);
@@ -116,6 +126,10 @@ if (scriptPath) {
   outroAvatar ??= meta.outroAvatar;
 }
 
+const sections = scriptPath && sectionsOn
+  ? sectionCards(parseScript(fs.readFileSync(path.resolve(scriptPath), 'utf8'), { file: path.basename(scriptPath) }).steps)
+  : [];
+
 // ---- avatar clips ----
 // A talking-head clip (an ElevenCreative avatar reading the card copy) voices
 // the card from a bubble beside its copy. ElevenCreative has no avatar API, so
@@ -132,10 +146,10 @@ if ((introAvatar || outroAvatar) && !avatarEnabled()) {
 introAvatar = resolveAvatar(introAvatar);
 outroAvatar = resolveAvatar(outroAvatar);
 
-if (!introText && !outroText) {
+if (!introText && !outroText && !sections.length) {
   throw new Error(
     'nothing to add: give --intro/--outro, or --script pointing at a .demo with ' +
-      '`intro:` / `outro:` headers.',
+      '`intro:` / `outro:` headers or `card` lines.',
   );
 }
 
@@ -605,15 +619,134 @@ parts.length = 0;
 await makeCard('outro', outroText, outroAvatar);
 const outroPart = parts.find((p) => p.kind === 'outro');
 
+// ---- section cards ----
+// Each goes in where its beat begins (the page open before its first line, or
+// just before that line when the take has no open there): the
+// dissolve into the card takes the quiet end of the outgoing piece, and the
+// dissolve out of it finishes GUARD before the line starts, so no voice fades.
+const SXF = Number(process.env.CARD_SECTION_XFADE ?? 0.5);
+const GUARD = 0.15;
+const SECTION_MIN_S = 3;
+
+// same discovery as narrate.mjs and qa.mjs: the take compose.mjs rendered from
+function narrationCues() {
+  try {
+    const project = JSON.parse(fs.readFileSync(projectPath(), 'utf8').replace(/^﻿/, ''));
+    const p = path.join(OUT, `${path.basename(project.videoPath)}.narration.json`);
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    // fall through
+  }
+  const p = [path.join(OUT, 'cut.mp4.narration.json'), path.join(OUT, 'raw.mp4.narration.json')].find((x) => fs.existsSync(x));
+  if (!p) throw new Error("section cards need the take's narration cues (raw.mp4.narration.json): record and narrate first");
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+function quietSpans(file, total) {
+  const r = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', file, '-vn', '-af', 'silencedetect=n=-40dB:d=0.2', '-f', 'null', '-'], { encoding: 'utf8' });
+  const quiet = [];
+  let qs = null;
+  for (const line of (r.stderr ?? '').split('\n')) {
+    const a = /silence_start: (-?[\d.]+)/.exec(line);
+    if (a) qs = Math.max(0, Number(a[1]));
+    const b = /silence_end: ([\d.]+)/.exec(line);
+    if (b) {
+      quiet.push([qs ?? 0, Number(b[1])]);
+      qs = null;
+    }
+  }
+  if (qs != null) quiet.push([qs, total]);
+  return quiet;
+}
+
+const srcS = durationOf(src);
+const placed = [];
+if (sections.length) {
+  const cues = narrationCues();
+  // tighten moved the take's timeline; the narrated and composed videos are on it
+  const map = /-tight\.mp4$/.test(src) ? readTimeMap(src) : { segments: [] };
+  if (!map) throw new Error(`${path.basename(src)} has no time map: re-run tighten.mjs so section cards can be placed`);
+  const quiet = quietSpans(src, srcS);
+
+  let from = 0;
+  for (const sec of sections) {
+    const idx = cues.findIndex((c, i) => i >= from && c.text === sec.line);
+    if (idx < 0) throw new Error(`section card "${sec.text}": no narration cue "${sec.line}" in this take: re-record it`);
+    from = idx + 1;
+    const lineAt = mapTime(map, cues[idx].atMs / 1000);
+    // A card whose line is the take's first goes straight after the intro:
+    // what comes before that line is only the opening load, and showing it
+    // before the card reads as a flash of the app between two cards.
+    // A beat opens its page before it speaks: the card goes where that open
+    // began (leadAtMs, assemble.mjs), so the new page appears after the card
+    // and not before it. A take without it falls back to just before the line.
+    // The open can start while the previous line is still being spoken: the
+    // card then waits for that line to end, so the dissolve into it stays in
+    // the quiet before this beat's line and never fades a voice.
+    const leadAt = cues[idx].leadAtMs != null ? mapTime(map, cues[idx].leadAtMs / 1000) : null;
+    const lineQuiet = quiet.find(([a, b]) => a <= lineAt - 0.05 && b >= lineAt - 0.05);
+    const latest = Math.max(0, lineAt - SXF - GUARD);
+    const at = idx === 0 ? 0
+      : leadAt != null && leadAt < lineAt
+        ? Math.min(latest, Math.max(leadAt - SXF, lineQuiet ? lineQuiet[0] + SXF : 0, 0))
+        : latest;
+    const q = quiet.find(([a, b]) => a <= at - SXF + 0.05 && b >= at);
+    if (idx > 0 && (!q || at - SXF < q[0] - 0.05)) {
+      console.warn(`warning: section card "${sec.text}": only ${lineQuiet ? (at - lineQuiet[0]).toFixed(2) : '0'}s of quiet before it; the dissolve into it may touch speech`);
+    }
+    // Where the take resumes after the card: once the beat's page open has
+    // finished (leadEndMs), so the previous screen never shows again after the
+    // card (take 5 review). Never later than the dissolve before the line.
+    const leadEnd = cues[idx].leadEndMs != null ? mapTime(map, cues[idx].leadEndMs / 1000) : null;
+    const resume = idx === 0 || leadEnd == null ? at : Math.min(latest, Math.max(at, leadEnd));
+    placed.push({ ...sec, at, resume, lineAt });
+  }
+}
+
+for (const [i, sec] of placed.entries()) {
+  const [headline, sub] = sec.text.split('|').map((x) => x.trim());
+  sec.headline = headline;
+  const png = await renderCard({ headline, sub: sub || null, contact: null, file: path.join(tmp, `section-${i + 1}.png`) });
+  let audioFile = null;
+  let seconds = SECTION_MIN_S;
+  if (provider) {
+    const { file, cached } = await speak(provider, `${headline}.`);
+    audioFile = file;
+    seconds = Math.max(seconds, audioDuration(file) + LEAD + 0.8);
+  }
+  console.log(`  section ${i + 1}: "${headline}" ${seconds.toFixed(1)}s card${provider ? '' : ', no voice'}, at ${sec.at.toFixed(2)}s${sec.resume > sec.at + 0.005 ? `, resumes at ${sec.resume.toFixed(2)}s` : ''}, before the line at ${sec.lineAt.toFixed(2)}s`);
+  sec.seconds = seconds;
+  sec.file = await buildClip({ png, seconds, audioFile, out: path.join(tmp, `section-${i + 1}.mp4`), fadeIn: false, fadeOut: false });
+}
+
 // ---- join ----
 // xfade/acrossfade rather than concat: the card dissolves into the demo instead
 // of cutting to it. Filters (not the concat demuxer) so mismatched encoder
 // settings between the cards and the composed video cannot corrupt the join.
+// Section cards cut the body into pieces; each input's `xf` is its dissolve
+// with the input before it.
 
+const xfAfter = (prev) => (!prev ? 0 : prev.kind === 'intro' ? XFADE : SXF);
 const inputs = [];
-if (introPart) inputs.push({ file: introPart.file, seconds: introPart.seconds });
-inputs.push({ file: src, seconds: durationOf(src) });
-if (outroPart) inputs.push({ file: outroPart.file, seconds: outroPart.seconds });
+if (introPart) inputs.push({ file: introPart.file, seconds: introPart.seconds, kind: 'intro', xf: 0 });
+let bodyFrom = 0;
+for (const sec of placed) {
+  // a piece too short to dissolve on both sides is left out: the card then
+  // follows the intro (or the previous card) and the next piece starts earlier
+  const xfIn = xfAfter(inputs[inputs.length - 1]);
+  if (sec.at - bodyFrom >= xfIn + SXF + 0.3) {
+    inputs.push({ file: src, ss: bodyFrom, seconds: sec.at - bodyFrom, kind: 'body', xf: xfIn });
+    bodyFrom = sec.at;
+  }
+  inputs.push({ file: sec.file, seconds: sec.seconds, kind: 'section', headline: sec.headline, xf: xfAfter(inputs[inputs.length - 1]) });
+  // the quiet span [at, resume] is left out: it only shows the old page leaving
+  if (sec.resume > bodyFrom) bodyFrom = sec.resume;
+}
+{
+  const prev = inputs[inputs.length - 1];
+  inputs.push({ file: src, ss: placed.length ? bodyFrom : null, seconds: srcS - bodyFrom, kind: 'body', xf: !prev ? 0 : prev.kind === 'section' ? SXF : XFADE });
+}
+if (outroPart) inputs.push({ file: outroPart.file, seconds: outroPart.seconds, kind: 'outro', xf: XFADE });
 
 const n = inputs.length;
 
@@ -628,32 +761,39 @@ const pre = inputs
   )
   .join(';');
 
-// Each dissolve overlaps the two clips, so the running total loses one XFADE
-// per join — the next offset has to be measured against that shortened total,
-// not against the sum of the source durations.
+// Each dissolve overlaps the two clips, so the running total loses one
+// dissolve per join: the next offset has to be measured against that shortened
+// total, not against the sum of the source durations.
 const steps = [];
 let vPrev = '[v0]';
 let aPrev = '[a0]';
 let running = inputs[0].seconds;
+const spans = [];
+if (inputs[0].kind === 'section') spans.push({ headline: inputs[0].headline, start: 0, end: inputs[0].seconds });
 
 for (let i = 1; i < n; i++) {
-  const offset = Math.max(0, running - XFADE);
+  const d = Math.max(0.06, Math.min(inputs[i].xf, running * 0.5, inputs[i].seconds * 0.5));
+  const offset = Math.max(0, running - d);
   const vOut = i === n - 1 ? '[v]' : `[vx${i}]`;
   const aOut = i === n - 1 ? '[a]' : `[ax${i}]`;
 
   steps.push(
-    `${vPrev}[v${i}]xfade=transition=fade:duration=${XFADE}:offset=${offset.toFixed(3)}${vOut}`,
-    `${aPrev}[a${i}]acrossfade=d=${XFADE}:c1=tri:c2=tri${aOut}`,
+    `${vPrev}[v${i}]xfade=transition=fade:duration=${d.toFixed(3)}:offset=${offset.toFixed(3)}${vOut}`,
+    `${aPrev}[a${i}]acrossfade=d=${d.toFixed(3)}:c1=tri:c2=tri${aOut}`,
   );
+  if (inputs[i].kind === 'section') {
+    spans.push({ headline: inputs[i].headline, start: Math.round(offset * 1000) / 1000, end: Math.round((offset + inputs[i].seconds) * 1000) / 1000 });
+  }
 
-  running = running + inputs[i].seconds - XFADE;
+  running = running + inputs[i].seconds - d;
   vPrev = vOut;
   aPrev = aOut;
 }
+if (n === 1) steps.push('[v0]null[v]', '[a0]anull[a]');
 
 ff([
   '-y', '-loglevel', 'error',
-  ...inputs.flatMap((s) => ['-i', s.file]),
+  ...inputs.flatMap((s) => [...(s.ss != null ? ['-ss', s.ss.toFixed(3), '-t', s.seconds.toFixed(3)] : []), '-i', s.file]),
   '-filter_complex', [pre, ...steps].join(';'),
   '-map', '[v]', '-map', '[a]',
   '-r', String(FPS),
@@ -666,7 +806,9 @@ ff([
 ]);
 
 console.log(`\n${dst}`);
+fs.writeFileSync(path.join(tmp, 'sections.json'), JSON.stringify({ video: path.basename(dst), spans }, null, 2) + '\n');
+
 console.log(
-  `  ${n} segments, ${n - 1} crossfade(s) of ${XFADE}s` +
-    `${introPart ? ', intro' : ''}${outroPart ? ' + outro' : ''} — ${running.toFixed(1)}s`,
+  `  ${n} segments, ${n - 1} crossfade(s)` +
+    `${introPart ? ', intro' : ''}${spans.length ? `, ${spans.length} section card(s)` : ''}${outroPart ? ' + outro' : ''} — ${running.toFixed(1)}s`,
 );

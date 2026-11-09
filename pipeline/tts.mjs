@@ -186,10 +186,29 @@ function trimHead(file) {
   return trimmed;
 }
 
+// TTS_PRONOUNCE = {"Shown": "Spoken", ...}: words the voice should say
+// differently from how they are written (a card shows "Acmemsg", the voice
+// says "Acme Message"). Whole words only; applies to every line and card.
+export function spokenForm(text, map = process.env.TTS_PRONOUNCE) {
+  if (!map) return text;
+  let pairs;
+  try {
+    pairs = Object.entries(JSON.parse(map));
+  } catch {
+    throw new Error(`TTS_PRONOUNCE must be a JSON object of {"shown": "spoken"}, got ${map}`);
+  }
+  const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const [shown, said] of pairs.sort((a, b) => b[0].length - a[0].length)) {
+    text = text.replace(new RegExp(`\\b${esc(shown)}\\b`, 'g'), said);
+  }
+  return text;
+}
+
 // Renders text to an mp3, cached by provider+voice+text so nothing is billed
 // twice. Returns { file, cached, trimmedMs }.
-export async function speak(provider, text) {
+export async function speak(provider, shownText) {
   fs.mkdirSync(CACHE, { recursive: true });
+  const text = spokenForm(shownText);
 
   const hash = crypto
     .createHash('sha256')

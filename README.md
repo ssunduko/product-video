@@ -19,7 +19,9 @@ cursor, and a styled window frame.
     compose.mjs     <take>.recordly + video -> final.mp4 (zoom, cursor, window frame)
     narrate.mjs     say-cues -> speech, muxed onto the video (optional)
     tighten.mjs     removes dead air: frozen + silent stretches, and the tail
-    cards.mjs       branded intro/outro cards, joined onto the video (optional)
+    cards.mjs       branded intro/outro cards, joined onto the video, and section
+                    cards cut in before a beat (optional)
+    timemap.mjs     take time -> output time across tighten (its .timemap.json)
     author.mjs      observed trace -> .demo + selector sidecar; sizes narration
                     to measured waits (see "Generating the whole script from
                     plain English")
@@ -286,6 +288,8 @@ Three more options shape the browser a take records in:
 | `"profile": "profile-member"` | record from this Chrome profile instead of `profile/` — one signed-in user per profile, so a video can show two users without anyone signing in on camera |
 | `"blockUrls": ["*intercom.io*"]` | keep these from loading during the take (CDP `Network.setBlockedURLs`): chat bubbles and surveys that pop up over the controls a flow clicks |
 | `"hideSelectors": ["[aria-label^=\"AlertBanner\"]"]` | hide these with CSS on every page of the take: app banners that have nothing to do with the flow |
+| `"blurSelectors": [".photo"]` | blur these with CSS on every page of the take. A last resort for something no replacement can reach (a name inside an image): the rule is invented values, never a blur (rules.md) |
+| `"replaceText": [{ "from": "Real Name", "to": "Maya Brooks" }]` | show invented text wherever the app draws the real one, in every text node, input value (a contact's Phone field; passwords never) and `data-name` attribute (avatar initials drawn by CSS), as the app redraws. Use it for phone numbers too: an invented number, never a blur (rules.md). Longer `from` first; `"whole": true` replaces only text that is exactly `from` (initials, short words). Only the browser's copy of the page changes, nothing is sent to the app, and selectors that match on text see the replaced text |
 
 `auth.start` decides what the take opens on:
 
@@ -399,6 +403,13 @@ double-digit silences that had to be found and fixed afterwards.
 Supply *more* narration lines than you think will fit; the generator places what
 the measurement allows and tells you what it dropped.
 
+**A page `open` before the line has ended is noted.** A `say` does not block,
+so the flow runs on while the voice speaks. `author.mjs` keeps the flow's own
+clock and prints `note: beat "<title>": open <url> starts ~Ns before "<line>"
+ends` when the hold before an `open` is shorter than the line at
+`CHARS_PER_SEC`: the end of the line would play over a loading page, and a
+section card there must wait for the line. Lengthen the hold it names.
+
 **Define each selector once.** A trace's top-level `selectors` table gives each
 element a name with its `intent`, `spec` and `evidence`. Steps then say only
 `"name": "heading"`, and a step's own intent/spec/evidence override the table.
@@ -489,6 +500,7 @@ Commands:
 | Command | Does |
 |---------|------|
 | `beat <label>` | a comment marking the next beat |
+| `card "Headline | Subhead"` | a section card announcing this beat: `cards.mjs` cuts it in where the beat begins (its page `open` before the first `say`, else just before that `say`) (the take itself is unchanged). In a trace, a beat's `card` field |
 | `wait <sel> [within 15s]` | wait for something to appear |
 | `wait <sel> gone [within 60s]` | wait for something to **disappear** — a spinner, a Stop button, a skeleton |
 | `say "..."` | a narration line, timestamped here and voiced by `narrate.mjs`. Does not pause the flow |
@@ -722,7 +734,10 @@ Writes `out/<take>.recordly`, named after the script the take ran
 (`scripts/acme-tour.demo` -> `acme-tour.recordly`; `driver.mjs` stores
 the name in `actions.json`, and a take recorded before that falls back to
 `demo.recordly`) — one zoom region per click cluster (clicks under
-2.5s apart merge), derived from the cut telemetry. Review the printed regions
+2.5s apart merge; `ZOOM_MERGE_MS` sets another gap, e.g. `7000` for a panel
+whose clicks sit a few seconds apart, so the view pans instead of zooming in
+and out at every click; a zoom never spans a page open, read from
+`<take>.opens.json`, which `assemble.mjs` writes), derived from the cut telemetry. Review the printed regions
 and hand-edit the JSON if framing needs it, e.g. a region crossing a cut
 boundary or focus too tight on a corner. Explicit regions beat any auto-zoom.
 
@@ -889,8 +904,9 @@ Levelling has to happen per clip, before the mix.
 Both filters leave digital silence alone — there is no noise floor between lines
 to lift — so `tighten.mjs` can still find the silent stretches afterwards.
 
-**Editing cues by hand.** `out/*.narration.json` is a plain `[{atMs, text}]`
-list — the same escape hatch as hand-editing zoom regions. Adding or moving a
+**Editing cues by hand.** `out/*.narration.json` is a plain `[{atMs, text, leadAtMs?, leadEndMs?}]`
+list (`leadAtMs` / `leadEndMs`: when the line's beat started and finished
+opening its page, for section cards) — the same escape hatch as hand-editing zoom regions. Adding or moving a
 line there avoids a whole re-record, which matters when a take is expensive
 (here, four messages to a live account). Re-run `narrate.mjs` and only changed
 lines re-render. Keep the script in sync afterwards, or the next re-record
@@ -905,6 +921,7 @@ into the next, or when narration outlasts the video.
 |-----|---------|--------------|
 | `DEMO_TTS` | key-dependent | `elevenlabs` or `openai` |
 | `DEMO_TTS_VOICE` | provider default | voice **ID**, not name |
+| `TTS_PRONOUNCE` | none | JSON `{"Shown": "Spoken"}`: whole words the voice says differently from how cards and lines spell them, e.g. `{"Acmemsg": "Acme Message"}`; applies to every line and card |
 | `DEMO_AVATAR` | off | `on` or `off`; any other value is an error. On: avatar clips voice the cards and `DEMO_AVATAR_VOICE` reads the narration |
 | `DEMO_AVATAR_VOICE` | — | the avatar's ElevenLabs voice **ID**; required while `DEMO_AVATAR` is on, ignored otherwise |
 | `TTS_ONSET_DB` | `-34` | level that counts as speaking, for the breath trim |
@@ -1069,6 +1086,23 @@ so the card dissolves into the demo. It used to fade the card out to black and
 then cut in — which reads as two videos stapled together, with a black flash on
 the seam. Only the outer edges fade to black now: the open of the intro and the
 close of the outro.
+
+**Section cards.** A beat that opens with `card "Headline | Subhead"` gets a
+card of its own, cut into the body where the beat begins: at the page `open`
+before the beat's first `say` (the cue's `leadAtMs`, written by `assemble.mjs`),
+so the new page appears after the card rather than before it (if the open
+starts while the previous line is still being spoken, the card waits for that
+line to end), and the take resumes after the card once that open has
+finished (`leadEndMs`), so the previous screen never shows again; a beat with no
+`open` before its line gets the card just before that line. The cue time is
+mapped through `final-narrated-tight.mp4.timemap.json`
+(written by `tighten.mjs`, read by `timemap.mjs`), and the card goes in where
+the audio is quiet: the dissolve into it (0.5s, `CARD_SECTION_XFADE`) takes the
+end of the previous beat, and the dissolve out finishes before the line starts.
+The headline is voiced; the card holds for at least 3s. A card whose line is the take's first goes straight after the intro, so the opening load plays after it rather than flashing between two cards. `--no-sections` leaves
+them out. Their spans in the output go to `cards/sections.json`, which `qa.mjs`
+reads so a still card is not judged a frozen screen. Nothing changes in the
+take, so cards can be added to a recorded take with `build.mjs --no-record`.
 
 It is filter-based, not the concat demuxer — the cards and the composed video
 are encoded separately, and the demuxer silently corrupts joins when parameters
