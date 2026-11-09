@@ -908,10 +908,11 @@ const kTeardown = mk(pkgDriver, 'component', 'Teardown', 'driver.mjs',
   'Stops the screencast, writes frames.json and actions.json, and closes Chrome by its window ' +
   'rather than killing it, so unflushed session state is not lost.');
 
-const kConditioner = mk(pkgDriver, 'component', 'Page conditioner', 'CDP Network.setBlockedURLs + injected CSS',
+const kConditioner = mk(pkgDriver, 'component', 'Page conditioner', 'CDP Network.setBlockedURLs + injected CSS + text replacer',
   "Applies the target to the page before the take: blockUrls keeps third-party widgets such as a " +
-  'chat bubble from loading, and hideSelectors hides app banners on this page and every page ' +
-  'loaded after it.');
+  'chat bubble from loading, hideSelectors hides app banners and blurSelectors blurs contact details ' +
+  'on this page and every page loaded after it, and replaceText shows invented names ' +
+  'and phone numbers in every text node, input value and avatar-initials attribute as the app draws it.');
 const kWaits = mk(pkgDriver, 'component', 'Wait logger', 'driver.mjs · timed()',
   'Times every open, wait and wait-gone the flow makes, keeping { start, end, kind, spec }. ' +
   'Written to actions.json for the assembler to fast-forward the long ones.');
@@ -962,7 +963,7 @@ const dL3a = diagram(pkgDriver, 'c4-l3-driver', 'C4-L3 — Components · Driver 
   link(dL3a, pkgDriver, vTeardown, vWork, 'Writes actions.json + frames.json');
   link(dL3a, pkgDriver, vLauncher, vProfiles, "Runs Chrome on the target's");
   link(dL3a, pkgDriver, vLauncher, vCond, 'Conditions the page via');
-  link(dL3a, pkgDriver, vCond, vTargetLib, 'Reads blockUrls and hideSelectors from');
+  link(dL3a, pkgDriver, vCond, vTargetLib, 'Reads blockUrls, hideSelectors, blurSelectors and replaceText from');
   link(dL3a, pkgDriver, vCond, vChrome, 'Blocks URLs and injects CSS', 'CDP');
   link(dL3a, pkgDriver, vPrim, vWaits, 'Every open and wait is timed by');
   link(dL3a, pkgDriver, vTeardown, vWaits, 'Serialises');
@@ -1049,7 +1050,7 @@ const zRead = mk(pkgProject, 'component', 'Telemetry reader', 'project.mjs',
   'Takes the cursor.json beside the newest take, cut.mp4 before raw.mp4, and keeps the clicks. ' +
   'No clicks is an error rather than an empty project.');
 const zCluster = mk(pkgProject, 'component', 'Click clusterer', 'project.mjs',
-  'Clicks less than 2500ms apart become one region — opening a menu and picking an item is one ' +
+  'Clicks less than 2500ms apart (ZOOM_MERGE_MS), with no page open between them (opens.json), become one region — opening a menu and picking an item is one ' +
   'move to the viewer, not two.');
 const zFlutter = mk(pkgProject, 'component', 'Flutter guard', 'project.mjs',
   'Two regions that would sit less than 800ms apart are merged, so the zoom holds instead of ' +
@@ -1267,14 +1268,18 @@ const tCheck = mk(pkgTighten, 'component', 'Placement check', 'tighten.mjs',
 const tRender = mk(pkgTighten, 'component', 'Renderer', 'ffmpeg xfade + acrossfade',
   'Each segment is trimmed and retimed, then dissolved into the next over a fade long enough to ' +
   'see. atempo only ever stretches silence, so the narration itself is never pitched or hurried.');
+const tTimeMap = mk(pkgTighten, 'component', 'Time map', 'tighten.mjs + timemap.mjs',
+  'Writes final-narrated-tight.mp4.timemap.json: each kept segment with its speed and where it ' +
+  'starts in the output. Stages after tighten that place something at a moment of the take read ' +
+  'it through timemap.mjs; the card renderer puts each section card where its beat opens its page (leadAtMs) once the previous line has ended, resumes the take when that open finished (leadEndMs), else cuts just before its beat line.');
 
 const dL3tighten = diagram(pkgTighten, 'c4-l3-tightener',
   'C4-L3 — Components · Tightener (tighten.mjs)',
   'Level 3, container "7 · Tightener".',
   { macro: 'Container_Boundary', name: '7 · Tightener' });
 {
-  const [vOpts, vDet, vInt, vZoom, vPlan, vChk, vRen] = grid(dL3tighten,
-    [tOpts, tDetect, tIntersect, tZoomGuard, tPlanner, tCheck, tRender], { cols: 3 });
+  const [vOpts, vDet, vInt, vZoom, vPlan, vChk, vRen, vMap] = grid(dL3tighten,
+    [tOpts, tDetect, tIntersect, tZoomGuard, tPlanner, tCheck, tRender, tTimeMap], { cols: 3 });
   const [vWork, vFfmpeg] = column(dL3tighten, [dWork, ffmpeg]);
 
   link(dL3tighten, pkgTighten, vWork, vDet, 'final-narrated.mp4 to');
@@ -1290,6 +1295,8 @@ const dL3tighten = diagram(pkgTighten, 'c4-l3-tightener',
   link(dL3tighten, pkgTighten, vChk, vRen, 'Approved plan to');
   link(dL3tighten, pkgTighten, vRen, vFfmpeg, 'Runs', 'child process');
   link(dL3tighten, pkgTighten, vRen, vWork, 'Writes final-narrated-tight.mp4');
+  link(dL3tighten, pkgTighten, vPlan, vMap, 'Segment plan and seams to');
+  link(dL3tighten, pkgTighten, vMap, vWork, 'Writes final-narrated-tight.mp4.timemap.json');
 }
 
 // ======================================== L3 · 8 — components: card renderer ==

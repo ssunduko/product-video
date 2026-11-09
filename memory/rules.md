@@ -40,15 +40,38 @@ it (2026-10-27).
 
 ## Content
 
-### Blur contact details
-Blur any contact's full name, phone number, email address and tags wherever
-they appear on screen (contact tabs, contact rows, names next to avatars,
-conversation headers). Blur, don't hide or drop the step. An unblurred one
-blocks publishing.
-*Why:* an earlier take showed a real contact on a contacts tab
-(2026-10-23).
-*Status:* the pipeline only hides elements (`hideSelectors`, display:none) and has
-no blur option yet. One is needed before this rule can be met.
+### Invent identifying details, never blur them
+Real names and identifiers never reach the screen, and nothing is blurred or
+masked in their place. Every one is replaced with an invented value that is
+random yet fits its context, through the target's `replaceText` (text nodes
+and input values, every format and every abbreviation the app draws):
+- **People** (contacts, members, owners, reps): a random first and last name,
+  the same one every time that person appears, initials and avatars to match
+  (`Pat Lane` -> `Maya Brooks`, `PL` -> `MB`).
+- **Phone numbers** of contacts: a random number in the reserved 555-01xx
+  range, so it reaches no one. A test inbox's own number may show.
+- **Inboxes:** at most one inbox is called `Sales Inbox` and at most one
+  `Marketing Inbox` (the ones the flow uses). Every other inbox gets a random
+  business name that fits a company's inbox list (`Support Line`,
+  `Billing Desk`, `Demo Requests`), never a number suffix.
+- **Everything else the account named:** tags, broadcasts, campaigns, AI
+  agents, triggers, workflows, smart views, saved replies, custom fields,
+  companies on contacts. Random, but as contextual as possible: a tag reads
+  like a real sales tag (`Hot Lead`, `Demo Booked`), a broadcast like a real
+  campaign (`Spring Sale Reminder`), an agent like a real assistant
+  (`Lead Qualifier`). No test or debug names (`test-123`, `Delete Me`)
+  and no real person's name inside any of them.
+Check every load in review, not only the settled screen: an app can draw the
+real value for a few frames before the swap (an `<input>` the app re-sets), or
+draw it somewhere the swap does not reach (avatar initials).
+A real name, number or account-named item on screen blocks publishing.
+*Why:* an earlier take showed a real contact (2026-10-23); blurred fields look
+broken in a feature video, so the user replaced the blur rule with invented
+values (2026-11-08), and the same day asked for every name to be random yet
+contextual, with only one Sales Inbox and one Marketing Inbox.
+*Exceptions:* videos published under the old blur waiver are listed in
+the app's `memory/features/<app>/README.md`; they are not
+re-cut.
 
 ### Match the samples
 `sample/` holds model videos (cards, outro, pacing, style). Compare new videos

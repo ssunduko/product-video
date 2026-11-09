@@ -109,6 +109,9 @@ export function demoFromTrace(trace) {
   const resolutions = {}; // intent -> {spec, evidence}
   const speedRanges = [];
   let clock = 0; // ms into the take, for SPEEDS_MS ranges
+  // the flow's own time (a `say` takes none of it) and the line still speaking
+  let act = 0;
+  let speaking = null;
 
   const out = [];
   const head = [];
@@ -139,6 +142,8 @@ export function demoFromTrace(trace) {
   for (const beat of trace.beats) {
     beatLines.push('');
     beatLines.push(`beat ${beat.title}`);
+    // a section card announcing the beat, shown by cards.mjs before its first line
+    if (beat.card) beatLines.push(`  card ${q(beat.card)}`);
 
     const ref = (step) => {
       // A step may name a selector defined once in the trace's top-level
@@ -283,7 +288,24 @@ export function demoFromTrace(trace) {
       }
     };
 
-    for (const step of beat.steps ?? []) emitOne(step);
+    for (const step of beat.steps ?? []) {
+      // A `say` does not block, so the flow goes on while the voice speaks. A
+      // page `open` before the line has ended puts the end of the line over a
+      // white loading page, and a section card cut there must wait for it: the
+      // take-5 review of a newsletter video (a 13.2s hold under a ~15s welcome).
+      // Overlapping lines are narrate.mjs's job: it measures the real audio.
+      if (step.op === 'open' && speaking && act < speaking.until - 250) {
+        notes.push(
+          `beat "${beat.title}": open ${step.url} starts ` +
+          `~${((speaking.until - act) / 1000).toFixed(1)}s before "${speaking.text.slice(0, 40)}…" ends ` +
+          `(~${(speechMs(speaking.text) / 1000).toFixed(1)}s at ${CHARS_PER_SEC} chars/s): lengthen the hold before it`,
+        );
+      }
+      const before = clock;
+      emitOne(step);
+      if (step.op === 'say') speaking = { text: step.text, until: act + speechMs(step.text) };
+      else act += clock - before;
+    }
   }
 
   // ---- header ----

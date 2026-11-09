@@ -83,3 +83,25 @@ describe('demoFromTrace', () => {
     assert.match(sidecar.resolvedBy, /hand-authored/);
   });
 });
+
+describe('line still speaking at a page open', () => {
+  const trace = (holdMs) => ({
+    name: 'overrun',
+    beats: [{
+      title: 'Welcome',
+      steps: [
+        { op: 'say', text: 'x'.repeat(125) }, // 10s at 12.5 chars/s
+        { op: 'hold', ms: holdMs },
+        { op: 'open', url: '/next' },
+      ],
+    }],
+  });
+  test('an open before the line ends is a note naming the beat and the shortfall', () => {
+    const { notes } = demoFromTrace(trace(8000));
+    assert.ok(notes.some((n) => /beat "Welcome": open \/next starts ~2\.0s before/.test(n)), notes.join('\n'));
+  });
+  test('a hold that covers the line is quiet', () => {
+    const { notes } = demoFromTrace(trace(10500));
+    assert.ok(!notes.some((n) => /starts ~/.test(n)), notes.join('\n'));
+  });
+});

@@ -253,11 +253,42 @@ fs.writeFileSync(`${raw}.cursor.json`, JSON.stringify(telemetry));
 // Narration cues go through the identical cut/shift maths as the cursor
 // telemetry. Do this anywhere else and a cut silently desyncs the voiceover
 // from the picture.
+// `leadAtMs`: where the line's lead-in began, the first page `open` between the
+// previous line and this one. A beat opens its page before it speaks, so a
+// section card placed at the line would come after the new page is already on
+// screen; cards.mjs places it here instead.
+// `leadEndMs`: when that open finished (the old page is gone), where the take
+// resumes after the card so the previous screen never shows again.
+const opens = waits.filter((w) => w.kind === 'open').sort((a, b) => a.start - b.start);
+const byTime = [...narration].sort((a, b) => a.t - b.t);
+const leadOf = new Map(byTime.map((c, i) => {
+  const prevT = i ? byTime[i - 1].t : -Infinity;
+  return [c, opens.find((w) => w.start > prevT && w.start < c.t)];
+}));
+const onTake = (epochMs) => {
+  const v = epochMs - t0 * 1000;
+  return v >= 0 && !inCut(v) ? Math.round(warp(v)) : null;
+};
 const cues = narration
-  .map((c) => ({ ...c, vt: c.t - t0 * 1000 }))
+  .map((c) => ({ ...c, vt: c.t - t0 * 1000, lead: leadOf.get(c) }))
   .filter((c) => c.vt >= 0 && !inCut(c.vt))
-  .map((c) => ({ atMs: Math.round(warp(c.vt)), text: c.text }))
+  .map((c) => {
+    const cue = { atMs: Math.round(warp(c.vt)), text: c.text };
+    const at = c.lead ? onTake(c.lead.start) : null;
+    if (at != null) {
+      cue.leadAtMs = at;
+      const end = onTake(c.lead.end);
+      if (end != null && end >= at) cue.leadEndMs = end;
+    }
+    return cue;
+  })
   .sort((a, b) => a.atMs - b.atMs);
+
+// Page opens on the take's timeline, for project.mjs: a zoom never spans one,
+// so merging clicks across a long gap cannot carry a zoom into the next page.
+fs.writeFileSync(`${raw}.opens.json`, JSON.stringify(
+  opens.map((w) => ({ atMs: onTake(w.start), endMs: onTake(w.end) })).filter((o) => o.atMs != null),
+));
 
 fs.writeFileSync(`${raw}.narration.json`, JSON.stringify(cues, null, 1));
 

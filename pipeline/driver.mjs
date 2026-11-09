@@ -3,7 +3,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { loadTarget, describeTarget, requireCredentials } from './target.mjs';
+import { loadTarget, describeTarget, requireCredentials, textReplacer } from './target.mjs';
 import { compileScript } from './script.mjs';
 import { OUT } from './paths.mjs';
 
@@ -281,8 +281,13 @@ if (target?.blockUrls?.length) {
 // App-rendered banners that have nothing to do with the flow ("integration
 // disconnected", "notifications are blocked") eat the top of every frame. A
 // target can hide them with CSS, on this page and on every page loaded later.
-if (target?.hideSelectors?.length) {
-  const css = `${target.hideSelectors.join(',\n')} { display: none !important; }`;
+// Contact details a replacement cannot reach (initials avatars, names inside
+// images) are blurred the same way.
+if (target?.hideSelectors?.length || target?.blurSelectors?.length) {
+  const css = [
+    target.hideSelectors.length ? `${target.hideSelectors.join(',\n')} { display: none !important; }` : '',
+    target.blurSelectors.length ? `${target.blurSelectors.join(',\n')} { filter: blur(6px) !important; }` : '',
+  ].join('\n');
   const inject = (rules) => {
     const add = () => {
       const s = document.createElement('style');
@@ -295,7 +300,16 @@ if (target?.hideSelectors?.length) {
   };
   await page.evaluateOnNewDocument(inject, css);
   await page.evaluate(inject, css);
-  console.log(`hiding: ${target.hideSelectors.join(', ')}`);
+  if (target.hideSelectors.length) console.log(`hiding: ${target.hideSelectors.join(', ')}`);
+  if (target.blurSelectors.length) console.log(`blurring: ${target.blurSelectors.join(', ')}`);
+}
+
+// Real names shown as invented ones (contacts, inboxes), in the browser only:
+// nothing is sent to the app. Selectors that match on text see the new text.
+if (target?.replaceText?.length) {
+  await page.evaluateOnNewDocument(textReplacer, target.replaceText);
+  await page.evaluate(textReplacer, target.replaceText);
+  console.log(`replacing: ${target.replaceText.length} name(s)`);
 }
 
 // size window so the viewport is exactly VIEWPORT

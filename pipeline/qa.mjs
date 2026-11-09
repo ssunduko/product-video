@@ -293,8 +293,25 @@ const cardS = (name, given) => {
 };
 const introS = cardS('intro', opt.introS);
 const outroS = cardS('outro', opt.outroS);
-// a range that starts inside a card only counts from where the card ends
-const outsideCards = (start, end) => [Math.max(start, introS), Math.min(end, totalS - outroS)];
+// Section cards (cards.mjs, `card` lines) sit inside the video; their spans
+// come from cards/sections.json when it was written for this file.
+const sectionSpans = (() => {
+  if (!/carded\.mp4$/.test(video)) return [];
+  const f = path.join(OUT, 'cards', 'sections.json');
+  if (!fs.existsSync(f) || fs.statSync(f).mtimeMs > fs.statSync(video).mtimeMs + 60000) return [];
+  const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+  return j.video === path.basename(video) ? j.spans : [];
+})();
+// a range that starts inside a card only counts from where the card ends; one
+// a section card splits is judged by its longest piece
+const outsideCards = (start, end) => {
+  let pieces = [[Math.max(start, introS), Math.min(end, totalS - outroS)]];
+  for (const c of sectionSpans) {
+    pieces = pieces.flatMap(([s, e]) =>
+      c.end <= s || c.start >= e ? [[s, e]] : [[s, c.start], [c.end, e]].filter(([a, b]) => b > a));
+  }
+  return pieces.reduce((best, p) => (p[1] - p[0] > best[1] - best[0] ? p : best), [start, start]);
+};
 
 for (const q of silences(video, DEADAIR_WARN_S)) {
   const [s0, e0] = outsideCards(q.start, q.end ?? totalS);

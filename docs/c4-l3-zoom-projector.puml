@@ -11,7 +11,7 @@ ContainerDb(work_directory, "Work directory", "out/ · out/{video}/{part}/", "On
 
 Container_Boundary(zoom_projector_2, "4 · Zoom Projector") {
   Component(telemetry_reader, "Telemetry reader", "project.mjs", "Takes the cursor.json beside the newest take, cut.mp4 before raw.mp4, and keeps the clicks.")
-  Component(click_clusterer, "Click clusterer", "project.mjs", "Clicks less than 2500ms apart become one region — opening a menu and picking an item is one move to the viewer, not two.")
+  Component(click_clusterer, "Click clusterer", "project.mjs", "Clicks less than 2500ms apart (ZOOM_MERGE_MS), with no page open between them (opens.json), become one region — opening a menu and picking an item is one move to the viewer, not two.")
   Component(flutter_guard, "Flutter guard", "project.mjs", "Two regions that would sit less than 800ms apart are merged, so the zoom holds instead of bouncing out and straight back in.")
   Component(region_builder, "Region builder", "project.mjs", "Starts 1200ms before the first click and ends 1600ms after the last, at depth 3, with focus clamped to 0.08..0.92 so a corner click still frames something.")
   Component(focus_track_builder, "Focus track builder", "project.mjs", "Keeps every click position in a cluster, not only the last.")

@@ -24,14 +24,25 @@ if (!clicks.length) throw new Error('no clicks in telemetry');
 // Every click's position is kept, not just the last: a merged region can span
 // clicks far apart on screen, and the compositor pans across them rather than
 // framing only the final one (which would leave the earlier clicks off screen).
-const MERGE_GAP_MS = 2500;
+// ZOOM_MERGE_MS widens the gap for a flow whose steps sit a few seconds apart
+// on one panel (tick, Stop, Resume), so the view stays zoomed and pans
+// instead of zooming in and out at every click.
+const MERGE_GAP_MS = Number(process.env.ZOOM_MERGE_MS || 2500);
+// Page opens (assemble.mjs writes <video>.opens.json): a zoom never spans one,
+// however close the clicks on either side are. Takes assembled before it
+// existed have no file and merge on time alone.
+const opensPath = `${videoPath}.opens.json`;
+const openTimes = fs.existsSync(opensPath)
+  ? JSON.parse(fs.readFileSync(opensPath, 'utf8')).map((o) => o.atMs)
+  : [];
+const openBetween = (a, b) => openTimes.some((t) => t > a && t < b);
 const groups = [];
 
 for (const c of clicks) {
   const point = { atMs: c.timeMs, cx: c.cx, cy: c.cy };
   const g = groups.at(-1);
 
-  if (g && c.timeMs - g.last <= MERGE_GAP_MS) {
+  if (g && c.timeMs - g.last <= MERGE_GAP_MS && !openBetween(g.last, c.timeMs)) {
     g.last = c.timeMs;
     g.points.push(point);
   } else {
@@ -44,7 +55,7 @@ const MIN_REGION_GAP_MS = 800;
 for (let i = groups.length - 2; i >= 0; i--) {
   const a = groups[i];
   const b = groups[i + 1];
-  if (b.first - 1200 - (a.last + 1600) < MIN_REGION_GAP_MS) {
+  if (b.first - 1200 - (a.last + 1600) < MIN_REGION_GAP_MS && !openBetween(a.last, b.first)) {
     a.last = b.last;
     a.points.push(...b.points);
     groups.splice(i + 1, 1);

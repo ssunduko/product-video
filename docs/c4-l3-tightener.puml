@@ -18,6 +18,7 @@ Container_Boundary(tightener_2, "7 · Tightener") {
   Component(segment_planner, "Segment planner", "tighten.mjs", "Live stretches at 1x, dead ones at up to speed, never leaving less than keep of screen time.")
   Component(placement_check, "Placement check", "tighten.mjs", "Re-verifies every seam against the detected silence and the zoom list, and refuses to write if one is over either.")
   Component(renderer, "Renderer", "ffmpeg xfade + acrossfade", "Each segment is trimmed and retimed, then dissolved into the next over a fade long enough to see. atempo only ever stretches silence, so the narration itself is never pitched or hurried.")
+  Component(time_map, "Time map", "tighten.mjs + timemap.mjs", "Writes final-narrated-tight.mp4.timemap.json: each kept segment with its speed and where it starts in the output.")
 }
 
 Rel(work_directory, detector, "final-narrated.mp4 to")
@@ -33,6 +34,8 @@ Rel(segment_planner, placement_check, "Segment plan to")
 Rel(placement_check, renderer, "Approved plan to")
 Rel(renderer, ffmpeg_ffprobe, "Runs", "child process")
 Rel(renderer, work_directory, "Writes final-narrated-tight.mp4")
+Rel(segment_planner, time_map, "Segment plan and seams to")
+Rel(time_map, work_directory, "Writes final-narrated-tight.mp4.timemap.json")
 
 LAYOUT_WITH_LEGEND()
 @enduml

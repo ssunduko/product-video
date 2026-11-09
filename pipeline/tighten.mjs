@@ -267,9 +267,19 @@ if (!merged.length) {
     console.log(`nothing to tighten (dry run: would copy to ${dst}).`);
   } else {
     fs.copyFileSync(src, dst);
+    writeTimeMap([]);
     console.log(`nothing to tighten — copied unchanged to\n${dst}`);
   }
   process.exit(0);
+}
+
+// Where each moment of the source lands in the output, for stages that place
+// things by take time (cards.mjs puts section cards before a narration line).
+// No segments means unchanged. A time t in [from, to) of a segment lands at
+// outStart + (t - from) / speed. A function declaration, so the no-op path
+// above can call it.
+function writeTimeMap(segments) {
+  fs.writeFileSync(`${dst}.timemap.json`, JSON.stringify({ source: path.basename(src), segments }, null, 2) + '\n');
 }
 
 // ---- turn dead runs into a segment plan ----
@@ -436,12 +446,14 @@ const steps = chains.flat();
 let vPrev = '[v0]';
 let aPrev = '[a0]';
 let running = (plan[0].to - plan[0].from) / plan[0].speed;
+const outStarts = [0];
 
 for (let i = 1; i < plan.length; i++) {
   const segLen = (plan[i].to - plan[i].from) / plan[i].speed;
   // a dissolve cannot be longer than either clip it joins
   const d = Math.max(0.06, Math.min(seam, running * 0.5, segLen * 0.5));
   const offset = Math.max(0, running - d);
+  outStarts.push(offset);
 
   const vOut = i === plan.length - 1 ? '[v]' : `[vx${i}]`;
   const aOut = i === plan.length - 1 ? '[a]' : `[ax${i}]`;
@@ -473,6 +485,8 @@ run(FFMPEG, [
   '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2',
   dst,
 ]);
+
+writeTimeMap(plan.map((p, i) => ({ from: p.from, to: p.to, speed: p.speed, outStart: Math.round(outStarts[i] * 1000) / 1000 })));
 
 const finalSecs = Number(
   execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', dst], {

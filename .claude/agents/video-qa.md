@@ -1,4 +1,4 @@
----
++++++++++++++++++++++++++++++++++++---
 name: video-qa
 description: Quality gate at the end of the product-video pipeline. Use after cards.mjs (or after joining several takes) and BEFORE a video is delivered or called done. Measures double narration (overlapping lines), sound out of step with the picture, dead air, long loading / frozen screens, black frames and loudness with pipeline/qa.mjs, then looks at stills to check every narration line against what is on screen. Returns PASS or FAIL with the exact fix for each defect. Read-only — it never re-records, re-renders or edits scripts.
 tools: Bash, Read, Glob, Grep
@@ -42,7 +42,14 @@ default to the single-take layout below and say that you assumed it.
 Read `memory/pipeline-lessons.md`, at least its "qa.mjs", "Zoom and cursor"
 and "Loading" sections: they list the defects earlier takes shipped with and
 what fixed them. Read the app's `memory/features/<app>/README.md` too, for its
-own rules and any blur waivers the user has given.
+own rules and any waivers the user has given. The personal-data rule is
+`memory/rules.md`, "Invent identifying details, never blur them": every
+real name and identifier is replaced with a random but contextual invented
+one — people (first and last name, initials to match), contact numbers
+(555-01xx), inboxes (exactly one Sales Inbox and one Marketing Inbox, every
+other a business name), tags, broadcasts, campaigns, agents, triggers, smart
+views. A test/debug name (`test-123`) or a numbered inbox is a finding; so
+is a blurred value.
 
 ## Procedure
 
@@ -79,9 +86,17 @@ own rules and any blur waivers the user has given.
 4. **Check the frame as a whole** on a few stills: banners across the top
    ("notifications are blocked", "integration disconnected"), cookie bars, chat
    bubbles, personal data or customer data that should not be in a shared
-   video (real names, emails, phone numbers, account figures). Report these;
-   personal or customer data is a FAIL unless the user waived it (the app's
-   README or the caller says so): report it as WAIVED then.
+   video (real names, emails, phone numbers, inbox names, account figures).
+   Report these; personal or customer data is a FAIL unless the user waived it
+   (the app's README or the caller says so): report it as WAIVED then. A blur
+   or mask over a name, number or inbox name is a WARN: the rule is invented
+   values. **Check the loads, not just the settled screen:** step through every
+   page load where a contact is open at 0.1-0.2s (Contact details, call panel,
+   Calls list) — an app can draw the real value for a few frames before the
+   swap. An earlier take flashed a real number in an
+   `<input>` for under a second at three loads, invisible on the line stills.
+   Check avatars too: initials drawn by CSS from an attribute are not text
+   (a take showed the real initials next to the invented name).
 
 5. **Check what qa.mjs cannot see.**
    - **Ghost text.** Tighten seams crossfade, and frames blended by a speed-up
@@ -104,6 +119,23 @@ own rules and any blur waivers the user has given.
      sits off its element (the page scrolled or the panel grew under it) or
      frames something the line is not about; WARN a missing one where the line
      points at an element. Tag `highlight`.
+
+   - **Section card seams.** For every card in `cards/sections.json`: the
+     previous line has finished before the dissolve into the card, the next
+     section's page appears only after the card, and the previous section's
+     screen does not come back after it (step at 0.1s across each seam). A
+     line cut by a card, or the old screen after a card, is a `[frame]` FAIL:
+     check the cue's `leadAtMs`/`leadEndMs` and the card's `at`/`resumes at`
+     in the build log.
+   - **A beat's result.** A beat that toggles something live (stop/resume,
+     on/off) must show the final state on screen for a moment before the
+     card. Check that no `SPEEDS_MS` range runs over the closing hold (take 5:
+     a 3x range shrank the resumed state's 1s hold to 0.33s).
+   - **Zoom per beat.** Count zoom in/out cycles in each beat on a contact
+     sheet (1 fps). More than one inside one panel's steps reads as the view
+     going in and out: the fix is `ZOOM_MERGE_MS` above the largest click gap
+     in the beat (zooms never span a page open, so it cannot run into the next
+     section).
 
 6. **Decide.** FAIL if `qa.mjs` reported any FAIL, or steps 2–4 found a FAIL.
    Otherwise PASS, listing any warnings worth knowing. Steps 2–5 FAILs count
@@ -130,6 +162,11 @@ Be specific: name the beat, the line and the number to change.
 | cursor outside the panel / card scrolled away | Hover the panel's input after clicks that leave it; don't hover a card after a long answer. Size the hold to the line instead. |
 | popup belonging to the account (plan alert) | Close it with an `ifAppears` guard in the trace, under a line. |
 | banner unrelated to the flow | Hide it with the target's `hideSelectors`. |
+| real name / number / inbox name, or a blur over one | Add `replaceText` pairs to the target for every format the app draws (rules.md, "Invent identifying details"); an `<input>` is covered by the replacer's value setter. Re-record. |
+| real value flashes during a load | The app wrote the value some way the replacer did not catch: name the element and the frame; the fix is in `textReplacer` (pipeline/target.mjs). Re-record. |
+| line cut by a section card / old screen after a card | cards.mjs places cards from the cue's `leadAtMs` and resumes at `leadEndMs`: re-render. If the cue has neither, the beat has no `open` before its first `say`; or the hold before the `open` is shorter than the line (author.mjs notes it) — lengthen it and re-record. |
+| beat ends before its result shows | Lengthen the closing `hold` (re-record) and end any `SPEEDS_MS` range before it (re-render). |
+| zooms in and out within one beat | Raise `ZOOM_MERGE_MS` in the manifest above the beat's largest click gap (re-render). |
 
 ## Report
 

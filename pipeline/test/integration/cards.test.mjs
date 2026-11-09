@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  hasFfmpeg, tempDir, runStage, makeClip, durationS, hasAudio, pixel, isRed, isBlue,
+  hasFfmpeg, tempDir, runStage, makeClip, durationS, hasAudio, pixel, isRed, isBlue, ff,
 } from './helpers.mjs';
 
 // cards.mjs geometry and timing, restated: a change to either should be a
@@ -123,5 +123,73 @@ describe('cards.mjs', { skip: !hasFfmpeg && 'ffmpeg not found' }, () => {
     });
     assert.notEqual(r.code, 0);
     assert.match(r.out, /DEMO_AVATAR must be on or off, got "yes"/);
+  });
+});
+
+// Section cards go where their beat begins: a beat opens its page before it
+// speaks, so a card at the line would follow the new page onto the screen.
+describe('cards.mjs section placement', { skip: !hasFfmpeg && 'ffmpeg not found' }, () => {
+  test('a card goes at the beat\'s page open (leadAtMs), not just before its line', () => {
+    const dir = tempDir('sections');
+    const take = makeClip(path.join(dir, 'take.mp4'), { color: 'gray', size: `${W}x${H}`, seconds: 8 });
+    const script = path.join(dir, 'sections.demo');
+    fs.writeFileSync(script, [
+      'name: sections-test',
+      '',
+      'beat A',
+      '  card "First | one"',
+      '  say "Line one."',
+      '',
+      'beat B',
+      '  card "Second | two"',
+      '  say "Line two."',
+      '',
+    ].join('\n'));
+    const out = path.join(dir, 'out');
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, 'raw.mp4.narration.json'), JSON.stringify([
+      { atMs: 300, text: 'Line one.' },
+      { atMs: 6000, leadAtMs: 3000, leadEndMs: 4200, text: 'Line two.' },
+    ]));
+    const r = runStage('cards.mjs', [take, '-o', path.join(dir, 'final.mp4'), '--script', script, '--no-voice'], {
+      DEMO_OUT: out,
+      DEMO_AVATAR: 'off',
+    });
+    assert.equal(r.code, 0, r.out);
+    // 3.0s lead minus the 0.5s section dissolve, not 6.0 - 0.5 - 0.15; and the
+    // take resumes when the open finished (4.2s), not back on the old page
+    assert.match(r.out, /section 2: "Second".*, at 2\.50s, resumes at 4\.20s, before the line at 6\.00s/);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('a card waits for the previous line to end when the open starts during it', () => {
+    const dir = tempDir('sections-overlap');
+    // speech (a tone) until 4s, quiet after; the open starts at 3s, mid-line
+    const take = path.join(dir, 'take.mp4');
+    ff([
+      '-f', 'lavfi', '-i', `color=c=gray:s=${W}x${H}:d=8`,
+      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=8',
+      '-af', "volume=enable='gte(t,4)':volume=0",
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', take,
+    ]);
+    const script = path.join(dir, 'sections.demo');
+    fs.writeFileSync(script, ['name: overlap-test', '', 'beat A', '  card "First | one"', '  say "Line one."', '',
+      'beat B', '  card "Second | two"', '  say "Line two."', ''].join('\n'));
+    const out = path.join(dir, 'out');
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, 'raw.mp4.narration.json'), JSON.stringify([
+      { atMs: 300, text: 'Line one.' },
+      { atMs: 6000, leadAtMs: 3000, text: 'Line two.' },
+    ]));
+    const r = runStage('cards.mjs', [take, '-o', path.join(dir, 'final.mp4'), '--script', script, '--no-voice'], {
+      DEMO_OUT: out,
+      DEMO_AVATAR: 'off',
+    });
+    assert.equal(r.code, 0, r.out);
+    // quiet from ~4.0s + the 0.5s dissolve: the card is not at 2.5s, inside the line
+    const at = Number(/section 2: "Second".*, at ([\d.]+)s/.exec(r.out)?.[1]);
+    assert.ok(at >= 4.4 && at <= 4.7, `card at ${at}s, expected about 4.5s`);
+    assert.doesNotMatch(r.out, /section card "Second \| two": only/);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });
