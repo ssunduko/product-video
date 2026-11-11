@@ -3,9 +3,10 @@
 // An app is a folder memory/features/<app>/. Its feature catalog,
 // data/features.json, is the initial feature set (one document per feature);
 // the other .md pages there are written by video work, one per filmed feature.
-// memory/sources.json is generic: it names no app or location. Each app's
-// online source comes from .env as FEATURE_SOURCE_<APP>, and its kind (a Google
-// Drive folder, ...) is recognised from that value.
+// memory/sources.json is generic: it names no app or location. The online
+// source comes from .env as FEATURE_SOURCE, for the app FEATURE_SOURCE_APP names
+// (no app in a variable name), and its kind (a Google Drive folder, ...) is
+// recognised from that value.
 //
 // Only Claude can read those sources (they are MCP tools, not APIs this
 // process can call), so the memory agent (.claude/agents/memory.md) lists the
@@ -85,7 +86,7 @@ const readJson = (f, dflt) => {
 };
 const writeJson = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 2) + '\n');
 
-const config = () => readJson(SOURCES, { env: 'FEATURE_SOURCE_<APP>', features: 'memory/features/<app>/data/features.json', indexOnly: [], kinds: {} });
+const config = () => readJson(SOURCES, { env: 'FEATURE_SOURCE', appEnv: 'FEATURE_SOURCE_APP', features: 'memory/features/<app>/data/features.json', indexOnly: [], kinds: {} });
 // what was synced from an app's source: next to its catalog, so a private app's record stays private too
 const lockPath = (app) => path.join(path.dirname(appInfo(app).featuresPath), 'sources.lock.json');
 const lockOf = (app) => readJson(lockPath(app), { lastSyncAt: null, files: {} });
@@ -95,11 +96,20 @@ export function apps() {
   return fs.existsSync(FEATURES) ? fs.readdirSync(FEATURES, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort() : [];
 }
 
+// the source an app gets from .env: FEATURE_SOURCE feeds the app FEATURE_SOURCE_APP
+// names (a folder under memory/features/); every other app has none. Generic
+// variable names, so no app is named in one.
+export function sourceFor(app, env = process.env, c = config()) {
+  const envVar = c.env ?? 'FEATURE_SOURCE';
+  const appVar = c.appEnv ?? `${envVar}_APP`;
+  const target = String(env[appVar] ?? '').trim();
+  return { envVar, appVar, location: target && target === app ? String(env[envVar] ?? '').trim() || null : null };
+}
+
 // everything known about one app: where its catalog is, and its source from .env
 export function appInfo(app) {
   const c = config();
-  const envVar = c.env.replace('<APP>', app.toUpperCase().replace(/[^A-Z0-9]/g, '_'));
-  const location = process.env[envVar] || null;
+  const { envVar, location } = sourceFor(app, process.env, c);
   const featuresPath = path.join(ROOT, c.features.replace('<app>', app));
   let kind = null;
   let remoteId = null;
@@ -115,7 +125,7 @@ export function appInfo(app) {
 
 // apps with a source whose last sync is older than MEMORY_MAX_AGE_H (or never)
 export function staleSources(now = Date.now()) {
-  loadTarget(undefined); // .env, for FEATURE_SOURCE_* when imported by build.mjs
+  loadTarget(undefined); // .env, for FEATURE_SOURCE when imported by build.mjs
   return apps()
     .map(appInfo)
     .filter((a) => a.location)
@@ -133,7 +143,7 @@ const ageText = (h) => (h === Infinity ? 'never synced' : `synced ${h < 1 ? 'und
 function needSource(app) {
   const a = appInfo(app);
   if (!fs.existsSync(path.join(FEATURES, app))) fail(`unknown app "${app}" (no memory/features/${app}/)`);
-  if (!a.location) fail(`no source for ${app}: set ${a.envVar} in .env`);
+  if (!a.location) fail(`no source for ${app}: set ${a.envVar} and ${a.envVar}_APP=${app} in .env`);
   if (!a.kind) fail(`${a.envVar} is not a kind memory/sources.json knows (${Object.keys(config().kinds).join(', ')})`);
   return a;
 }
@@ -293,7 +303,7 @@ function status(json) {
   if (json) return console.log(JSON.stringify({ apps: rows, zep, maxAgeH: maxAgeH() }, null, 2));
   for (const r of rows) {
     console.log(`${r.app}: ${r.catalog ?? 'no catalog'}; ${r.videoPages} video page(s)`);
-    console.log(`  source: ${r.source ? `${r.source}, ${r.remoteFiles} file(s) tracked, ${r.age}${r.stale ? '  STALE' : ''}` : `none (set ${r.envVar} in .env to sync one)`}`);
+    console.log(`  source: ${r.source ? `${r.source}, ${r.remoteFiles} file(s) tracked, ${r.age}${r.stale ? '  STALE' : ''}` : `none (set ${r.envVar} and ${r.envVar}_APP=${r.app} in .env to sync one)`}`);
   }
   console.log(`zep: ${zep ? 'ZEP_API_KEY set' : 'ZEP_API_KEY not set (add it to .env)'}`);
 }
@@ -886,6 +896,7 @@ function renderStatus(name, v) {
   if (v.published) {
     const p = v.published;
     out.push('', `Published ${p.at}: ${p.url} (${p.title ?? ''}, ${p.destination ?? ''}; ${p.revision ?? ''}).`);
+    if (v.youtube) out.push(`On YouTube ${v.youtube.at}: ${v.youtube.url} (${v.youtube.privacy ?? ''}, channel ${v.youtube.channel ?? ''}).`);
     if (p.jira?.length) out.push(...p.jira.map((j) => `Link posted on ${j.ticket} (comment ${j.comment}) ${j.at}.`));
     else if (p.ticket) out.push(`Not yet posted on ${p.ticket}.`);
   }
@@ -924,6 +935,8 @@ export function recordVideo(name, event) {
   if (event.type === 'review') v.review = { at, verdict: event.verdict, note: event.note, findings: event.findings ?? [] };
   if (event.type === 'accept') v.accepted = { at, reason: event.reason, findings: event.findings ?? [] };
   if (event.type === 'publish') v.published = { ...event, at, type: undefined, jira: [] };
+  // the YouTube video stays across publications: YouTube cannot replace a video's file
+  if (event.type === 'youtube') v.youtube = { ...event, at, type: undefined };
   if (event.type === 'jira') {
     if (!v.published) throw new Error(`${name} is not published: nothing to post`);
     v.published.jira = [...(v.published.jira ?? []), { at, ticket: event.ticket, comment: event.comment }];
@@ -931,7 +944,9 @@ export function recordVideo(name, event) {
   const summary = event.type === 'build'
     ? `build ${event.outcome}${event.scope ? ` (${event.scope})` : ''}${event.joinedQa ? `, joined qa ${event.joinedQa}` : ''}${event.message ? `: ${event.message}` : ''}`
     : event.type === 'publish'
-      ? `published to ${event.destination}: ${event.url}`
+      ? `published to ${event.destination}: ${event.url}${event.youtube && event.youtube !== event.url ? ` and ${event.youtube}` : ''}`
+      : event.type === 'youtube'
+        ? `uploaded to YouTube (${event.privacy}): ${event.url}`
       : event.type === 'jira'
         ? `link posted on ${event.ticket} (comment ${event.comment})`
         : event.type === 'accept'
@@ -1025,7 +1040,8 @@ async function videoSync(name) {
       `The ${manifest.title ?? name} video (${name}) was published on ${p.at.slice(0, 10)}.`,
       manifest.description ? `The ${name} video shows: ${manifest.description}.` : '',
       p.ticket ? `The ${name} video is the product video for Jira ticket ${p.ticket}.` : '',
-      `The published ${name} video is in Google Drive at ${p.url}.`,
+      p.fileId ? `The published ${name} video is in Google Drive at https://drive.google.com/file/d/${p.fileId}/view.` : '',
+      v.youtube ? `The ${name} video is on YouTube at ${v.youtube.url}.` : '',
       ...(p.jira ?? []).map((j) => `The ${name} video link was posted on Jira ticket ${j.ticket} on ${j.at.slice(0, 10)}.`),
       `The ${name} video's status is ${v.status}.`,
     ].filter(Boolean).join(' ');
@@ -1065,7 +1081,7 @@ function opts(args) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  loadTarget(undefined); // .env: FEATURE_SOURCE_*, ZEP_API_KEY
+  loadTarget(undefined); // .env: FEATURE_SOURCE, ZEP_API_KEY
   const [cmd, ...rest] = process.argv.slice(2);
   const o = opts(rest);
   if (cmd === 'status') status(o.json);

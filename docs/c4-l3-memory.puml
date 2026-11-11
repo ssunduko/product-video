@@ -16,7 +16,7 @@ Container(build_orchestrator, "Build Orchestrator", "build.mjs · Node.js + ffmp
 System_Ext(zep_cloud, "Zep Cloud", "@getzep/zep-cloud · HTTPS. Searchable memory: one graph per app for feature pages, traces and manifests, one for rules and pipeline notes, and a thread per working session.")
 
 Container_Boundary(memory_2, "Memory") {
-  Component(source_resolver, "Source resolver", "sources.json + .env · source", "Finds the apps (one folder per app under memory/features), the catalog of each, and its online source from FEATURE_SOURCE_{APP} in .env; recognises the kind of source and names the tools to list an...")
+  Component(source_resolver, "Source resolver", "sources.json + .env · source", "Finds the apps (one folder per app under memory/features), the catalog of each, and its online source from FEATURE_SOURCE in .env (for the app FEATURE_SOURCE_APP names); recognises the kind of sour...")
   Component(change_detector, "Change detector", "diff · baseline", "Compares a source listing with the sync lock: new, changed, removed, unchanged.")
   Component(catalog_merger, "Catalog merger", "upsert", "Merges the features the agent found into data/features.json: matched by name, a new one gets the next feature id; totals and the updated date follow.")
   Component(sync_lock, "Sync lock", "mark · synced", "data/sources.lock.json next to each catalog: every source file seen, its kind and the features it fed, and when the app was last synced.")

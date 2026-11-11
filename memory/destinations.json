@@ -1,16 +1,20 @@
 {
   "//": [
-    "Generic: where finished videos are published. No app or location is named here.",
-    "An app's destination is the .env variable <env> (<APP> = the folder name under memory/features/",
-    "upper-cased, dashes as underscores), e.g. PUBLISH_DEST_ACME=https://drive.google.com/drive/folders/<id>.",
-    "Its kind is recognised from that value by each kind's `match`. pipeline/publish.mjs uploads there,",
-    "only for a video whose state is done and only with the user's final approval (--approved)."
+    "Generic: where finished videos are published. No app or location is named here, nor in a variable name.",
+    "Each destination kind is read from its own .env variable; leave one unset to skip it. `match` finds",
+    "the folder or channel in the value (its first group). pipeline/publish.mjs uploads to every one set,",
+    "only for a video whose state is done (or accepted) and only with the user's final approval (--approved)."
   ],
-  "env": "PUBLISH_DEST_<APP>",
-  "kinds": {
+  "destinations": {
     "google-drive-folder": {
+      "env": "PUBLISH_DEST",
       "match": "drive\\.google\\.com/drive/(?:u/\\d+/)?folders/([A-Za-z0-9_-]+)",
       "upload": "Drive API v3 resumable upload into the folder, as the signed-in user (GOOGLE_OAUTH_* in .env)"
+    },
+    "youtube-channel": {
+      "env": "PUBLISH_YOUTUBE_CHANNEL",
+      "match": "^(?:https?://(?:www\\.|m\\.)?youtube\\.com/)?(@[A-Za-z0-9._-]+|(?:channel/)?UC[A-Za-z0-9_-]+)(?:/.*)?$",
+      "upload": "YouTube Data API v3 resumable videos.insert with full metadata, then thumbnails.set, as the channel the user signed in as (YOUTUBE_OAUTH_REFRESH_TOKEN in .env); refused unless that channel is the configured one"
     }
   }
 }

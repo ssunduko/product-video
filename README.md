@@ -30,8 +30,8 @@ cursor, and a styled window frame.
     qa.mjs          quality gate: overlap, sync, dead air, frozen/loading, lineage
     build.mjs       one command per video: record + render + gate each part, join
     paths.mjs       where stages read/write (DEMO_OUT, default out/)
-    publish.mjs     publishes a finished video after final approval: Drive upload,
-                    video state, Jira comment (see "Publish a finished video")
+    publish.mjs     publishes a finished video after final approval: Drive and
+                    YouTube upload, video state, Jira comment (see "Publish a finished video")
     memory.mjs      project memory: feature catalogs, source diffs, sync lock, Zep
                     (see "Project memory")
     test/           unit/ and integration/ suites, node:test (see "Tests")
@@ -1157,39 +1157,104 @@ approval:
   review (`node memory.mjs video state <name>`);
 - the user has said to publish it. Only then does Claude add `--approved`.
 
-Where to: `memory/destinations.json` is generic. Each app's destination comes
-from `.env` as `PUBLISH_DEST_<APP>`, for example
-`PUBLISH_DEST_ACME=https://drive.google.com/drive/folders/<id>`, a Google Drive
-folder. The manifest names the video's `"title"` (the file name in Drive) and
-its Jira `"ticket"`.
+Every published video is **HD**: `check` and `upload` probe the file with
+ffprobe and refuse anything under 1920x1080, or not H.264 in yuv420p. YouTube
+marks a video HD from the file itself (the API has no setting), so this is the
+only place it can be ensured. A bit rate under 0.4 Mbps only warns.
 
-Uploads run as you, with the Drive API (no service account: those cannot upload
-into a personal Drive). One-time setup:
-1. In Google Cloud, enable the Google Drive API and create an OAuth client ID of
-   type **Desktop app**. Put its id and secret in `.env` as
-   `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+Where to: `memory/destinations.json` is generic, and no variable names an app.
+Each destination is its own `.env` variable; leave one unset to skip it:
+- `PUBLISH_DEST`: a Google Drive folder, `https://drive.google.com/drive/folders/<id>`;
+- `PUBLISH_YOUTUBE_CHANNEL`: a YouTube channel, as `@handle`, its URL
+  (`https://www.youtube.com/@handle`) or its `UC...` channel id.
+
+The manifest names the video's `"title"` (the file name in Drive and the
+YouTube title), its `"description"` and its Jira `"ticket"`.
+
+What YouTube gets, built from the video itself unless the manifest's optional
+`"youtube"` block says otherwise (field by field):
+
+| Field | Default | `"youtube"` key |
+|---|---|---|
+| title | the manifest `title` (100 characters at most) | `title` |
+| description | the intro card's subhead (else the manifest `description`); chapters from the section cards (`0:00 Intro`, then each card's start on the joined timeline; only when there are three or more, each 10s or longer); the outro card's contact line | `description` |
+| tags | the section card headlines | `tags` |
+| thumbnail | `PUBLISH_YOUTUBE_THUMBNAIL` (a path with `<name>` for the video name, for a designed thumbnail) when that file exists, else the first part's intro title card (`cards/intro.png`); over 2 MB it is sent as a 1280-wide JPEG | `thumbnail` (repo-relative) |
+| privacy | `PUBLISH_YOUTUBE_PRIVACY`, else `public` | `privacy` |
+| language | `PUBLISH_YOUTUBE_LANGUAGE`, else `en` (title and audio) | `language` |
+| category | `28`, Science & Technology | `categoryId` |
+| AI disclosure | yes when a part has an avatar card (a realistic AI presenter) | `syntheticMedia` |
+| recording date | the build time | |
+| always | not made for kids, embeddable, public stats, standard YouTube licence | |
+
+`check` prints all of it, so it can be read before approval.
+
+Uploads run as you, with the Drive API and the YouTube Data API (no service
+account: those cannot upload into a personal Drive or to a channel). One-time
+setup:
+1. In Google Cloud, enable the Google Drive API and the YouTube Data API v3, and
+   create an OAuth client ID of type **Desktop app**. Put its id and secret in
+   `.env` as `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
 2. Run `node publish.mjs auth` and sign in in the browser. It writes
-   `GOOGLE_OAUTH_REFRESH_TOKEN` into `.env` and never prints it.
+   `GOOGLE_OAUTH_REFRESH_TOKEN` (Drive) into `.env` and never prints it.
+3. For YouTube, run `node publish.mjs auth youtube`, sign in with an account
+   that manages the channel and pick the channel (often a brand account) when
+   Google asks. It writes `YOUTUBE_OAUTH_REFRESH_TOKEN` and prints the channel
+   the token uploads to.
+
+Before every YouTube upload, `publish.mjs` asks YouTube which channel the token
+signs in as and refuses unless it is the configured one, so a video never lands
+on the wrong channel. `check` shows that channel too. A Google Cloud project
+that has not passed the YouTube API audit can only upload private videos:
+`upload` says so when YouTube changed the privacy, and the video is then made
+public in YouTube Studio. Custom thumbnails need a verified channel
+(youtube.com/verify); when YouTube refuses one, the upload still stands and
+`node publish.mjs thumbnail <name> --approved` sets it later.
+
+The YouTube sign-in can only act as a channel whose **brand account** the
+signed-in Google account manages; a role given in Studio → Settings →
+Permissions works in Studio but never for the API, and the token then signs in
+as a personal channel, which the channel check refuses. Until a brand-account
+manager or the owner signs in once, the video is uploaded in Studio by hand,
+with what `check` prints.
+
+**Subtitles.** `node publish.mjs subtitles <name>` writes `out/<name>.srt`
+(English, with timing) from what the video says: the intro card's voice, every
+narration line, each section card's headline and the outro card's voice. Each
+line is placed from the edit (its cue through tighten's time map, after the
+intro card and the section cards) and then snapped to where the speech starts
+in the final audio, so it matches what is heard; it ends where that speech
+stops. Lines longer than two subtitle rows (84 characters) are split at
+sentences, or evenly at a comma. Upload it in Studio under Video elements →
+Subtitles → Upload file → With timing.
 
 ```bash
 cd pipeline
 node publish.mjs check acme-tour                # what would be published, and what blocks it
-node publish.mjs upload acme-tour --approved    # upload (a new revision if published before)
-node publish.mjs jira acme-tour --ticket ACME-123 --comment <id>   # after Claude posts the link
+node publish.mjs upload acme-tour --approved    # upload to every destination
+node publish.mjs upload acme-tour --approved --replace-youtube   # also a new YouTube video
+node publish.mjs thumbnail acme-tour --approved # set the thumbnail on the video already on YouTube
+node publish.mjs subtitles acme-tour             # write out/acme-tour.srt (timed English subtitles)
+node publish.mjs jira acme-tour --ticket ACME-123 --comment <id>   # after Claude posts the link(s)
 npm run publish-video -- check acme-tour        # the same, via npm
 ```
 
 After an upload:
-- the video's state is **published**, with the link, the file id and the
-  destination;
+- the video's state is **published**, with the links, the Drive file id, the
+  YouTube video id and the destinations;
 - its page and its Zep thread show it;
 - the app's Zep graph states it as plain facts: the video, its ticket, the
-  date and the link.
+  date and the links.
 
-Claude then posts the link on the ticket through the Atlassian MCP tool and
+Claude then posts the links on the ticket through the Atlassian MCP tool and
 records the comment with `publish.mjs jira`. Publishing again uploads a new
-revision of the same Drive file, so the link stays the same. A new build or
-review moves the status back until the video is published again.
+revision of the same Drive file, so the Drive link stays the same. YouTube
+cannot replace a video's file, so a video already on the channel is skipped
+unless `--replace-youtube` is given; that uploads a new video and leaves the
+old one for you to unlist or delete in YouTube Studio. If one destination
+fails, the others are still recorded; rerun `upload --approved` after the fix.
+A new build or review moves the status back until the video is published
+again.
 
 ## Project memory
 
@@ -1209,7 +1274,9 @@ review moves the status back until the video is published again.
 Each app can have an online source. `memory/sources.json` is generic: it names
 no app or location, only how to recognise and read each kind of source (a
 Google Drive folder, for now). The location comes from `.env` as
-`FEATURE_SOURCE_<APP>`, for example `FEATURE_SOURCE_ACME=<Drive folder URL>` for `memory/features/acme/`.
+`FEATURE_SOURCE`, and the app it feeds as `FEATURE_SOURCE_APP` (no variable is
+named after an app), for example `FEATURE_SOURCE=<Drive folder URL>` and
+`FEATURE_SOURCE_APP=acme` for `memory/features/acme/`.
 
 Those sources are reachable only as Claude tools (MCP), so a Claude Code agent
 does the sync, `.claude/agents/memory.md`:
