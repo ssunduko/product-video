@@ -85,6 +85,10 @@ by hand. `node pipeline/memory.mjs video state <name>` answers "where is this
 video?"
 
 Publishing (`pipeline/publish.mjs`) happens only after final approval: state
-done, and the user says to publish. Then run `upload <name> --approved`, post
-the printed link on the manifest's ticket with the Atlassian tool, and record it
-with `publish.mjs jira <name> --ticket <KEY> --comment <id>`.
+done, and the user says to publish. Run `check <name>` first and show the user
+what goes where (Drive folder, YouTube channel, title, privacy). Then run
+`upload <name> --approved`: it uploads to every destination of the app (Drive
+and, when configured, the YouTube channel). Post the printed links on the
+manifest's ticket with the Atlassian tool, and record it with `publish.mjs jira
+<name> --ticket <KEY> --comment <id>`. If a destination failed, say which and
+rerun after the fix. `--replace-youtube` only on the user's word.

@@ -27,6 +27,32 @@ ticket) only when its state is done and the user has said to publish it.
 user's go-ahead for that video. Posting the Jira comment is part of publishing.
 *Why:* the user set this on 2026-10-24.
 
+### Approved videos also go to the app's YouTube channel
+Publishing uploads to every configured destination: the Drive folder
+(`PUBLISH_DEST`) and the YouTube channel (`PUBLISH_YOUTUBE_CHANNEL`). The same
+final approval covers both; `publish.mjs` refuses YouTube unless its token signs
+in as the configured channel. YouTube gets the full metadata (title,
+description with chapters and contact line, tags, language, AI disclosure) and
+the designed thumbnail (`PUBLISH_YOUTUBE_THUMBNAIL`, else the intro title card).
+Show the user `publish.mjs check` before asking for approval. Post both links on
+the ticket. Never upload a second copy of a video already on the channel
+(`--replace-youtube`) without the user saying so for that video.
+*Why:* the user asked for approved videos to go to the company YouTube channel
+with all the metadata and the title image (2026-11-11).
+
+### Every video is published in HD
+At least 1920x1080, H.264 yuv420p. `publish.mjs` refuses anything less, for
+Drive and YouTube alike; never work around it by re-encoding a smaller build
+upward: rebuild at 1920x1080.
+*Why:* the user asked for every video to be published in HD (2026-11-11).
+
+### No app in a variable name
+Configuration variables are generic (`PUBLISH_DEST`, `PUBLISH_YOUTUBE_CHANNEL`,
+`FEATURE_SOURCE` with `FEATURE_SOURCE_APP`), never named after an app: the
+repo is public. An app may appear in a value in `.env`, which is gitignored.
+`docs/check.mjs` requires `.env` and `.env.example` to list the same names.
+*Why:* the user asked for it (2026-11-11).
+
 ### A video is done only after both gates
 `qa.mjs` PASS and a video-qa visual review with no FAIL. A qa.mjs PASS alone is
 not done: an earlier take passed qa.mjs and still showed loading

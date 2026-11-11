@@ -1,6 +1,6 @@
 ---
 name: memory
-description: Syncs project memory at session start. For each app under memory/features/ with an online source (FEATURE_SOURCE_<APP> in .env, for example a Google Drive folder of feature one-pagers), it finds new or changed files, merges the features they describe into the app's catalog (memory/features/<app>/data/features.json), and stores catalogs, video pages, traces, manifests and session notes in Zep. Use when the SessionStart hook says memory is stale, or when asked to sync or search project memory.
+description: Syncs project memory at session start. For each app under memory/features/ with an online source (FEATURE_SOURCE in .env, for the app FEATURE_SOURCE_APP names; for example a Google Drive folder of feature one-pagers), it finds new or changed files, merges the features they describe into the app's catalog (memory/features/<app>/data/features.json), and stores catalogs, video pages, traces, manifests and session notes in Zep. Use when the SessionStart hook says memory is stale, or when asked to sync or search project memory.
 ---
 
 You keep ProductVideo's memory current. Everything goes through
@@ -18,7 +18,8 @@ and nothing else.
 - **Video pages**: the other `.md` pages in the app folder (for example
   `<feature>.md`) and the app's `README.md` (its own rules). Video work writes
   these. You don't.
-- **The source**: the `.env` variable `FEATURE_SOURCE_<APP>`.
+- **The source**: the `.env` variable `FEATURE_SOURCE`, for the app
+  `FEATURE_SOURCE_APP` names (`memory.mjs source <app>` resolves it).
   `memory/sources.json` is generic: it says how to recognise and read each kind
   of source, never where one is.
 

@@ -417,11 +417,15 @@ const memoryAgent = mk(pkgContext, 'external', 'memory agent', 'Claude Code suba
   'MCP tool, reads what changed, merges its features into the catalog and pushes them to Zep. Read-only on ' +
   'the sources. Defined in .claude/agents/memory.md.');
 const featureSource = mk(pkgContext, 'external', 'Online feature sources', 'e.g. a Google Drive folder per app',
-  'Where the features of each app are published, located by FEATURE_SOURCE_{APP} in .env. Reachable only ' +
+  'Where the features of each app are published, located by FEATURE_SOURCE in .env (the app it feeds: FEATURE_SOURCE_APP). Reachable only ' +
   'as Claude tools (MCP), so the memory agent reads them, never the pipeline.');
 const videoDest = mk(pkgContext, 'external', 'Video destination', 'Google Drive API v3 · HTTPS',
-  'Where finished videos are published: a Google Drive folder per app, located by PUBLISH_DEST_{APP} ' +
+  'Where finished videos are published: a Google Drive folder, named in PUBLISH_DEST ' +
   'in .env. Uploads run as the signed-in user (OAuth refresh token in .env).');
+const youtubeChannel = mk(pkgContext, 'external', 'YouTube channel', 'YouTube Data API v3 · HTTPS',
+  'Where finished videos are also published for viewers, in HD with full metadata and a thumbnail: a channel named (as @handle or channel id) ' +
+  'in PUBLISH_YOUTUBE_CHANNEL in .env. Uploads run as the channel the user signed in as ' +
+  '(YOUTUBE_OAUTH_REFRESH_TOKEN), and only when that is the configured channel.');
 const jiraTickets = mk(pkgContext, 'external', 'Jira', 'Atlassian MCP',
   'The ticket each video is for (the manifest names it). Claude posts the published link there as a ' +
   'comment through the Atlassian MCP tool; the pipeline only records that it was posted.');
@@ -446,6 +450,7 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   const vZep = place(dL1, zepCloud, 1160, 60);
   const vDest = place(dL1, videoDest, 1160, 620);
   const vJira = place(dL1, jiraTickets, 800, 780);
+  const vYoutube = place(dL1, youtubeChannel, 1160, 780);
   const vElevenCreative = place(dL1, elevenCreative, 60, 780);
   const vCi = place(dL1, ciRunner, 440, 780);
 
@@ -460,6 +465,7 @@ const dL1 = diagram(pkgContext, 'c4-l1-context', 'C4-L1 — System Context',
   link(dL1, pkgContext, vQaAgent, vSystem, 'Reviews every video built by');
   link(dL1, pkgContext, vSystem, vZep, 'Stores feature catalogs, pages, traces and session threads in', 'HTTPS');
   link(dL1, pkgContext, vSystem, vDest, 'Publishes approved videos to', 'HTTPS');
+  link(dL1, pkgContext, vSystem, vYoutube, 'Uploads approved videos to', 'HTTPS');
   link(dL1, pkgContext, vAuthor, vJira, 'Posts the published link on the ticket (through Claude)', 'MCP');
   link(dL1, pkgContext, vMemoryAgent, vSources, 'Reads new and changed feature files from', 'MCP');
   link(dL1, pkgContext, vMemoryAgent, vSystem, 'Merges features and syncs memory via', 'CLI');
@@ -566,10 +572,12 @@ const cBuild = mk(pkgContainers, 'container', 'Build Orchestrator', 'build.mjs �
 const dManifests = mk(pkgContainers, 'store', 'Video manifests', 'videos/*.json',
   'One per finished video: its parts in recording order with what must be true before each take, ' +
   'the settings every stage runs with, and how the parts join. Committed.');
-const cPublish = mk(pkgContainers, 'container', 'Publisher', 'publish.mjs · Node.js + Google Drive API',
+const cPublish = mk(pkgContainers, 'container', 'Publisher', 'publish.mjs · Node.js + Google Drive API + YouTube Data API',
   'Publishes a finished video after final approval: only a video whose state is done, and only with ' +
-  '--approved. Uploads it to the app destination (a new revision when it was published before, so the ' +
-  'link stays), records the publication in the video state and prints the Jira comment for Claude to post.');
+  '--approved. Uploads it to each app destination: the Drive folder (a new revision when it was published ' +
+  'before, so the link stays) and the YouTube channel (once; a new video only with --replace-youtube), ' +
+  'records the publication in the video state and prints the Jira comment for Claude to post. subtitles writes ' +
+  'a timed English .srt from the narration and card voices, snapped to the speech in the final audio.');
 const cMemory = mk(pkgContainers, 'container', 'Memory', 'memory.mjs · Node.js + @getzep/zep-cloud',
   'Bookkeeping for project memory: finds the source of each app from .env, diffs a remote listing against ' +
   'the sync lock next to the catalog (files older than the catalog are its baseline), merges new features into ' +
@@ -635,6 +643,7 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   const vZep = place(dL2, zepCloud, 1560, 860);
   const vPublish = place(dL2, cPublish, 340, 1020);
   const vDest2 = place(dL2, videoDest, 1000, 1020);
+  const vYoutube2 = place(dL2, youtubeChannel, 1000, 1180);
   const vJira2 = place(dL2, jiraTickets, 1280, 1020);
   const vAvatar = place(dL2, dAvatar, 1280, 700);
   const vElevenCreative2 = place(dL2, elevenCreative, 1560, 1020);
@@ -708,6 +717,7 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   link(dL2, pkgContainers, vAuthor, vPublish, 'Approves and runs after the visual review', 'CLI');
   link(dL2, pkgContainers, vPublish, vWork, 'Reads the finished MP4');
   link(dL2, pkgContainers, vPublish, vDest2, 'Uploads the video to', 'HTTPS');
+  link(dL2, pkgContainers, vPublish, vYoutube2, 'Uploads the video to', 'HTTPS');
   link(dL2, pkgContainers, vPublish, vMemory, 'Records the publication via', 'import');
   link(dL2, pkgContainers, vAuthor, vJira2, 'Posts the link on the ticket (through Claude)', 'MCP');
 
@@ -1526,7 +1536,7 @@ const pkgMemory = pkg(
 
 const mSource = mk(pkgMemory, 'component', 'Source resolver', 'sources.json + .env · source',
   'Finds the apps (one folder per app under memory/features), the catalog of each, and its online ' +
-  'source from FEATURE_SOURCE_{APP} in .env; recognises the kind of source and names the tools to ' +
+  'source from FEATURE_SOURCE in .env (for the app FEATURE_SOURCE_APP names); recognises the kind of source and names the tools to ' +
   'list and read it.');
 const mDiff = mk(pkgMemory, 'component', 'Change detector', 'diff · baseline',
   'Compares a source listing with the sync lock: new, changed, removed, unchanged. Files dated on ' +
@@ -1611,20 +1621,27 @@ const pkgPublish = pkg(
     'the video state and on the explicit approval of the user.',
 );
 const pPlan = mk(pkgPublish, 'component', 'Publish plan', 'check',
-  'The file, its destination (PUBLISH_DEST_{APP} and its kind), the ticket from the manifest, and ' +
-  'every reason it may not be published yet: state not done, file missing, destination or Google ' +
-  'credentials not set.');
+  'The file and its HD check (ffprobe: at least 1920x1080, H.264 yuv420p), its destinations (PUBLISH_DEST, ' +
+  'PUBLISH_YOUTUBE_CHANNEL), the YouTube metadata built from the manifest and the cards (title, description ' +
+  'with chapters and contact line, tags, language, privacy, AI disclosure, thumbnail), the ticket, and every ' +
+  'reason it may not be published yet: state not done, file missing or not HD, destination or Google ' +
+  'credentials not set, YouTube token on another channel.');
 const pAuth = mk(pkgPublish, 'component', 'Google sign-in', 'auth · OAuth loopback + PKCE',
-  'One-time: the user signs in in the browser, Google redirects to a 127.0.0.1 port, and the refresh ' +
-  'token is written into .env, never printed.');
+  'One-time, once for Drive (auth) and once for the channel (auth youtube): the user signs in in the ' +
+  'browser, Google redirects to a 127.0.0.1 port, and the refresh token is written into .env, never printed.');
 const pGate = mk(pkgPublish, 'component', 'Approval gate', 'upload --approved',
   'Refuses unless the video state is done (or already published) and --approved is given, which ' +
   'Claude passes only after the user says to publish.');
 const pUpload = mk(pkgPublish, 'component', 'Drive uploader', 'resumable upload · 8 MB chunks',
   'Uploads into the destination folder as the user, or adds a new revision of the file published ' +
   'before so its link stays the same.');
+const pYoutube = mk(pkgPublish, 'component', 'YouTube uploader', 'videos.insert · resumable · 8 MB chunks',
+  'Checks which channel the token signs in as (channels.list mine) and refuses unless it is the ' +
+  'configured one, uploads the video with its full metadata, then sets the thumbnail (the designed ' +
+  'PUBLISH_YOUTUBE_THUMBNAIL image, else the intro title card; a JPEG when over 2 MB). Skips a video ' +
+  'already on the channel unless --replace-youtube; thumbnail sets it again later.');
 const pRecord = mk(pkgPublish, 'component', 'Publication record', 'memory.mjs recordVideo · video sync',
-  'Records the link, file id and destination in the video state (status published), posts it to the ' +
+  'Records the links, Drive file id, YouTube video id and destinations in the video state (status published), posts it to the ' +
   'video thread and states it as facts in the app graph. jira records the comment Claude posted.');
 
 const dL3publish = diagram(pkgPublish, 'c4-l3-publisher',
@@ -1633,8 +1650,8 @@ const dL3publish = diagram(pkgPublish, 'c4-l3-publisher',
   { macro: 'Container_Boundary', name: 'Publisher' });
 {
   const vAuthor = place(dL3publish, author, 60, 40);
-  const [vPlan, vAuth, vGate, vUp, vRec] = grid(dL3publish, [pPlan, pAuth, pGate, pUpload, pRecord], { y: 200, cols: 3 });
-  const [vWorkP, vMemP, vDestP, vJiraP] = column(dL3publish, [dWork, cMemory, videoDest, jiraTickets], { dy: 150 });
+  const [vPlan, vAuth, vGate, vUp, vYt, vRec] = grid(dL3publish, [pPlan, pAuth, pGate, pUpload, pYoutube, pRecord], { y: 200, cols: 3 });
+  const [vWorkP, vMemP, vDestP, vYtP, vJiraP] = column(dL3publish, [dWork, cMemory, videoDest, youtubeChannel, jiraTickets], { dy: 150 });
   link(dL3publish, pkgPublish, vAuthor, vAuth, 'Signs in once', 'CLI');
   link(dL3publish, pkgPublish, vAuthor, vGate, 'Approves, then Claude runs upload', 'CLI');
   link(dL3publish, pkgPublish, vGate, vPlan, 'Checks');
@@ -1644,8 +1661,12 @@ const dL3publish = diagram(pkgPublish, 'c4-l3-publisher',
   link(dL3publish, pkgPublish, vAuth, vUp, 'Refresh token for');
   link(dL3publish, pkgPublish, vUp, vDestP, 'Uploads to', 'HTTPS');
   link(dL3publish, pkgPublish, vUp, vRec, 'The link to');
+  link(dL3publish, pkgPublish, vGate, vYt, 'Approved to');
+  link(dL3publish, pkgPublish, vAuth, vYt, 'Channel refresh token for');
+  link(dL3publish, pkgPublish, vYt, vYtP, 'Checks the channel, then uploads to', 'HTTPS');
+  link(dL3publish, pkgPublish, vYt, vRec, 'The YouTube link to');
   link(dL3publish, pkgPublish, vRec, vMemP, 'Records and syncs via', 'import + child process');
-  link(dL3publish, pkgPublish, vAuthor, vJiraP, 'Posts the link on the ticket (through Claude)', 'MCP');
+  link(dL3publish, pkgPublish, vAuthor, vJiraP, 'Posts the links on the ticket (through Claude)', 'MCP');
 }
 
 // ====================================== L3 · 13 — components: test suites ==

@@ -88,7 +88,9 @@ is a blurred value.
    bubbles, personal data or customer data that should not be in a shared
    video (real names, emails, phone numbers, inbox names, account figures).
    Report these; personal or customer data is a FAIL unless the user waived it
-   (the app's README or the caller says so): report it as WAIVED then. A blur
+   (the app's README or the caller says so): report it as WAIVED then. An
+   approved video can go to a public YouTube channel, where it cannot be
+   re-cut in place, so a single frame of real data counts. A blur
    or mask over a name, number or inbox name is a WARN: the rule is invented
    values. **Check the loads, not just the settled screen:** step through every
    page load where a contact is open at 0.1-0.2s (Contact details, call panel,

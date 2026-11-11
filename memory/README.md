@@ -7,7 +7,7 @@ session (and every person) starts from it instead of relearning it.
 |---|---|
 | [rules.md](rules.md) | Standing rules for every video. They override defaults and the target's settings. `CLAUDE.md` imports it, so every session loads it. |
 | [pipeline-lessons.md](pipeline-lessons.md) | How the pipeline behaves in practice (timing, qa, zoom, loading) and the trace changes that fixed each problem. Read before authoring or recording; add to it after a take. |
-| [sources.json](sources.json) | Generic: how to recognise and read each kind of online source. The location of each app's source is in `.env` (`FEATURE_SOURCE_<APP>`). |
+| [sources.json](sources.json) | Generic: how to recognise and read each kind of online source. The location of each app's source is in `.env` (`FEATURE_SOURCE`, for the app `FEATURE_SOURCE_APP` names). |
 | [features/](features/) | One folder per app: `data/features.json`, the app's feature catalog (the initial feature set, kept current from its source), plus video pages: how to reach a filmed feature, what's on screen, data it needs, quirks, and the videos that cover it. |
 
 ## Apps
