@@ -160,8 +160,41 @@ problem. The README says what the stages are; this page says how to get a pass.
   line (after a `say`) so the wait isn't silent. A guard at the very start of a
   take makes a frozen, silent opening.
 
+## Publishing
+
+- **The YouTube API reaches a channel only through its brand account.** A
+  Google account invited in YouTube Studio → Settings → Permissions (even as
+  Manager, and even when the channel shows in YouTube's Switch account list)
+  can upload in Studio, but Google's sign-in never offers that channel to an
+  app: the token comes back with no channel, or the person's own channel once
+  one exists. `channels.list mine=true` returning `totalResults: 0` means
+  exactly that, not a code or API fault. Retrying the sign-in does not help;
+  a brand-account manager or the owner must sign in once (`publish.mjs auth
+  youtube` asks Google for the account chooser, `prompt=select_account`).
+  Seven sign-ins were spent learning this (2026-11-11).
+- **Until then, upload in Studio with the browser extension.** Its
+  `file_upload` takes files under 10 MB, so the person picks the MP4 in Studio's
+  dialog. Then fill the form from `publish.mjs check`: title, description,
+  thumbnail (the file input in the Thumbnail section), tags, category, and
+  subtitles under Video elements → Subtitles → Upload file → With timing (the
+  hidden input `#captions-file-loader` takes the .srt directly; Continue would
+  open the system picker). The AI-use question and the final Publish are the
+  person's own answers: leave them to them.
+- **A channel's upload defaults apply to Studio uploads.** Default tags were
+  already in the tag field and the category defaulted to the channel's own;
+  read the form before typing, keep or replace them on purpose.
+- **Subtitles: anchor each line to the speech, not the edit alone.** Section
+  card cut points (`at`/`resume`) are not saved, so the body offset after each
+  card is taken from the first speech onset after the card's span. With the
+  intro card's length less its dissolve as the first offset, the predicted
+  starts landed within 0.03s of the real onsets (`publish.mjs subtitles`).
+- **Studio confirms HD before publishing**: "Processing up to HD" during the
+  upload, and `videos.list` reports `definition: hd` afterwards.
+
 ## Files
 
+- **Edit files with an editor, not `sed -i`, on Windows.** `sed -i` rewrote
+  CRLF files as LF, so git showed whole files changed (2026-11-11).
 - **The zoom project file** is `out/<part>/<take>.recordly`, named from the
   script. Re-render a recorded take without Chrome with
   `build.mjs <manifest> --only <part> --no-record`.
