@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadTarget } from './target.mjs';
 import { pickProvider, TTS_CACHE as OUT_TTS } from './tts.mjs';
 import { speechMs } from './author.mjs';
-import { OUT } from './paths.mjs';
+import { OUT, captureSpace } from './paths.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
@@ -66,6 +66,20 @@ const { viewport, samples, narration = [], waits = [], targets = [] } = JSON.par
 );
 
 if (allFrames.length < 10) throw new Error(`only ${allFrames.length} frames captured`);
+
+// Boxes and cursor samples are normalised by the size of the captured frames,
+// which can differ from the viewport the driver logged (captureSpace).
+const probed = (() => {
+  try {
+    const out = execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', allFrames[0].file], { encoding: 'utf8' }).trim();
+    const [width, height] = out.split(',').map(Number);
+    return { width, height };
+  } catch {
+    return null;
+  }
+})();
+const space = captureSpace(viewport, probed);
+if (space.differs) console.warn(`frames are ${space.width}x${space.height}, not the logged viewport ${viewport.width}x${viewport.height}: boxes and cursor are normalised by the frame size`);
 
 // video timeline starts at the first screencast frame
 const t0 = allFrames[0].ts; // epoch seconds (float)
@@ -237,8 +251,8 @@ const telemetry = samples
   .filter((s) => s.vt >= 0 && !inCut(s.vt))
   .map((s) => ({
     timeMs: Math.round(warp(s.vt)),
-    cx: Math.min(1, Math.max(0, s.x / viewport.width)),
-    cy: Math.min(1, Math.max(0, s.y / viewport.height)),
+    cx: Math.min(1, Math.max(0, s.x / space.width)),
+    cy: Math.min(1, Math.max(0, s.y / space.height)),
     interactionType: s.type,
     cursorType: s.cursorType,
   }))
@@ -312,18 +326,18 @@ const highlights = targets
     startMs: Math.round(warp(t.s)),
     endMs: Math.round(warp(t.e)),
     kind: t.kind,
-    x: t.x / viewport.width,
-    y: t.y / viewport.height,
-    w: t.w / viewport.width,
-    h: t.h / viewport.height,
+    x: t.x / space.width,
+    y: t.y / space.height,
+    w: t.w / space.width,
+    h: t.h / space.height,
     // where a typed field grew, its later boxes, from when each took over
     ...(t.track && {
       track: t.track.map((b) => ({
         atMs: Math.round(warp(b.t - t0 * 1000)),
-        x: b.x / viewport.width,
-        y: b.y / viewport.height,
-        w: b.w / viewport.width,
-        h: b.h / viewport.height,
+        x: b.x / space.width,
+        y: b.y / space.height,
+        w: b.w / space.width,
+        h: b.h / space.height,
       })),
     }),
   }))

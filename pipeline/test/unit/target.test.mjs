@@ -37,6 +37,21 @@ describe('loadTarget', () => {
   test('refuses a pair without a from', () => {
     assert.throws(() => loadTarget(writeTarget({ replaceText: [{ to: 'x' }] })), /replaceText\[0\]/);
   });
+
+  test('reads extra CSS styles, and refuses anything but non-empty strings', () => {
+    const rule = '[aria-label="Avatar_Image"] { background-image: none !important; }';
+    assert.deepEqual(loadTarget(writeTarget({ styles: [rule] })).styles, [rule]);
+    assert.deepEqual(loadTarget(writeTarget({})).styles, []);
+    assert.throws(() => loadTarget(writeTarget({ styles: [''] })), /styles/);
+    assert.throws(() => loadTarget(writeTarget({ styles: 'a { }' })), /styles/);
+  });
+
+  test('reads a pattern pair, and refuses an invalid or empty one', () => {
+    const t = loadTarget(writeTarget({ replaceText: [{ pattern: 'meet\\.google\\.com/\\S+', to: 'meet.google.com/rqx-hvbn-tpw' }] }));
+    assert.deepEqual(t.replaceText, [{ pattern: 'meet\\.google\\.com/\\S+', to: 'meet.google.com/rqx-hvbn-tpw' }]);
+    assert.throws(() => loadTarget(writeTarget({ replaceText: [{ pattern: '(', to: 'x' }] })), /not a valid regular expression/);
+    assert.throws(() => loadTarget(writeTarget({ replaceText: [{ pattern: '', to: 'x' }] })), /empty "pattern"/);
+  });
 });
 
 // A minimal DOM: text nodes under one element, walked in order.
@@ -72,6 +87,19 @@ describe('textReplacer', () => {
         { from: 'PL', to: 'MB', whole: true },
       ]);
       assert.deepEqual(dom.nodes.map((n) => n.nodeValue), ['Call with Maya Brooks', 'Maya', 'Patio', 'MB', 'Pat Lane']);
+    } finally {
+      dom.restore();
+    }
+  });
+
+  test('a pattern swaps a value only known during the take (a meeting link), before names', () => {
+    const dom = fakeDom([['Join: https://meet.google.com/abc-defg-hij today'], ['meet.google.com/xyz-uvwx-rst'], ['no link']]);
+    try {
+      textReplacer([
+        { from: 'abc', to: 'NOPE' },
+        { pattern: 'meet\\.google\\.com/[a-z]+-[a-z]+-[a-z]+', to: 'meet.google.com/rqx-hvbn-tpw' },
+      ]);
+      assert.deepEqual(dom.nodes.map((n) => n.nodeValue), ['Join: https://meet.google.com/rqx-hvbn-tpw today', 'meet.google.com/rqx-hvbn-tpw', 'no link']);
     } finally {
       dom.restore();
     }

@@ -25,3 +25,17 @@ export function projectPath() {
   } catch {}
   return path.join(OUT, `${name}.recordly`);
 }
+
+// The pixel space the take's element boxes and cursor samples are measured in:
+// the size of the captured frames. The driver logs the viewport it asked for,
+// but the screencast can come out a few pixels different (a take on 2026-11-17
+// captured 1456x799 for a 1440x810 viewport), and normalising by the logged
+// size then drew every red frame and the cursor off target, more so toward the
+// bottom right. Falls back to the logged viewport when the frame size is
+// unknown. `differs` says whether the two disagree, for a warning.
+export function captureSpace(viewport, frame) {
+  const ok = (s) => s && Number.isFinite(s.width) && Number.isFinite(s.height) && s.width > 0 && s.height > 0;
+  if (!ok(frame)) return { width: viewport.width, height: viewport.height, differs: false };
+  const differs = !ok(viewport) || frame.width !== viewport.width || frame.height !== viewport.height;
+  return { width: frame.width, height: frame.height, differs };
+}

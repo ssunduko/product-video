@@ -560,6 +560,12 @@ const dTts = mk(pkgContainers, 'store', 'TTS clip cache', 'out/tts/ · mp3',
   'breath trimmed. Re-cutting or re-composing re-bills nothing; only changed lines re-render. ' +
   'Shared by every take folder.');
 
+const cInserts = mk(pkgContainers, 'container', '8b · Still Inserter', 'inserts.mjs · Node.js + canvas + ffmpeg',
+  'Optional, per manifest part: shows still images (a screenshot of what the take could not record ' +
+  'live) for a section, from the end of its card to the next card. Measures the app window in the ' +
+  'composed frame, fits each image inside it with an optional red frame, and dissolves from the card ' +
+  'into the stills and from the stills into the next card, so the take never shows between them. ' +
+  'Keeps the narration. Writes final-narrated-tight-carded-inserted.mp4.');
 const cQa = mk(pkgContainers, 'container', '9 · Quality Gate', 'qa.mjs · Node.js + ffmpeg',
   'Measures what a viewer notices and a stage only warns about: two narration lines at once, a ' +
   'line off its cue, dead air, a frozen or loading screen, black frames, mismatched streams, ' +
@@ -632,6 +638,9 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   const vTts = place(dL2, ttsApi, 1000, 700);
 
   const v9 = place(dL2, cQa, 620, 700);
+  const v8b = place(dL2, cInserts, 60, 700);
+  link(dL2, pkgContainers, v8b, vWork, 'Overlays stills after a section card');
+  link(dL2, pkgContainers, v8b, vFfmpeg, 'Runs', 'child process');
   const vBuild = place(dL2, cBuild, 620, 200);
   const vManifests = place(dL2, dManifests, 1560, 560);
   const vProfiles = place(dL2, dProfiles, 1560, 720);
@@ -700,7 +709,7 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
   link(dL2, pkgContainers, vAuthor, vBuild, 'Runs one build per video', 'CLI');
   link(dL2, pkgContainers, vAuthor, vManifests, 'Writes the manifest');
   link(dL2, pkgContainers, vBuild, vManifests, 'Reads');
-  for (const v of [v2, v3, v4, v5, v6, v7, v8, v9]) {
+  for (const v of [v2, v3, v4, v5, v6, v7, v8, v8b, v9]) {
     link(dL2, pkgContainers, vBuild, v, 'Runs per part', 'child process');
   }
   link(dL2, pkgContainers, vBuild, vWork, 'Gives each part its own folder; writes the joined MP4');
@@ -909,7 +918,9 @@ const kTelemetry = mk(pkgDriver, 'component', 'Input telemetry recorder', 'drive
   'Samples synthesized pointer moves and clicks into actions.json. The cursor in the finished video ' +
   'is drawn from this, which is why the capture needs no real cursor. It also keeps the box of the ' +
   'visible part (hit-tested, so an element under a side panel is cut at its edge) of the element ' +
-  'each hover, click and type acted on, with when it was the subject, for the red frame.');
+  'each hover, click and type acted on, with when it was the subject, for the red frame; bare text ' +
+  'inside a field, row, option or menu item is framed by that container, so the frame never crosses ' +
+  'the text or its box.');
 const kCues = mk(pkgDriver, 'component', 'Narration cue collector', 'driver.mjs · d.say()',
   'Stamps { t, text } at wall-clock time and returns immediately — the voice plays over the visuals ' +
   'instead of the flow pausing for it. Cue times are recorded during the take precisely because ' +
@@ -1393,6 +1404,42 @@ const dL3cards = diagram(pkgCards, 'c4-l3-card-renderer',
   link(dL3cards, pkgCards, vWork, vJoin, 'The tightened video to');
   link(dL3cards, pkgCards, vJoin, vFfmpeg, 'Runs', 'child process');
   link(dL3cards, pkgCards, vJoin, vWork, 'Writes the carded MP4');
+}
+
+// ===================================== L3 · 8b — components: still inserter ==
+const pkgInserts = pkg(
+  '3.8b — Components · Still Inserter',
+  'Inside inserts.mjs. Placement comes from the section cards, never from hand-typed times, so a ' +
+    're-render that moves a card moves the stills with it.',
+);
+const iSchedule = mk(pkgInserts, 'component', 'Scheduler', 'inserts.mjs insertSchedule',
+  'From cards/sections.json: the end of the named card to the start of the next, or to the outro. ' +
+  'Splits that span between the images by share. Refuses an unknown section or a span too short ' +
+  'to fade in and out.');
+const iWindow = mk(pkgInserts, 'component', 'Window finder', 'inserts.mjs findWindowRect',
+  'Reads one frame of the carded video and finds the app window as everything that is not the ' +
+  'brand background, so padding, corners and shadow match whatever compose drew.');
+const iPlate = mk(pkgInserts, 'component', 'Plate painter', '@napi-rs/canvas',
+  'Fits the image inside the window, letterboxed with its own edge colour, clipped to rounded ' +
+  'corners, with the red frame in the highlight colour when the spec gives one.');
+const iOverlay = mk(pkgInserts, 'component', 'Overlay', 'ffmpeg overlay + alpha fade',
+  'Lays a still of the card under its own dissolve, overlays each full-frame plate for its slot ' +
+  '(dissolving in over the card, over the plate before, and out over the next card), and copies the audio.');
+const dL3inserts = diagram(pkgInserts, 'c4-l3-still-inserter',
+  'C4-L3 — Components · Still Inserter (inserts.mjs)',
+  'Level 3, container "8b · Still Inserter".',
+  { macro: 'Container_Boundary', name: '8b · Still Inserter' });
+{
+  const [vSchedule, vWindow, vPlate, vOverlay] = grid(dL3inserts, [iSchedule, iWindow, iPlate, iOverlay], { cols: 2 });
+  const [vManifests, vWork, vFfmpeg] = column(dL3inserts, [dManifests, dWork, ffmpeg], { dy: 150 });
+  link(dL3inserts, pkgInserts, vManifests, vSchedule, 'The inserts of the part to');
+  link(dL3inserts, pkgInserts, vWork, vSchedule, 'Reads cards/sections.json');
+  link(dL3inserts, pkgInserts, vWork, vWindow, 'Reads a frame of the carded MP4');
+  link(dL3inserts, pkgInserts, vWindow, vPlate, 'Window rect to');
+  link(dL3inserts, pkgInserts, vSchedule, vOverlay, 'Slots to');
+  link(dL3inserts, pkgInserts, vPlate, vOverlay, 'Plates to');
+  link(dL3inserts, pkgInserts, vOverlay, vFfmpeg, 'Runs', 'child process');
+  link(dL3inserts, pkgInserts, vOverlay, vWork, 'Writes the inserted MP4');
 }
 
 // ========================================= L3 · 9 — components: quality gate ==

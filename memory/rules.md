@@ -124,6 +124,16 @@ Never "lives in" / "lives": the voice reads it as the plural of "life". Say
 
 ## Recording
 
+### Red frames surround the text and its box, never cross them
+Every red highlight frame is centred on what it points at and encloses the
+text together with its surrounding box (the field, button, list row, menu
+item or option it sits in). It never cuts through text, and never crosses
+another box's border. Hover or click the row or field, not a bare text label;
+the driver frames an element's visible container when the element is bare text
+inside one (`frameBox` in driver.mjs). Check every frame in review.
+*Why:* the user found many frames cutting through words and boxes on a
+booking-agent video (2026-11-17).
+
 ### Close app popups in the script, not the target
 Popups that belong to the account state (for example a plan-limit alert)
 are closed by an `ifAppears` guard in the trace, not hidden through the
