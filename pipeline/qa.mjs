@@ -87,6 +87,7 @@ const firstExisting = (...ps) => ps.find((p) => p && fs.existsSync(p));
 const video = path.resolve(
   opt.video ??
     firstExisting(
+      path.join(OUT, 'final-narrated-tight-carded-inserted.mp4'),
       path.join(OUT, 'final-narrated-tight-carded.mp4'),
       path.join(OUT, 'final-narrated-tight.mp4'),
       path.join(OUT, 'final-narrated.mp4'),
@@ -196,7 +197,7 @@ function lineDurationS(text) {
 // it: a clean-looking video of the wrong take. Inside out/, every stage output
 // the deliverable is built from must be newer than the one before it.
 {
-  const chain = ['raw.mp4', 'cut.mp4', 'final.mp4', 'final-narrated.mp4', 'final-narrated-tight.mp4', 'final-narrated-tight-carded.mp4']
+  const chain = ['raw.mp4', 'cut.mp4', 'final.mp4', 'final-narrated.mp4', 'final-narrated-tight.mp4', 'final-narrated-tight-carded.mp4', 'final-narrated-tight-carded-inserted.mp4']
     .map((f) => path.join(OUT, f));
   const upTo = chain.indexOf(video);
   if (upTo > 0) {

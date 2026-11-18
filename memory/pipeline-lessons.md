@@ -159,6 +159,102 @@ problem. The README says what the stages are; this page says how to get a pass.
 - **`ifAppears` costs its full timeout when nothing appears.** Put it under a
   line (after a `say`) so the wait isn't silent. A guard at the very start of a
   take makes a frozen, silent opening.
+- **`ifAppears` is the non-fatal wait for something outside the take** (a reply
+  sent from another inbox, an AI agent's answer): `if @x appears within 150s`
+  moves on as soon as it shows, or after the timeout, where a `wait` would
+  abort the take. Follow it with a hard `wait` once the page has been reloaded
+  (2026-11-17).
+- **...but it only ends early if the thing draws in the take's browser.** When
+  pushed messages never draw live, the guard runs its full timeout, and
+  `AUTO_SPEED` and tighten leave minutes of a still screen (a 150s guard made
+  2.5 minutes of dead air). Keep the timeout near the expected time (60s for
+  an agent's answer) and cut the span with `CUTS_MS` in the manifest.
+
+## Red frames
+
+- **A hover on bare text frames only the text.** A list option, a table cell's
+  name or a field label is a text node's box, so the red frame hugs the word
+  and crosses the icon, the badge or the field border around it. The rule
+  (rules.md) is to frame the text with its surrounding box: hover the row,
+  option or field. The driver now frames the visible container of bare text
+  (`frameBox`); for a take recorded before that, widen the `targets[]` box in
+  `actions.json` to the row and re-render (2026-11-17).
+- **Check every red frame in review**, not only the line stills: the stills
+  catch what a line plays over, not every hover between lines.
+- **Frames all off in the same direction mean a scale bug, not bad boxes.** A
+  take captured its frames at 1456x799 while the driver logged a 1440x810
+  viewport; normalising by the logged size drew all 24 frames and the cursor
+  up and to the right, worse toward the bottom right. assemble.mjs now
+  normalises by the captured frame size and warns ("frames are WxH, not the
+  logged viewport"); if that warning shows, the take's boxes are still right
+  (2026-11-17). Compare `ffprobe` of a frame with `actions.json` `viewport`
+  when frames look off.
+- **Frame the whole tile.** A stat (label, number, percentage) is one card:
+  frame the card, not its text. Cards a few pixels apart leave no room for the
+  6px frame pad, so inset the box by about 3px. A message bubble with a hover
+  toolbar over its top edge is framed with the toolbar inside.
+
+## Live AI agents in a take
+
+Learned on a booking-agent video that took five takes (2026-11-17).
+- **Walk the flow once before the take, and expect the walk to change it.** The
+  walk found that booking itself failed in the app, that reconnecting a
+  calendar integration emptied the agent's calendar setting, and that published
+  agent changes only reach new sessions.
+- **An AI agent reads the whole thread when a session starts.** Earlier failed
+  sessions, auto-replies and bot messages in the thread shape its opener (one
+  apologised for earlier failed bookings on camera). Use a thread with no
+  earlier agent, bot or auto-reply messages; failed takes add history, so each
+  retake on the same thread gets worse.
+- **The receiving side must stay silent.** When the "contact" is another inbox
+  of the same account, that inbox's own AI agent or after-hours auto-reply
+  answers first: two agents talked to each other until the session closed, and
+  an auto-reply made the agent treat the contact as away. Turn them off, and
+  record in business hours.
+- **Waits must key on text new to the thread.** A wait on text the history
+  already holds passes at once and the narration runs ahead. Send replies with
+  wording the thread has never had, and wait for the agent's answer to it.
+- **Match message bubbles, not list previews.** A text selector also matches
+  the conversation list's preview of the latest message, which comes first in
+  the page. Scope waits and hovers to the thread's message list.
+- **The recording browser may never draw pushed messages.** Live updates that
+  showed in the user's own browser never drew in the take's browser; a status
+  notice came seconds late. Reload the conversation after the external event
+  and wait on the thread bubble.
+- **Replies take SMS time:** 6-70s for an agent's opener after enrolling,
+  10-30s per answer, and about 20s carrier delay each way between two inboxes
+  of the same account.
+- **Clean up after every take:** stop the agent for the contact, clear any field
+  it filled (an email it collected), and check nothing was booked.
+- **Give a booking a real mailbox, never `@example.com`.** Every booking with
+  a test contact's `@example.com` address failed as a "server error" (two agents, two
+  calendars, reconnects and fresh sessions), while the same agent booked at once
+  for a contact with a real address: the calendar refuses a guest at a reserved
+  domain, and the agent reports it as a system error. A day of reconnecting was
+  spent on it (2026-11-17). Use a mailbox the user owns; the target's
+  `replaceText` shows an invented one on screen.
+- **The test panel does not book.** An agent editor's "Test agent" chat finds
+  open slots but creates no event; enroll a real contact to test booking.
+- **Re-enrolling keeps the thread's context.** A new session reread the old
+  thread and retried the old slot, ignoring a new time the contact asked for.
+- **Capturing stills with the browser extension** (2026-11-18): never call
+  `resize_window` on a maximized window (the tab went to a 0x0 viewport and
+  froze until the person restored it); `save_to_disk` with `scale` saves the
+  scaled image, so save at full scale; Google pages enforce Trusted Types, so
+  staged HTML needs a `trustedTypes.createPolicy`; keep a staged popup as a
+  cloned node or HTML before navigating, the app closes it; hover the far
+  bottom-right pixel so no pointer is drawn. Match the chat: the stills must
+  show the day and time the conversation agreed, in the calendar's own zone.
+- **Measure red frames for stills against the neighbours** before capturing:
+  a 30-minute event 2px under another left no room for a frame outside it;
+  move the staged element, or draw the frame on its own edge.
+- **Show what the take cannot record with stills, not a re-take.** A result in
+  another app (the event on Google Calendar) goes in as a screenshot through the
+  manifest part's `inserts` (inserts.mjs), after the section card it belongs to.
+  Stage the page before capturing (in-page text swaps to invented names, titles,
+  Meet codes and dial-ins; avatar photos to initials), re-run the swap right
+  before each capture because the app redraws and restores real titles, and
+  check the saved file, not the live tab.
 
 ## Publishing
 
@@ -190,6 +286,18 @@ problem. The README says what the stages are; this page says how to get a pass.
   starts landed within 0.03s of the real onsets (`publish.mjs subtitles`).
 - **Studio confirms HD before publishing**: "Processing up to HD" during the
   upload, and `videos.list` reports `definition: hd` afterwards.
+- **An eighth sign-in (2026-11-18) reached the personal channel again.** Do not
+  run `auth youtube` for this account until the channel owner has added it to
+  the Brand Account (myaccount.google.com/brandaccounts → the channel → Users →
+  Manage permissions → Invite new users, as Manager or Owner; only an owner
+  sees that page), or until the owner runs the sign-in on this machine. A
+  quick test: the account sees the channel on its own brandaccounts page.
+- **A hand upload needs the spec, not just `check`.** Give the person every
+  field: file paths (video, thumbnail, .srt), title, description, tags,
+  category, audience, altered content, language, subtitles, visibility.
+- **A manifest `youtube.description` replaces the generated one whole,** so the
+  chapters and the outro's contact line disappear. Leave it out, or write the
+  chapters into it.
 
 ## Files
 
@@ -200,3 +308,37 @@ problem. The README says what the stages are; this page says how to get a pass.
   `build.mjs <manifest> --only <part> --no-record`.
 - **Stage outputs** are named after the stages that made them
   (`final-narrated-tight-carded.mp4`). The manifest's `output` is the deliverable.
+- **Never leave a shell inside `out/<video>/<part>/` on Windows.** A shell whose
+  working directory is the frames folder locks it, and the next take fails with
+  `EPERM` before it starts; even after `cd` out, a handle can stay. Read frames
+  by absolute path. If the folder stays locked, rename the manifest part so the
+  take records into a new folder (2026-11-17).
+- **Fix a recorded take in `actions.json`, not in assemble's outputs.**
+  `--no-record` re-runs `assemble.mjs`, which rewrites
+  `raw.mp4.narration.json` and `raw.mp4.highlights.json` from the take's
+  `actions.json`, so edits to those are lost. Edit the source instead and a
+  plain `build.mjs <manifest> --only <part> --no-record` keeps them: move a
+  line (`narration[].t`, epoch ms), add one (a new `{ t, text }`), widen a red
+  box (`targets[]` x, y, w, h in viewport pixels). Back the file up first, and
+  mirror the change in the trace so the next recording has it. (Running
+  narrate, tighten, cards and qa by hand, then `--join-only`, also works but
+  does not survive the next re-render.)
+- **Cuts are timed from the first frame**, not the first cursor sample in
+  `actions.json`; they differed by 3.2s on one take. Put `CUTS_MS` /
+  `SPEEDS_MS` in the manifest's `env` so every re-render repeats them.
+- **One target per video when rules clash.** A whole-text rule one video needs
+  (`T` -> `M` for one contact's initials) can be wrong in another (`T` -> `R`).
+  Copy the target and change the copy rather than the shared one. A target's
+  `styles` draws what replacement cannot reach, such as the signed-in user's
+  photo as the invented person's initials.
+- **Start from `input/<name>.flow`.** The flow comes first, then the trace
+  written while walking the app, with each selector and measured wait
+  recorded as it is found; `author.mjs` makes the `.demo` and its sidecar from
+  the trace. Writing the trace from memory afterwards loses the evidence.
+- **The flow stays the source of the user's wording.** When the user edits
+  copy in the `.flow` (an intro subhead), carry it into the trace, regenerate
+  with `author.mjs`, and run `author.mjs --check`; the take only reads the
+  generated script.
+- **`cards.mjs` reads the script when its stage starts**, after compose. A card
+  copy change regenerated while a build is still composing lands in that
+  build; once cards has run, it needs a cards re-render (2026-11-17).

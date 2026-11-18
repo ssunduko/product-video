@@ -21,6 +21,8 @@ cursor, and a styled window frame.
     tighten.mjs     removes dead air: frozen + silent stretches, and the tail
     cards.mjs       branded intro/outro cards, joined onto the video, and section
                     cards cut in before a beat (optional)
+    inserts.mjs     still images shown in the app window after a section card
+                    (a manifest part's "inserts"; see "Stills inside a part")
     timemap.mjs     take time -> output time across tighten (its .timemap.json)
     author.mjs      observed trace -> .demo + selector sidecar; sizes narration
                     to measured waits (see "Generating the whole script from
@@ -218,6 +220,7 @@ npm run                    # lists them all
 | 8 | `narrate.mjs` | `npm run narrate` | `final.mp4` + cues | `out/final-narrated.mp4` |
 | 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
 | 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand` | `out/*-carded.mp4` |
+| 10b | `inserts.mjs` | — (run by `build.mjs`) | the carded video + `cards/sections.json` + images | `out/final-narrated-tight-carded-inserted.mp4` |
 | 11 | `qa.mjs` | `npm run qa` | the deliverable, the narrated take, the cues | `out/qa/qa.json` + stills; exit 1 on a failure |
 | — | `author.mjs` | `npm run author` | `scenarios/*.trace.json` | `scripts/*.demo` + `*.selectors.json` |
 | — | `build.mjs` | `npm run build` | `videos/<name>.json` | every stage of every part, then the joined video |
@@ -289,7 +292,8 @@ Three more options shape the browser a take records in:
 | `"blockUrls": ["*intercom.io*"]` | keep these from loading during the take (CDP `Network.setBlockedURLs`): chat bubbles and surveys that pop up over the controls a flow clicks |
 | `"hideSelectors": ["[aria-label^=\"AlertBanner\"]"]` | hide these with CSS on every page of the take: app banners that have nothing to do with the flow |
 | `"blurSelectors": [".photo"]` | blur these with CSS on every page of the take. A last resort for something no replacement can reach (a name inside an image): the rule is invented values, never a blur (rules.md) |
-| `"replaceText": [{ "from": "Real Name", "to": "Maya Brooks" }]` | show invented text wherever the app draws the real one, in every text node, input value (a contact's Phone field; passwords never) and `data-name` attribute (avatar initials drawn by CSS), as the app redraws. Use it for phone numbers too: an invented number, never a blur (rules.md). Longer `from` first; `"whole": true` replaces only text that is exactly `from` (initials, short words). Only the browser's copy of the page changes, nothing is sent to the app, and selectors that match on text see the replaced text |
+| `"styles": ["[aria-label=\"Avatar_Image\"][style*=\"/users/\"] { background-image: none !important; }"]` | extra CSS rules, injected on every page of the take with the hide and blur rules, for a change neither can make: an account photo drawn as the invented person's initials (`::after { content: "AM" }`) |
+| `"replaceText": [{ "from": "Real Name", "to": "Maya Brooks" }]` | show invented text wherever the app draws the real one, in every text node, input value (a contact's Phone field; passwords never) and `data-name` attribute (avatar initials drawn by CSS), as the app redraws. Use it for phone numbers too: an invented number, never a blur (rules.md). Longer `from` first; `"whole": true` replaces only text that is exactly `from` (initials, short words). `{ "pattern": "meet\\.google\\.com/\\S+", "to": "meet.google.com/rqx-hvbn-tpw" }` swaps every match of a regular expression, for a value only known during the take (a link the app creates); patterns run before the `from` pairs. Only the browser's copy of the page changes, nothing is sent to the app, and selectors that match on text see the replaced text |
 
 `auth.start` decides what the take opens on:
 
@@ -657,7 +661,10 @@ node assemble.mjs
 ```
 
 Writes `out/raw.mp4`, `out/raw.mp4.cursor.json` and
-`out/raw.mp4.highlights.json` (the element boxes, on the video's clock), and prints the largest
+`out/raw.mp4.highlights.json` (the element boxes, on the video's clock). Boxes and
+cursor positions are normalised by the size of the captured frames, which can
+differ by a few pixels from the viewport the driver logged (it warns when they
+do); normalising by the logged size drew every red frame off target. It prints the largest
 inter-frame gaps — the video freezes there. Frames the screencast stamped
 earlier than the frame before them are dropped (it prints how many): kept,
 each one pushed the rest of the picture later than the narration, up to 3s by
@@ -767,7 +774,12 @@ This is the step that replaces Recordly. It renders every frame itself:
   element each hover, click and type acts on (the driver hit-tests the box, so
   a table running under a side panel is framed only where it shows, and the
   cursor aims at that part), from `*.highlights.json` (assemble writes it from the
-  boxes the driver measured). A click is framed from the moment the cursor
+  boxes the driver measured). When the element is bare text inside a box of its
+  own (a label in a field, a name in a list row, menu item or option), the frame
+  surrounds that box instead (the nearest row-like or bordered, filled or
+  shadowed ancestor within five levels, at most four lines tall), so it never
+  cuts through the text or the box's border; the cursor still aims at the
+  element. A click is framed from the moment the cursor
   arrives until the button is released (it often closes its card or dialog), a typed field for the whole typing (re-measured after each key, so the frame grows with an input that wraps), and
   a hovered element, which is how a trace points at what the next line is
   about, until the flow does something else, capped at `HIGHLIGHT_HOLD_MS`
@@ -1112,6 +1124,37 @@ takes well under a minute.
 Override without touching the script with `--intro` / `--outro`, or point it at
 a different video: `node cards.mjs out/final.mp4 -o out/x.mp4`.
 
+#### Stills inside a part
+
+When the take could not record something live (an event that appears in
+another app, a result that only arrived after the take), show a screenshot of
+it instead of re-recording. List the images on the manifest part:
+
+```jsonc
+"inserts": [{
+  "section": "Land Every Meeting on Your Google Calendar",   // after this card ...
+  "images": [                                                // ... until the next card
+    { "file": "out/<name>/stills/week.jpg", "frame": [478, 392, 146, 22], "share": 0.4 },
+    { "file": "out/<name>/stills/details.jpg", "frame": [634, 118, 496, 496], "share": 0.6 }
+  ]
+}]
+```
+
+`build.mjs` runs `inserts.mjs` after `cards.mjs`, and the part's deliverable
+becomes `final-narrated-tight-carded-inserted.mp4` (`qa.mjs` checks it and its
+lineage). Each image fills the span from the end of the named card to the start
+of the next card (or the outro), split by `share`, and is drawn in the app
+window measured from the frame it covers: fitted, letterboxed with its own edge
+colour, clipped to the window's corners, with the narration playing on. The
+first image dissolves in under the card's own dissolve out, each next one
+dissolves over the one before, and the last dissolves out under the next card's
+dissolve in (0.4s each), so the take never shows between them. `frame` is an
+optional red frame round a box in image pixels, drawn 6px outside it like the
+take's own: give the inner box so the stroke never crosses what surrounds it. Placement follows the cards, so a re-render that
+moves a card moves the stills too. The screenshots follow the same content
+rules as a take: invented names and values, never blurred (stage them in the
+page before capturing). Keep private images under `out/`, which is ignored.
+
 ### 11. Verify before calling it done
 
 **Run the quality gate.** `qa.mjs` measures what viewers notice and the stages
@@ -1177,7 +1220,7 @@ What YouTube gets, built from the video itself unless the manifest's optional
 | Field | Default | `"youtube"` key |
 |---|---|---|
 | title | the manifest `title` (100 characters at most) | `title` |
-| description | the intro card's subhead (else the manifest `description`); chapters from the section cards (`0:00 Intro`, then each card's start on the joined timeline; only when there are three or more, each 10s or longer); the outro card's contact line | `description` |
+| description | the intro card's subhead (else the manifest `description`); chapters from the section cards (`0:00 Intro`, then each card's start on the joined timeline; only when there are three or more, each 10s or longer); the outro card's contact line | `description` (replaces all three: chapters and the contact line too, so leave it out to keep them) |
 | tags | the section card headlines | `tags` |
 | thumbnail | `PUBLISH_YOUTUBE_THUMBNAIL` (a path with `<name>` for the video name, for a designed thumbnail) when that file exists, else the first part's intro title card (`cards/intro.png`); over 2 MB it is sent as a 1280-wide JPEG | `thumbnail` (repo-relative) |
 | privacy | `PUBLISH_YOUTUBE_PRIVACY`, else `public` | `privacy` |

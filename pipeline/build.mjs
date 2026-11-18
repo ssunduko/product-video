@@ -18,7 +18,8 @@
 //     "leadS": 0.6, "tailS": 1.6,            // silence kept around a join
 //     "parts": [
 //       { "name": "admin", "script": "scripts/x-admin.demo",
-//         "before": "what must be true before this take (printed)" },
+//         "before": "what must be true before this take (printed)",
+//         "inserts": [ ... ] },                // optional stills after a card (inserts.mjs)
 //       ...
 //     ]
 //   }
@@ -35,6 +36,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_OUT } from './paths.mjs';
 import { staleSources, recordVideo, qaCounts } from './memory.mjs';
+import { INSERTED } from './inserts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -132,7 +134,7 @@ building = true;
 const results = [];
 for (const [i, part] of M.parts.entries()) {
   const dir = path.join(BUILD, part.name);
-  const deliverable = path.join(dir, 'final-narrated-tight-carded.mp4');
+  const deliverable = path.join(dir, part.inserts?.length ? INSERTED : 'final-narrated-tight-carded.mp4');
   const fallback = path.join(dir, 'final-narrated-tight.mp4');
   const skip = opt.joinOnly || (opt.only && opt.only !== part.name);
 
@@ -153,6 +155,7 @@ for (const [i, part] of M.parts.entries()) {
       ['narrate', ['narrate.mjs']],
       ['tighten', ['tighten.mjs']],
       ['cards', ['cards.mjs', '--script', script]],
+      ...(part.inserts?.length ? [['inserts', ['inserts.mjs', '--spec', JSON.stringify(part.inserts)]]] : []),
     ];
     for (const [label, args] of steps) {
       if (run(`${part.name} ${label}`, args, env) !== 0) fail(`part "${part.name}": ${label} failed — fix it and rerun with --only ${part.name}${label === 'record' ? '' : ' --no-record'}`);

@@ -35,6 +35,7 @@ const KNOWN_KEYS = new Set([
   'blockUrls',
   'hideSelectors',
   'blurSelectors',
+  'styles',
   'replaceText',
   'profile',
   'auth',
@@ -246,6 +247,7 @@ export function loadTarget(ref) {
     blockUrls: cfg.blockUrls ?? [],
     hideSelectors: cfg.hideSelectors ?? [],
     blurSelectors: cfg.blurSelectors ?? [],
+    styles: normaliseStyles(cfg.styles),
     replaceText: normaliseReplace(cfg.replaceText),
     profile: cfg.profile ?? null,
     secrets: cfg.secrets ?? {},
@@ -254,13 +256,33 @@ export function loadTarget(ref) {
   };
 }
 
-// replaceText: [{ from, to, whole? }] — real names shown as invented ones.
-function normaliseReplace(pairs) {
+// styles: extra CSS rules, injected with hideSelectors and blurSelectors, for a
+// change hiding cannot make: an account photo drawn as invented initials.
+export function normaliseStyles(rules) {
+  if (rules === undefined || rules === null) return [];
+  if (!Array.isArray(rules) || rules.some((r) => typeof r !== 'string' || !r.trim())) throw new Error('target styles must be an array of non-empty CSS rule strings');
+  return rules;
+}
+
+// replaceText: [{ from, to, whole? } | { pattern, to }] — real names shown as
+// invented ones. `pattern` is a regular expression (source text, matched
+// globally), for values only known during the take, such as a meeting link the
+// app creates: every match shows as `to`.
+export function normaliseReplace(pairs) {
   if (pairs === undefined || pairs === null) return [];
-  if (!Array.isArray(pairs)) throw new Error('target replaceText must be an array of { from, to, whole? }');
+  if (!Array.isArray(pairs)) throw new Error('target replaceText must be an array of { from, to, whole? } or { pattern, to }');
   return pairs.map((p, i) => {
+    if (isPlain(p) && typeof p.pattern === 'string' && typeof p.to === 'string') {
+      if (!p.pattern) throw new Error(`target replaceText[${i}] has an empty "pattern"`);
+      try {
+        new RegExp(p.pattern, 'g');
+      } catch (e) {
+        throw new Error(`target replaceText[${i}] "pattern" is not a valid regular expression: ${e.message}`);
+      }
+      return { pattern: p.pattern, to: p.to };
+    }
     if (!isPlain(p) || typeof p.from !== 'string' || !p.from || typeof p.to !== 'string') {
-      throw new Error(`target replaceText[${i}] needs a non-empty "from" and a "to" string`);
+      throw new Error(`target replaceText[${i}] needs a non-empty "from" (or "pattern") and a "to" string`);
     }
     return { from: p.from, to: p.to, whole: p.whole === true };
   });
@@ -273,8 +295,14 @@ function normaliseReplace(pairs) {
 // (initials, short words). Only the browser's copy of the page changes:
 // nothing is sent to the app.
 export function textReplacer(pairs) {
-  const list = [...pairs].sort((a, b) => b.from.length - a.from.length);
+  // patterns first (a whole link before any name inside it), then longer `from` first
+  const patterns = pairs.filter((p) => p.pattern).map((p) => ({ re: new RegExp(p.pattern, 'g'), to: p.to }));
+  const list = pairs.filter((p) => !p.pattern).sort((a, b) => b.from.length - a.from.length);
   const swap = (t) => {
+    for (const p of patterns) {
+      p.re.lastIndex = 0;
+      if (p.re.test(t)) t = t.replace(p.re, p.to);
+    }
     for (const p of list) {
       if (p.whole) { if (t.trim() === p.from) return t.replace(p.from, p.to); }
       else if (t.includes(p.from)) t = t.split(p.from).join(p.to);

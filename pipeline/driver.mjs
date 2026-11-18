@@ -283,10 +283,13 @@ if (target?.blockUrls?.length) {
 // target can hide them with CSS, on this page and on every page loaded later.
 // Contact details a replacement cannot reach (initials avatars, names inside
 // images) are blurred the same way.
-if (target?.hideSelectors?.length || target?.blurSelectors?.length) {
+// A target's `styles` are extra CSS rules injected the same way (an account
+// photo drawn as invented initials, say).
+if (target?.hideSelectors?.length || target?.blurSelectors?.length || target?.styles?.length) {
   const css = [
     target.hideSelectors.length ? `${target.hideSelectors.join(',\n')} { display: none !important; }` : '',
     target.blurSelectors.length ? `${target.blurSelectors.join(',\n')} { filter: blur(6px) !important; }` : '',
+    ...(target.styles ?? []),
   ].join('\n');
   const inject = (rules) => {
     const add = () => {
@@ -302,6 +305,7 @@ if (target?.hideSelectors?.length || target?.blurSelectors?.length) {
   await page.evaluate(inject, css);
   if (target.hideSelectors.length) console.log(`hiding: ${target.hideSelectors.join(', ')}`);
   if (target.blurSelectors.length) console.log(`blurring: ${target.blurSelectors.join(', ')}`);
+  if (target.styles?.length) console.log(`styles: ${target.styles.length} rule(s)`);
 }
 
 // Real names shown as invented ones (contacts, inboxes), in the browser only:
@@ -583,6 +587,43 @@ async function visibleBox(el, box) {
   return { x: box.x + (vis.x - vis.dx), y: box.y + (vis.y - vis.dy), width: vis.w, height: vis.h };
 }
 
+// The box the red frame draws round: the element's visible container when the
+// element is bare text inside one (a label in a field, a name in a list row or
+// menu item), so the frame surrounds the text and its own box instead of
+// crossing them. A container is the nearest ancestor, at most five levels up,
+// that is row-like (tr, li, button, link, label, or role row/option/menuitem/
+// button/tab/listitem) or draws a box (a border, a background or a shadow),
+// and is at most four lines of the element's height and 95% of the viewport
+// wide. An element that is already such a box is framed as it is. The pointer
+// still goes to the element itself. (User, 2026-11-17: always centre the red
+// box over the text and its surrounding box.)
+async function frameBox(el, box) {
+  const r = await el
+    .evaluate((node) => {
+      const nr = node.getBoundingClientRect();
+      const clear = (c) => !c || c === 'transparent' || /rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(c);
+      const drawsBox = (x) => {
+        const cs = getComputedStyle(x);
+        const border = ['Top', 'Right', 'Bottom', 'Left'].some((s) => parseFloat(cs[`border${s}Width`]) > 0 && !clear(cs[`border${s}Color`]));
+        return border || !clear(cs.backgroundColor) || (cs.boxShadow && cs.boxShadow !== 'none');
+      };
+      const rowLike = (x) => /^(TR|LI|BUTTON|A|LABEL)$/.test(x.tagName) ||
+        /^(row|option|menuitem|button|tab|listitem)$/.test(x.getAttribute('role') || '');
+      if (rowLike(node) || (drawsBox(node) && nr.width >= 24 && nr.height >= 18)) return null;
+      let x = node.parentElement;
+      for (let k = 0; k < 5 && x && x !== document.body; k++, x = x.parentElement) {
+        const xr = x.getBoundingClientRect();
+        if (xr.height > Math.max(nr.height * 4, 72) || xr.width > innerWidth * 0.95) break;
+        if (xr.left > nr.left + 1 || xr.top > nr.top + 1 || xr.right < nr.right - 1 || xr.bottom < nr.bottom - 1) continue;
+        if (rowLike(x) || drawsBox(x)) return { l: xr.left, t: xr.top, w: xr.width, h: xr.height, dl: nr.left, dt: nr.top };
+      }
+      return null;
+    })
+    .catch(() => null);
+  if (!r) return box;
+  return { x: box.x + (r.l - r.dl), y: box.y + (r.t - r.dt), width: r.w, height: r.h };
+}
+
 async function center(spec, timeout = 10000) {
   const el = await waitSpec(spec, timeout);
   let box = await el.boundingBox();
@@ -601,8 +642,12 @@ async function center(spec, timeout = 10000) {
     if (!box) throw new Error(`no box for ${spec} after scrolling it into view`);
   }
 
+  const raw = box;
   box = await visibleBox(el, box);
-  return { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200), box };
+  // the frame: the visible container when the element is bare text inside one
+  const framed = await frameBox(el, raw);
+  const frame = framed === raw ? box : framed;
+  return { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 200), box, frame };
 }
 
 const d = {
@@ -620,7 +665,7 @@ const d = {
     endTarget();
     const c = await center(spec);
     await moveTo(c.x, c.y, 'pointer');
-    if (frame) markTarget('hover', c.box, Date.now());
+    if (frame) markTarget('hover', c.frame ?? c.box, Date.now());
   },
   async clickSel(spec) {
     endTarget();
@@ -635,7 +680,7 @@ const d = {
     log('mouseup', 'pointer');
     // ends at the release: a clicked button often closes its card or dialog,
     // and a frame kept after it outlines whatever moves into its place
-    markTarget('click', c.box, start, Date.now());
+    markTarget('click', c.frame ?? c.box, start, Date.now());
     await sleep(120);
   },
   // Types at human pace, logging a sample per keystroke so the composited
