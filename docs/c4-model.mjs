@@ -566,6 +566,16 @@ const cInserts = mk(pkgContainers, 'container', '8b · Still Inserter', 'inserts
   'composed frame, fits each image inside it with an optional red frame, and dissolves from the card ' +
   'into the stills and from the stills into the next card, so the take never shows between them. ' +
   'Keeps the narration. Writes final-narrated-tight-carded-inserted.mp4.');
+const cDiagram = mk(pkgContainers, 'container', '8c · Diagram Renderer', 'diagram.mjs · Node.js + canvas',
+  'Turns a JSON diagram spec (boxes and circles with Lucide icons, labelled arrows, groups, bar charts) ' +
+  'into full-frame PNGs in the brand colours and type, one per build-up step. Lays a flow out from the ' +
+  'real box sizes, leaving each arrow label its own gap, and scales it down until it fits. The Still ' +
+  'Inserter renders a diagram named in the inserts of a part.');
+const cMusic = mk(pkgContainers, 'container', '10 · Music Mixer', 'music.mjs · Node.js + ffmpeg',
+  'Optional, per video: after the join, mixes a background bed under the whole video, synthesized by ' +
+  'a vendored audio engine (MIT) in one of its styles or levelled from a music file. Finds the ' +
+  'speech by measurement, ducks the bed under it, holds it a set distance under the voice and limits ' +
+  'the mix.');
 const cQa = mk(pkgContainers, 'container', '9 · Quality Gate', 'qa.mjs · Node.js + ffmpeg',
   'Measures what a viewer notices and a stage only warns about: two narration lines at once, a ' +
   'line off its cue, dead air, a frozen or loading screen, black frames, mismatched streams, ' +
@@ -639,6 +649,12 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
 
   const v9 = place(dL2, cQa, 620, 700);
   const v8b = place(dL2, cInserts, 60, 700);
+  const v8c = place(dL2, cDiagram, 1280, 700);
+  const v10 = place(dL2, cMusic, 1000, 860);
+  link(dL2, pkgContainers, v8b, v8c, 'Renders diagram steps via', 'import');
+  link(dL2, pkgContainers, v8c, vBrand, 'Reads colours and fonts');
+  link(dL2, pkgContainers, v10, vWork, 'Mixes music under the joined MP4');
+  link(dL2, pkgContainers, v10, vFfmpeg, 'Measures and mixes via', 'child process');
   link(dL2, pkgContainers, v8b, vWork, 'Overlays stills after a section card');
   link(dL2, pkgContainers, v8b, vFfmpeg, 'Runs', 'child process');
   const vBuild = place(dL2, cBuild, 620, 200);
@@ -713,6 +729,7 @@ const dL2 = diagram(pkgContainers, 'c4-l2-containers', 'C4-L2 — Containers',
     link(dL2, pkgContainers, vBuild, v, 'Runs per part', 'child process');
   }
   link(dL2, pkgContainers, vBuild, vWork, 'Gives each part its own folder; writes the joined MP4');
+  link(dL2, pkgContainers, vBuild, v10, 'Runs after the join', 'child process');
   link(dL2, pkgContainers, vBuild, vFfmpeg, 'Measures and joins via', 'child process');
 
   link(dL2, pkgContainers, vMemoryAgent, vFeatureSource, 'Lists and reads', 'MCP');
@@ -1440,6 +1457,73 @@ const dL3inserts = diagram(pkgInserts, 'c4-l3-still-inserter',
   link(dL3inserts, pkgInserts, vPlate, vOverlay, 'Plates to');
   link(dL3inserts, pkgInserts, vOverlay, vFfmpeg, 'Runs', 'child process');
   link(dL3inserts, pkgInserts, vOverlay, vWork, 'Writes the inserted MP4');
+}
+
+// =================================== L3 · 8c — components: diagram renderer ==
+const pkgDiagram = pkg(
+  '3.8c — Components · Diagram Renderer',
+  'Inside diagram.mjs. Everything is drawn with canvas, so a diagram renders the same in a build, a test ' +
+    'or an agent run, with no browser.',
+);
+const gSpec = mk(pkgDiagram, 'component', 'Spec checker', 'diagram.mjs normaliseDiagram',
+  'Defaults the spec and refuses what would draw wrong: duplicate ids, arrows to missing nodes, unknown ' +
+  'icons, shapes or layouts. Counts the build-up steps.');
+const gLayout = mk(pkgDiagram, 'component', 'Layout', 'diagram.mjs ranks + place',
+  'Ranks nodes along the flow (longest path, cycles ignored), sizes each rank by its widest box and each ' +
+  'gap by the widest arrow label crossing it, and centres the flow; grid and manual layouts too.');
+const gIcons = mk(pkgDiagram, 'component', 'Icon set', 'vendor/lucide (ISC)',
+  '1,854 Lucide icons as SVG paths on a 24-unit grid, drawn as strokes with Path2D; old names resolve ' +
+  'through aliases.');
+const gPaint = mk(pkgDiagram, 'component', 'Painter', '@napi-rs/canvas',
+  'Draws the heading, groups, arrows with label pills, boxes with icons and bar charts, up to a step, in ' +
+  'the colours and fonts of the style guide.');
+const dL3diagram = diagram(pkgDiagram, 'c4-l3-diagram-renderer',
+  'C4-L3 — Components · Diagram Renderer (diagram.mjs)',
+  'Level 3, container "8c · Diagram Renderer".',
+  { macro: 'Container_Boundary', name: '8c · Diagram Renderer' });
+{
+  const [vSpec, vLayout, vIcons, vPaint] = grid(dL3diagram, [gSpec, gLayout, gIcons, gPaint], { cols: 2 });
+  const [vManifests, vBrand, vWork] = column(dL3diagram, [dManifests, dBrand, dWork], { dy: 150 });
+  link(dL3diagram, pkgDiagram, vManifests, vSpec, 'Inserts name a diagram spec');
+  link(dL3diagram, pkgDiagram, vSpec, vIcons, 'Checks icon names against');
+  link(dL3diagram, pkgDiagram, vSpec, vLayout, 'Nodes and edges to');
+  link(dL3diagram, pkgDiagram, vLayout, vPaint, 'Positions to');
+  link(dL3diagram, pkgDiagram, vIcons, vPaint, 'Icon paths to');
+  link(dL3diagram, pkgDiagram, vBrand, vPaint, 'Colours and fonts to');
+  link(dL3diagram, pkgDiagram, vPaint, vWork, 'Writes a PNG per step');
+}
+
+// ======================================== L3 · 10 — components: music mixer ==
+const pkgMusic = pkg(
+  '3.10 — Components · Music Mixer',
+  'Inside music.mjs. The synthesis is a vendored audio engine, kept with its MIT licence; the stage ' +
+    'adds measurement and the mix onto a finished video.',
+);
+const mSpec = mk(pkgMusic, 'component', 'Spec checker', 'music.mjs normaliseMusic',
+  'A style or a file, volume 0-1, how far under the voice; refuses an unknown style or both at once.');
+const mMeasure = mk(pkgMusic, 'component', 'Voice meter', 'ffmpeg silencedetect + ebur128',
+  'Finds the speech spans in the own audio of the video (narration and voiced cards) and its loudness.');
+const mEngine = mk(pkgMusic, 'component', 'Synthesis engine', 'vendor/music-engine (MIT)',
+  'Renders the bed in one of five styles, deterministic from a seed, or levels a file to the same ' +
+  'loudness; ducks it 8 dB under the speech spans.');
+const mMix = mk(pkgMusic, 'component', 'Mixer', 'ffmpeg amix + alimiter',
+  'Sets the bed a fixed distance under the measured voice, mixes it in, limits peaks and copies the video.');
+const dL3music = diagram(pkgMusic, 'c4-l3-music-mixer',
+  'C4-L3 — Components · Music Mixer (music.mjs)',
+  'Level 3, container "10 · Music Mixer".',
+  { macro: 'Container_Boundary', name: '10 · Music Mixer' });
+{
+  const [vSpec, vMeasure, vEngine, vMix] = grid(dL3music, [mSpec, mMeasure, mEngine, mMix], { cols: 2 });
+  const [vManifests, vWork, vFfmpeg] = column(dL3music, [dManifests, dWork, ffmpeg], { dy: 150 });
+  link(dL3music, pkgMusic, vManifests, vSpec, 'The music block to');
+  link(dL3music, pkgMusic, vWork, vMeasure, 'Reads the joined MP4');
+  link(dL3music, pkgMusic, vMeasure, vFfmpeg, 'Runs', 'child process');
+  link(dL3music, pkgMusic, vSpec, vEngine, 'Style or file to');
+  link(dL3music, pkgMusic, vMeasure, vEngine, 'Speech spans to');
+  link(dL3music, pkgMusic, vEngine, vMix, 'The bed (WAV) to');
+  link(dL3music, pkgMusic, vMeasure, vMix, 'Voice loudness to');
+  link(dL3music, pkgMusic, vMix, vFfmpeg, 'Runs', 'child process');
+  link(dL3music, pkgMusic, vMix, vWork, 'Writes the MP4 with music');
 }
 
 // ========================================= L3 · 9 — components: quality gate ==

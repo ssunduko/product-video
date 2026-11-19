@@ -33,6 +33,9 @@ brand/fonts/*.otf
 # repo. cards.mjs renders title cards without the logo when it is absent.
 brand/*.png
 
+# music files for music.mjs: licensed tracks are rarely redistributable
+brand/music/
+
 # OS / logs
 .DS_Store
 Thumbs.db

@@ -1,0 +1,18 @@
+{
+  "title": "How an AI agent books a meeting",
+  "subtitle": "From a text message to a calendar invite",
+  "nodes": [
+    { "id": "contact", "label": "Contact texts a question", "icon": "message-square", "step": 1 },
+    { "id": "agent", "label": "AI agent", "icon": "bot", "color": "green", "step": 1 },
+    { "id": "cal", "label": "Checks open times", "icon": "calendar-search", "step": 2 },
+    { "id": "book", "label": "Books the meeting", "icon": "calendar-check", "step": 3 },
+    { "id": "meet", "label": "Sends a Google Meet link", "icon": "video", "color": "purple", "step": 3 }
+  ],
+  "edges": [
+    { "from": "contact", "to": "agent", "label": "texts", "step": 1 },
+    { "from": "agent", "to": "cal", "label": "asks", "step": 2 },
+    { "from": "cal", "to": "book", "label": "slot is free", "step": 3 },
+    { "from": "book", "to": "meet", "step": 3 }
+  ],
+  "groups": [ { "label": "Your calendar", "nodes": ["cal", "book"], "step": 2 } ]
+}

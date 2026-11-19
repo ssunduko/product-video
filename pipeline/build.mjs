@@ -16,6 +16,7 @@
 //     "env": { "ZOOM_DEPTH": "2", "AUTO_SPEED": "10" },   // for every stage
 //     "crossfadeS": 0.75,                    // between parts
 //     "leadS": 0.6, "tailS": 1.6,            // silence kept around a join
+//     "music": { "style": "tech" },          // optional bed under the joined video (music.mjs)
 //     "parts": [
 //       { "name": "admin", "script": "scripts/x-admin.demo",
 //         "before": "what must be true before this take (printed)",
@@ -210,6 +211,11 @@ const j = spawnSync(FFMPEG, ['-y', '-v', 'error', ...inputs, '-filter_complex', 
   '-map', '[v]', '-map', `[${aLast}]`, '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-r', '60',
   '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', OUTPUT], { stdio: 'inherit' });
 if (j.status !== 0) fail('ffmpeg join failed');
+
+// ---- background music under the joined video (optional) ----
+if (M.music) {
+  if (run('music', ['music.mjs', '--video', OUTPUT, '--spec', JSON.stringify(M.music)], M.env ?? {}) !== 0) fail('music failed');
+}
 
 // ---- gate the joined video ----
 const joinedQa = path.join(BUILD, 'qa-joined');
