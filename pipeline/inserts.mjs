@@ -25,6 +25,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createCanvas, loadImage, ImageData } from '@napi-rs/canvas';
 import { OUT } from './paths.mjs';
+import { renderDiagram, normaliseDiagram } from './diagram.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -61,6 +62,23 @@ export function insertSchedule(spans, insert, endS) {
     t += d;
     return slot;
   });
+}
+
+// An image entry { "diagram": "<spec.json>" } stands for the diagram's build-up:
+// one full-frame image per step (its share split evenly), or only { "step": n }.
+export function expandDiagrams(images, stepsOf) {
+  return images.flatMap((im) => {
+    if (!im.diagram) return [im];
+    if (im.step != null) return [{ fit: 'frame', ...im }];
+    const n = stepsOf(im.diagram);
+    const share = (im.share ?? 1) / n;
+    return Array.from({ length: n }, (_, k) => ({ ...im, fit: im.fit ?? 'frame', step: k + 1, share }));
+  });
+}
+
+function readDiagram(file) {
+  const spec = JSON.parse(fs.readFileSync(path.resolve(ROOT, file), 'utf8'));
+  return { spec, steps: normaliseDiagram(spec).steps };
 }
 
 // When each plate is on screen, and how it fades, so the take never shows: the
@@ -145,6 +163,17 @@ function grabFrame(file, atS, width, height) {
 async function renderPlate(slot, win, size, radius, outFile, under) {
   const img = await loadImage(path.resolve(ROOT, slot.file));
   const full = createCanvas(size.width, size.height);
+  if (slot.fit === 'frame') {
+    // the whole frame (a diagram): the image covers it, no app window
+    const fx = full.getContext('2d');
+    const f = fitRect({ x: 0, y: 0, w: size.width, h: size.height }, img.width, img.height);
+    fx.fillStyle = '#ffffff';
+    fx.fillRect(0, 0, size.width, size.height);
+    fx.imageSmoothingQuality = 'high';
+    fx.drawImage(img, f.x, f.y, f.w, f.h);
+    fs.writeFileSync(outFile, full.toBuffer('image/png'));
+    return;
+  }
   // the take's own frame (brand background, shadow) around the window
   full.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(under), size.width, size.height), 0, 0);
   const c = createCanvas(win.w, win.h);
@@ -195,10 +224,19 @@ async function main(argv) {
   const outroFile = path.join(path.dirname(video), 'cards', 'outro.mp4');
   const endS = fs.existsSync(outroFile) ? v.durationS - probe(outroFile).durationS : v.durationS;
 
-  const slots = spec.flatMap((ins) => insertSchedule(spans, ins, endS));
-  for (const s of slots) if (!fs.existsSync(path.resolve(ROOT, s.file))) throw new Error(`inserts: no image ${s.file}`);
   const plateDir = path.join(path.dirname(video), 'inserts');
   fs.mkdirSync(plateDir, { recursive: true });
+  const expanded = spec.map((ins) => ({ ...ins, images: expandDiagrams(ins.images ?? [], (file) => readDiagram(file).steps) }));
+  for (const ins of expanded) {
+    for (const im of ins.images) {
+      if (!im.diagram) continue;
+      const out = path.join(plateDir, `${path.basename(im.diagram).replace(/.diagram.json$|.json$/, '')}-step-${im.step}.png`);
+      fs.writeFileSync(out, renderDiagram(readDiagram(im.diagram).spec, { width: v.width, height: v.height, step: im.step }).canvas.toBuffer('image/png'));
+      im.file = path.relative(ROOT, out);
+    }
+  }
+  const slots = expanded.flatMap((ins) => insertSchedule(spans, ins, endS));
+  for (const s of slots) if (!fs.existsSync(path.resolve(ROOT, s.file))) throw new Error(`inserts: no image ${s.file}`);
 
   const inputs = ['-i', video];
   const chains = [];
@@ -229,7 +267,7 @@ async function main(argv) {
     const plate = path.join(plateDir, `insert-${k + 1}.png`);
     await renderPlate(s, win, v, radius, plate, frame);
     const t = times[k];
-    console.log(`inserts: ${s.file} -> ${t.from.toFixed(2)}-${t.to.toFixed(2)}s in window ${win.w}x${win.h}+${win.x}+${win.y}`);
+    console.log(`inserts: ${s.file} -> ${t.from.toFixed(2)}-${t.to.toFixed(2)}s ${s.fit === 'frame' ? 'full frame' : `in window ${win.w}x${win.h}+${win.x}+${win.y}`}`);
     const dur = t.to - t.from;
     layer(plate, t.from, t.to, [`fade=in:st=0:d=${t.fadeIn}:alpha=1`, ...(t.fadeOut ? [`fade=out:st=${(dur - t.fadeOut).toFixed(3)}:d=${t.fadeOut}:alpha=1`] : [])]);
   }

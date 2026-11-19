@@ -23,6 +23,12 @@ cursor, and a styled window frame.
                     cards cut in before a beat (optional)
     inserts.mjs     still images shown in the app window after a section card
                     (a manifest part's "inserts"; see "Stills inside a part")
+    diagram.mjs     diagram spec -> full-frame PNGs, one per build-up step
+                    (see "Diagrams")
+    music.mjs       background music mixed under the joined video
+                    (a manifest's "music"; see "Background music")
+    vendor/         third-party code kept with its licence: music-engine
+                    (MIT, the music engine) and lucide (ISC, the icons)
     timemap.mjs     take time -> output time across tighten (its .timemap.json)
     author.mjs      observed trace -> .demo + selector sidecar; sizes narration
                     to measured waits (see "Generating the whole script from
@@ -221,6 +227,8 @@ npm run                    # lists them all
 | 9 | `tighten.mjs` | `npm run tighten` | `final-narrated.mp4` | `out/final-narrated-tight.mp4` |
 | 10 | `cards.mjs` | `npm run cards` | the newest stage + `brand` | `out/*-carded.mp4` |
 | 10b | `inserts.mjs` | — (run by `build.mjs`) | the carded video + `cards/sections.json` + images | `out/final-narrated-tight-carded-inserted.mp4` |
+| — | `diagram.mjs` | — (rendered by `inserts.mjs`, or by hand) | `diagrams/*.diagram.json` + `brand` | PNGs, one per step |
+| 10c | `music.mjs` | — (run by `build.mjs` after the join) | the joined video + a `music` block | the same MP4, with music |
 | 11 | `qa.mjs` | `npm run qa` | the deliverable, the narrated take, the cues | `out/qa/qa.json` + stills; exit 1 on a failure |
 | — | `author.mjs` | `npm run author` | `scenarios/*.trace.json` | `scripts/*.demo` + `*.selectors.json` |
 | — | `build.mjs` | `npm run build` | `videos/<name>.json` | every stage of every part, then the joined video |
@@ -1124,6 +1132,41 @@ takes well under a minute.
 Override without touching the script with `--intro` / `--outro`, or point it at
 a different video: `node cards.mjs out/final.mp4 -o out/x.mp4`.
 
+#### Diagrams
+
+A diagram explains what no screen shows: a flow, an architecture, the steps of
+a feature, a small bar chart. Write a spec in `diagrams/<name>.diagram.json`.
+The format is at the top of `pipeline/diagram.mjs`, and
+`diagrams/example-booking.diagram.json` is a working one. Render it to check:
+
+```powershell
+node diagram.mjs ..\diagrams\example-booking.diagram.json -o ..\out\diagrams   # a PNG per step
+node diagram.mjs --icons calendar                                              # icon names
+```
+
+- **Nodes** are boxes, pills or circles with a label and a Lucide icon (1,854
+  of them, in `pipeline/vendor/lucide`). **Edges** are arrows with an optional
+  label, dashed or bent. **Groups** draw a dashed frame round some nodes. A
+  **chart** draws bars.
+- **Layout** `right` (the default) or `down` ranks the nodes along the flow,
+  sizes each column by its widest box and each gap by its widest arrow label,
+  and scales the whole flow down (to 60%) until it fits. `grid` fills cells, and
+  `manual` takes each node's `x` and `y`.
+- **Steps:** a node, edge, group or chart with `step: n` appears from step n.
+  Positions never move between steps, and a group grows with its members.
+- **Theme** `light` (the default) or `brand` (white on the brand blue). Colours
+  and fonts come from the style guide, like the cards.
+
+To show one in a video, name it in a part's `inserts`. It becomes one
+full-frame image per step, dissolving from one to the next after the card:
+
+```jsonc
+"inserts": [{ "section": "How it works", "images": [{ "diagram": "diagrams/x.diagram.json" }] }]
+```
+
+The **diagram agent** (`.claude/agents/diagram.md`) writes a spec from a brief,
+renders it, checks every step's image and returns the inserts entry.
+
 #### Stills inside a part
 
 When the take could not record something live (an event that appears in
@@ -1154,6 +1197,37 @@ take's own: give the inner box so the stroke never crosses what surrounds it. Pl
 moves a card moves the stills too. The screenshots follow the same content
 rules as a take: invented names and values, never blurred (stage them in the
 page before capturing). Keep private images under `out/`, which is ignored.
+
+### Background music
+
+A manifest's `music` block puts a bed under the whole joined video. `build.mjs`
+runs `music.mjs` right after the join, before the joined video's quality gate:
+
+```jsonc
+"music": { "style": "tech" }                     // warm | upbeat | calm | tech | playful
+"music": { "style": "warm", "volume": 0.4, "seed": 2 }
+"music": { "src": "brand/music/track.mp3", "credit": "Track by Artist, CC BY 4.0" }
+```
+
+- The built-in music is synthesized on this computer by a vendored audio
+  engine in `pipeline/vendor/music-engine` (MIT, see its LICENSE). The same spec
+  always gives the same music. `node music.mjs --styles` lists the styles, and
+  `seed`, `key` and `bpm` vary or pin the piece.
+- A file (`src`, any format ffmpeg reads) is levelled to the same loudness. It
+  loops when it is shorter than the video; `"loop": false` plays it once. Keep
+  music files under `brand/`, which is ignored, and only use music the user may
+  use. Put its `credit` in the video description.
+- The speech is found by measurement, so both the narration and the voiced
+  cards count. The bed ducks 8 dB under it and sits `underDb` (14) below the
+  voice's measured loudness, which is about 13 dB under it in the pauses.
+  `volume` (0-1, 0.5 calibrated) scales it. The mix is limited and the video
+  stream is copied.
+- To try music on a finished video without touching it:
+  `node music.mjs --video ..\out\<name>.mp4 -o ..\out\music-trial\x.mp4 --spec '{"style":"calm"}'`.
+
+The **music agent** (`.claude/agents/music.md`) picks a style for the video,
+mixes a trial copy, measures that the voice stays clear, and asks the user to
+listen before the block goes into the manifest.
 
 ### 11. Verify before calling it done
 
@@ -1475,8 +1549,8 @@ npm run test:integration   # the real CLIs end to end; needs ffmpeg (about a min
 
 | Suite | Folder | Covers |
 |---|---|---|
-| unit | `pipeline/test/unit/` | voice choice and the avatar switch (`tts.mjs`, `fetch` stubbed); the script language (`script.mjs`); trace authoring and narration budgeting (`author.mjs`); brand colour helpers (`brand.mjs`) |
-| integration | `pipeline/test/integration/` | `author.mjs` -> `script.mjs` -> loading the scenario, in a temp folder; `author.mjs --check` on the committed traces; `cards.mjs` with the avatar on, off, with a clip missing and with a bad `DEMO_AVATAR`, checking durations, audio and pixels in the rendered cards |
+| unit | `pipeline/test/unit/` | voice choice and the avatar switch (`tts.mjs`, `fetch` stubbed); the script language (`script.mjs`); trace authoring and narration budgeting (`author.mjs`); brand colour helpers (`brand.mjs`); stills timing, card holds and window detection (`inserts.mjs`); capture size (`paths.mjs`); target text patterns and styles (`target.mjs`); the music spec, speech spans, bed gain and the vendored engine's determinism (`music.mjs`); diagram specs, flow ranks, label-sized layout, arrow ends, icons and step rendering (`diagram.mjs`) |
+| integration | `pipeline/test/integration/` | `author.mjs` -> `script.mjs` -> loading the scenario, in a temp folder; `author.mjs --check` on the committed traces; `cards.mjs` with the avatar on, off, with a clip missing and with a bad `DEMO_AVATAR`, checking durations, audio and pixels in the rendered cards; `music.mjs` on generated audio (the bed in the pauses, ducked under the voice, the video copied, a looping file, refusals); `diagram.mjs` from the command line (a PNG per step, sizes, the example spec, icon search); `inserts.mjs` on a generated carded video (a diagram full-frame with no take between card and steps, a screenshot in the app window) |
 
 Neither suite calls a text-to-speech API, a browser or the app: the avatar
 clips and the take are solid-colour stand-ins made with ffmpeg, and the voice

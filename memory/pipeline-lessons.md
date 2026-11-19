@@ -299,6 +299,30 @@ Learned on a booking-agent video that took five takes (2026-11-17).
   chapters and the outro's contact line disappear. Leave it out, or write the
   chapters into it.
 
+## Music and diagrams
+
+Learned building music.mjs and diagram.mjs (2026-11-18).
+- **The music bed's loudness looks low on paper.** A ducked bed measures about
+  -35 LUFS integrated, but in narration pauses it sits about 13 dB under the
+  voice (-28.5 against -15.7 LUFS on a 2:31 video). Judge it in the pauses,
+  not on the whole-file number. The first section of every piece is sparse by
+  design: a pause there measures much quieter.
+- **Music changes almost nothing else.** Integrated loudness moved 0.1 LU and
+  peaks not at all after mixing, because the bed is ducked under the speech.
+  A rendered 2:31 bed took about 20 s; the whole stage took about 80 s, mostly
+  measurement passes.
+- **Nobody can hear the result but the user.** Numbers say the voice is clear;
+  only the user can say the music fits. Ask before it goes in a manifest.
+- **Diagram boxes need gaps sized to their labels.** Even spacing put arrow
+  labels on top of the boxes. Lay a flow out from the real box widths, and give
+  each gap the widest label crossing it plus room for the arrow. Five boxes in
+  a row only fit after scaling down; the renderer does that before warning.
+- **Groups follow their visible members.** A group drawn at its final size in
+  an early step framed empty space.
+- **Run vendored code only with the user's go-ahead.** Running code fetched
+  from another repo was blocked until the user said yes; vendor it with its
+  licence and a note of the commit (pipeline/vendor/README.md).
+
 ## Files
 
 - **Edit files with an editor, not `sed -i`, on Windows.** `sed -i` rewrote
