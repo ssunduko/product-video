@@ -311,6 +311,17 @@ Learned building music.mjs and diagram.mjs (2026-11-18).
   peaks not at all after mixing, because the bed is ducked under the speech.
   A rendered 2:31 bed took about 20 s; the whole stage took about 80 s, mostly
   measurement passes.
+- **Adding music to an approved video is a join-only rebuild** (2026-11-19).
+  The routine:
+  1. Copy the deliverable aside (`<name>.no-music.mp4`).
+  2. Add the manifest's `music` block.
+  3. Run `build.mjs --join-only`: it re-joins, mixes, and gates the joined video.
+  The rebuild resets the state to "awaiting review". The re-join re-encodes the
+  same parts the same way, so a PSNR of `inf` against the copy proves the
+  picture is the reviewed one, frame for frame. Record the review on that,
+  with the music measurements: the pauses before and after, the speech
+  unchanged, and the integrated loudness. A full visual review is not needed.
+  Publishing then adds a Drive revision, and the link stays.
 - **Nobody can hear the result but the user.** Numbers say the voice is clear;
   only the user can say the music fits. Ask before it goes in a manifest.
 - **Diagram boxes need gaps sized to their labels.** Even spacing put arrow
