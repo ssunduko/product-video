@@ -327,6 +327,18 @@ Learned building music.mjs and diagram.mjs (2026-11-18).
 
 - **Edit files with an editor, not `sed -i`, on Windows.** `sed -i` rewrote
   CRLF files as LF, so git showed whole files changed (2026-11-11).
+- **Script edits must match line endings.** A node replace written with `\n`
+  missed text in a CRLF file, and JS strings written through a shell heredoc
+  lost their escaped apostrophes and broke `docs/c4-model.mjs` (2026-11-18).
+  Normalise to `\n` before matching and restore CRLF after, keep apostrophes
+  out of C4 strings, or use the Edit tool.
+- **An agent file must start with `---`.** `.claude/agents/video-qa.md` began
+  with a corrupted line (`++++…---`), so its frontmatter never parsed and the
+  agent never loaded; it went unnoticed for a week (fixed 2026-11-18).
+- **Run new integration tests on their own locally.** The full suite takes
+  about 10 minutes; under memory pressure, Windows failed to start ffmpeg and
+  node (exit 3221225794, 0xC0000142) in tests the change never touched. Run
+  `node --test test/integration/<new file>` here, and the full suite on CI.
 - **The zoom project file** is `out/<part>/<take>.recordly`, named from the
   script. Re-render a recorded take without Chrome with
   `build.mjs <manifest> --only <part> --no-record`.
